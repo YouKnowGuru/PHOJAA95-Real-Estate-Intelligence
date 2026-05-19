@@ -1,0 +1,715 @@
+import { z } from "zod";
+import { eq, desc, and } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import { createRouter, authedQuery } from "./middleware";
+import { logger } from "./lib/logger";
+import { chatConversations, chatMessages } from "../db/schema";
+import type { InsertChatConversation, InsertChatMessage } from "../db/schema";
+import { getDb } from "./queries/connection";
+import {
+    getOpenRouterClient,
+    buildSystemPrompt,
+    DEFAULT_MODEL,
+    type OpenRouterMessage,
+    type OpenRouterTool,
+} from "./services/openrouter";
+
+// ─── Schemas ────────────────────────────────────────────────────────
+
+const sendMessageSchema = z.object({
+    conversationId: z.number().optional(),
+    message: z.string().min(1).max(4000),
+    model: z.string().optional(),
+});
+
+const conversationIdSchema = z.object({
+    conversationId: z.number(),
+});
+
+const updateConversationSchema = z.object({
+    conversationId: z.number(),
+    title: z.string().min(1).max(255).optional(),
+    isArchived: z.boolean().optional(),
+});
+
+// ─── Tool Definitions for Function Calling ──────────────────────────
+
+const CHAT_TOOLS: OpenRouterTool[] = [
+    {
+        type: "function",
+        function: {
+            name: "search_properties",
+            description: "Search for properties in the real estate system by name, address, owner, or status",
+            parameters: {
+                type: "object",
+                properties: {
+                    query: { type: "string", description: "Search by property name, address, or owner name" },
+                    status: { type: "string", enum: ["draft", "submitted", "approved", "rejected", "completed", "cancelled"], description: "Filter by approval status" },
+                    limit: { type: "number", description: "Maximum results (max 10)", default: 5 },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_property_detail",
+            description: "Get full details and workflow progress for a specific property by its ID",
+            parameters: {
+                type: "object",
+                properties: {
+                    propertyId: { type: "number", description: "The property ID" },
+                },
+                required: ["propertyId"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_pending_approvals",
+            description: "Get properties that are pending admin review/approval",
+            parameters: {
+                type: "object",
+                properties: {
+                    limit: { type: "number", description: "Maximum results", default: 10 },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_system_stats",
+            description: "Get current system statistics like property counts, user counts, attendance, and payroll totals",
+            parameters: {
+                type: "object",
+                properties: {
+                    statType: {
+                        type: "string",
+                        enum: ["properties", "users", "attendance", "payroll", "all"],
+                        description: "Type of statistics to retrieve",
+                    },
+                },
+                required: ["statType"],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_user_info",
+            description: "Get information about the currently logged-in user (name, role, permissions)",
+            parameters: {
+                type: "object",
+                properties: {},
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_attendance_summary",
+            description: "Get attendance summary for a staff member for the current or a specific month",
+            parameters: {
+                type: "object",
+                properties: {
+                    userId: { type: "number", description: "User ID (defaults to current user)" },
+                    month: { type: "string", description: "Month in YYYY-MM format (defaults to current month)" },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_payroll_info",
+            description: "Get payroll information for a staff member for a specific month",
+            parameters: {
+                type: "object",
+                properties: {
+                    userId: { type: "number", description: "User ID (defaults to current user)" },
+                    month: { type: "string", description: "Month in YYYY-MM format (defaults to current month)" },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "get_users_list",
+            description: "List all staff/users in the system (admin only)",
+            parameters: {
+                type: "object",
+                properties: {
+                    role: { type: "string", enum: ["admin", "staff"], description: "Filter by role" },
+                    limit: { type: "number", description: "Maximum results", default: 20 },
+                },
+                required: [],
+            },
+        },
+    },
+    {
+        type: "function",
+        function: {
+            name: "navigate_to_page",
+            description: "Suggest navigation to a specific page in the application",
+            parameters: {
+                type: "object",
+                properties: {
+                    page: {
+                        type: "string",
+                        enum: [
+                            "dashboard", "properties", "property-types", "approvals",
+                            "users", "attendance", "payroll", "activity-logs",
+                            "reports", "notifications", "profile", "settings",
+                        ],
+                        description: "The page to navigate to",
+                    },
+                    reason: { type: "string", description: "Why this navigation is helpful" },
+                },
+                required: ["page"],
+            },
+        },
+    },
+];
+
+// ─── Tool Handler ───────────────────────────────────────────────────
+
+async function executeToolCall(
+    toolName: string,
+    args: Record<string, unknown>,
+    ctx: { unifiedUser?: { id: number; name: string; role: string } },
+): Promise<string> {
+    const db = getDb();
+
+    switch (toolName) {
+        case "get_user_info": {
+            return JSON.stringify({
+                id: ctx.unifiedUser?.id,
+                name: ctx.unifiedUser?.name,
+                role: ctx.unifiedUser?.role,
+                message: `You are logged in as ${ctx.unifiedUser?.name} with role ${ctx.unifiedUser?.role}.`,
+            });
+        }
+
+        case "search_properties": {
+            try {
+                const { query, status, limit = 5 } = args as {
+                    query?: string;
+                    status?: string;
+                    limit?: number;
+                };
+                const { properties, propertyImages } = await import("../db/schema");
+                const dbQuery = db.select({
+                    id: properties.id,
+                    propertyName: properties.propertyName,
+                    address: properties.address,
+                    approvalStatus: properties.approvalStatus,
+                    sellingPrice: properties.sellingPrice,
+                    ownerName: properties.ownerName,
+                    currentStep: properties.currentStep,
+                }).from(properties)
+                    .limit(Math.min(limit as number, 10));
+
+                let results = await dbQuery;
+
+                if (status) {
+                    results = results.filter((p) => p.approvalStatus === status);
+                }
+
+                if (query) {
+                    const q = (query as string).toLowerCase();
+                    results = results.filter(
+                        (p) =>
+                            p.propertyName.toLowerCase().includes(q) ||
+                            p.address.toLowerCase().includes(q) ||
+                            p.ownerName.toLowerCase().includes(q),
+                    ).slice(0, limit as number);
+                }
+
+                return JSON.stringify({
+                    count: results.length,
+                    properties: results.map((p) => ({
+                        id: p.id,
+                        name: p.propertyName,
+                        address: p.address,
+                        status: p.approvalStatus,
+                        price: p.sellingPrice,
+                        owner: p.ownerName,
+                        step: p.currentStep,
+                    })),
+                });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to search properties", details: String(err) });
+            }
+        }
+
+        case "get_property_detail": {
+            try {
+                const { propertyId } = args as { propertyId: number };
+                const { properties } = await import("../db/schema");
+                const [property] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
+                if (!property) return JSON.stringify({ error: "Property not found" });
+                return JSON.stringify({
+                    id: property.id,
+                    name: property.propertyName,
+                    address: property.address,
+                    owner: property.ownerName,
+                    ownerCID: property.ownerCID,
+                    ownerPhone: property.ownerPhone,
+                    buyer: property.buyerName,
+                    buyerCID: property.buyerCID,
+                    sellingPrice: property.sellingPrice,
+                    fee: property.realEstateFee,
+                    status: property.approvalStatus,
+                    workflowStatus: property.workflowStatus,
+                    currentStep: property.currentStep,
+                    isSold: property.isSold,
+                    listedBy: property.listedById,
+                    adminNotes: property.adminNotes,
+                    rejectionComments: property.rejectionComments,
+                    completedAt: property.completedAt,
+                    createdAt: property.createdAt,
+                });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get property detail", details: String(err) });
+            }
+        }
+
+        case "get_pending_approvals": {
+            try {
+                const { limit = 10 } = args as { limit?: number };
+                const { properties } = await import("../db/schema");
+                const results = await db.select({
+                    id: properties.id,
+                    propertyName: properties.propertyName,
+                    address: properties.address,
+                    approvalStatus: properties.approvalStatus,
+                    currentStep: properties.currentStep,
+                    ownerName: properties.ownerName,
+                }).from(properties)
+                    .where(eq(properties.approvalStatus, "pending_review"))
+                    .limit(Math.min(limit as number, 20));
+                return JSON.stringify({
+                    count: results.length,
+                    properties: results,
+                });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get pending approvals", details: String(err) });
+            }
+        }
+
+        case "get_system_stats": {
+            try {
+                const { statType } = args as { statType: string };
+                const { properties, localUsers, attendance, payroll } = await import("../db/schema");
+                const stats: Record<string, unknown> = {};
+
+                if (statType === "all" || statType === "properties") {
+                    const allProps = await db.select().from(properties);
+                    const byStatus: Record<string, number> = {};
+                    for (const p of allProps) {
+                        byStatus[p.approvalStatus] = (byStatus[p.approvalStatus] || 0) + 1;
+                    }
+                    stats.properties = { total: allProps.length, byStatus };
+                }
+
+                if (statType === "all" || statType === "users") {
+                    const allUsers = await db.select().from(localUsers);
+                    const byRole: Record<string, number> = {};
+                    for (const u of allUsers) {
+                        byRole[u.role] = (byRole[u.role] || 0) + 1;
+                    }
+                    stats.users = { total: allUsers.length, byRole };
+                }
+
+                if (statType === "all" || statType === "attendance") {
+                    const allAttendance = await db.select().from(attendance);
+                    stats.attendance = { totalRecords: allAttendance.length };
+                }
+
+                if (statType === "all" || statType === "payroll") {
+                    const allPayroll = await db.select().from(payroll);
+                    stats.payroll = { totalRecords: allPayroll.length };
+                }
+
+                return JSON.stringify(stats);
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get stats", details: String(err) });
+            }
+        }
+
+        case "get_attendance_summary": {
+            try {
+                const { userId, month } = args as { userId?: number; month?: string };
+                const { attendance } = await import("../db/schema");
+                const targetMonth = month || new Date().toISOString().slice(0, 7);
+                const targetUserId = userId || ctx.unifiedUser?.id;
+                if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
+
+                const records = await db.select().from(attendance)
+                    .where(eq(attendance.userId, targetUserId as number))
+                    .orderBy(attendance.date);
+
+                const filtered = records.filter(r =>
+                    String(r.date).startsWith(targetMonth)
+                );
+
+                const byStatus: Record<string, number> = {};
+                for (const r of filtered) {
+                    byStatus[r.status] = (byStatus[r.status] || 0) + 1;
+                }
+
+                return JSON.stringify({
+                    userId: targetUserId,
+                    month: targetMonth,
+                    total: filtered.length,
+                    byStatus,
+                    records: filtered.map(r => ({
+                        date: r.date,
+                        checkIn: r.checkIn,
+                        checkOut: r.checkOut,
+                        status: r.status,
+                    })),
+                });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get attendance summary", details: String(err) });
+            }
+        }
+
+        case "get_payroll_info": {
+            try {
+                const { userId, month } = args as { userId?: number; month?: string };
+                const { payroll } = await import("../db/schema");
+                const targetUserId = userId || ctx.unifiedUser?.id;
+                if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
+
+                const records = await db.select().from(payroll)
+                    .where(eq(payroll.userId, targetUserId as number))
+                    .orderBy(payroll.month)
+                    .limit(12);
+
+                let filtered = records;
+                if (month) {
+                    filtered = records.filter(r => String(r.month).startsWith(month));
+                }
+
+                return JSON.stringify({
+                    userId: targetUserId,
+                    count: filtered.length,
+                    records: filtered.map(r => ({
+                        month: r.month,
+                        baseSalary: r.baseSalary,
+                        bonus: r.bonus,
+                        deduction: r.deduction,
+                        netSalary: r.netSalary,
+                        pfDeduction: r.pfDeduction,
+                        paymentStatus: r.paymentStatus,
+                        paidAt: r.paidAt,
+                    })),
+                });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get payroll info", details: String(err) });
+            }
+        }
+
+        case "get_users_list": {
+            try {
+                const { role: roleFilter, limit = 20 } = args as { role?: string; limit?: number };
+                const { localUsers } = await import("../db/schema");
+                const query = db.select({
+                    id: localUsers.id,
+                    fullName: localUsers.fullName,
+                    email: localUsers.email,
+                    role: localUsers.role,
+                    status: localUsers.status,
+                    phone: localUsers.phone,
+                    employeeId: localUsers.employeeId,
+                }).from(localUsers);
+
+                const results = roleFilter
+                    ? await query.where(eq(localUsers.role, roleFilter as "admin" | "staff")).limit(Math.min(limit as number, 50))
+                    : await query.limit(Math.min(limit as number, 50));
+
+                return JSON.stringify({ count: results.length, users: results });
+            } catch (err) {
+                return JSON.stringify({ error: "Failed to get users list", details: String(err) });
+            }
+        }
+
+        case "navigate_to_page": {
+            const { page, reason } = args as { page: string; reason?: string };
+            return JSON.stringify({
+                action: "navigate",
+                page: `/${page}`,
+                label: page.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+                reason: reason || `Navigating to ${page}`,
+            });
+        }
+
+        default:
+            return JSON.stringify({ error: `Unknown tool: ${toolName}` });
+    }
+}
+
+// ─── Router ─────────────────────────────────────────────────────────
+
+export const chatbotRouter = createRouter({
+    // ── List user's conversations ───────────────────────────────────
+    conversations: authedQuery.query(async (opts) => {
+        const db = getDb();
+        const userId = opts.ctx.unifiedUser!.id;
+
+        const conversations = await db
+            .select()
+            .from(chatConversations)
+            .where(
+                and(
+                    eq(chatConversations.userId, userId),
+                    eq(chatConversations.isArchived, false),
+                ),
+            )
+            .orderBy(desc(chatConversations.updatedAt))
+            .limit(50);
+
+        return conversations;
+    }),
+
+    // ── Get single conversation with messages ───────────────────────
+    conversation: authedQuery.input(conversationIdSchema).query(async (opts) => {
+        const db = getDb();
+        const { conversationId } = opts.input;
+
+        const [conv] = await db
+            .select()
+            .from(chatConversations)
+            .where(eq(chatConversations.id, conversationId))
+            .limit(1);
+
+        if (!conv) return null;
+
+        const messages = await db
+            .select()
+            .from(chatMessages)
+            .where(eq(chatMessages.conversationId, conversationId))
+            .orderBy(chatMessages.createdAt)
+            .limit(200);
+
+        return { ...conv, messages };
+    }),
+
+    // ── Update conversation (title, archive) ────────────────────────
+    updateConversation: authedQuery.input(updateConversationSchema).mutation(async (opts) => {
+        const db = getDb();
+        const { conversationId, ...updates } = opts.input;
+
+        await db
+            .update(chatConversations)
+            .set(updates)
+            .where(eq(chatConversations.id, conversationId));
+
+        return { success: true };
+    }),
+
+    // ── Delete conversation ─────────────────────────────────────────
+    deleteConversation: authedQuery.input(conversationIdSchema).mutation(async (opts) => {
+        const db = getDb();
+        const { conversationId } = opts.input;
+
+        await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
+        await db.delete(chatConversations).where(eq(chatConversations.id, conversationId));
+
+        return { success: true };
+    }),
+
+    // ── Send message (non-streaming fallback) ───────────────────────
+    sendMessage: authedQuery.input(sendMessageSchema).mutation(async (opts) => {
+        const db = getDb();
+        const userId = opts.ctx.unifiedUser!.id;
+        const { conversationId, message, model } = opts.input;
+        const selectedModel = model || DEFAULT_MODEL;
+
+        // Create or get conversation
+        let convId = conversationId;
+        if (!convId) {
+            const title = message.slice(0, 80) + (message.length > 80 ? "..." : "");
+            const result = await db
+                .insert(chatConversations)
+                .values({
+                    userId,
+                    title,
+                    model: selectedModel || "auto",
+                    systemPrompt: buildSystemPrompt({
+                        userName: opts.ctx.unifiedUser?.name,
+                        userRole: opts.ctx.unifiedUser?.role,
+                    }),
+                } as InsertChatConversation);
+            convId = Number(result[0].insertId);
+        }
+
+        // Save user message
+        await db.insert(chatMessages).values({
+            conversationId: convId,
+            role: "user",
+            content: message,
+        } as InsertChatMessage);
+
+        // Get conversation history
+        const history = await db
+            .select()
+            .from(chatMessages)
+            .where(eq(chatMessages.conversationId, convId))
+            .orderBy(chatMessages.createdAt)
+            .limit(50);
+
+        const [conv] = await db
+            .select()
+            .from(chatConversations)
+            .where(eq(chatConversations.id, convId))
+            .limit(1);
+
+        // Build messages array
+        const messages: OpenRouterMessage[] = [];
+
+        if (conv?.systemPrompt) {
+            messages.push({ role: "system", content: conv.systemPrompt });
+        } else {
+            messages.push({
+                role: "system",
+                content: buildSystemPrompt({
+                    userName: opts.ctx.unifiedUser?.name,
+                    userRole: opts.ctx.unifiedUser?.role,
+                }),
+            });
+        }
+
+        for (const msg of history) {
+            messages.push({
+                role: msg.role as OpenRouterMessage["role"],
+                content: msg.content,
+                tool_calls: msg.toolCalls as OpenRouterMessage["tool_calls"] | undefined,
+                tool_call_id: msg.toolCallId || undefined,
+                name: msg.toolName || undefined,
+            });
+        }
+
+        // Call OpenRouter
+        const client = getOpenRouterClient();
+        let fullResponse = "";
+        let totalTokens = 0;
+
+        try {
+            // First attempt with tools
+            const response = await client.complete({
+                model: selectedModel,
+                messages,
+                tools: CHAT_TOOLS,
+                tool_choice: "auto",
+                temperature: 0.7,
+                max_tokens: 2000,
+            });
+
+            const choice = response.choices[0];
+            totalTokens = response.usage?.total_tokens || 0;
+
+            if (choice.message.tool_calls && choice.message.tool_calls.length > 0) {
+                // Save assistant message with tool calls
+                await db.insert(chatMessages).values({
+                    conversationId: convId,
+                    role: "assistant",
+                    content: choice.message.content || "",
+                    toolCalls: choice.message.tool_calls,
+                    tokensUsed: response.usage?.completion_tokens,
+                });
+
+                // Add assistant message to history ONCE before processing tools
+                messages.push({
+                    role: "assistant",
+                    content: choice.message.content,
+                    tool_calls: choice.message.tool_calls,
+                });
+
+                // Execute tool calls
+                for (const tc of choice.message.tool_calls) {
+                    let args: Record<string, unknown> = {};
+                    try {
+                        args = JSON.parse(tc.function.arguments);
+                    } catch { /* empty args */ }
+
+                    const result = await executeToolCall(tc.function.name, args, opts.ctx);
+
+                    // Save tool result
+                    await db.insert(chatMessages).values({
+                        conversationId: convId,
+                        role: "tool",
+                        content: result,
+                        toolCallId: tc.id,
+                        toolName: tc.function.name,
+                    } as InsertChatMessage);
+
+                    // Add tool result to messages for final response
+                    messages.push({
+                        role: "tool",
+                        content: result,
+                        tool_call_id: tc.id,
+                    });
+                }
+
+                // Get final response after tool calls
+                const finalResponse = await client.complete({
+                    model: selectedModel,
+                    messages,
+                    temperature: 0.7,
+                    max_tokens: 2000,
+                });
+
+                fullResponse = finalResponse.choices[0].message.content || "";
+                totalTokens += finalResponse.usage?.total_tokens || 0;
+            } else {
+                fullResponse = choice.message.content || "";
+            }
+
+            // Save assistant response
+            await db.insert(chatMessages).values({
+                conversationId: convId,
+                role: "assistant",
+                content: fullResponse,
+                tokensUsed: totalTokens,
+            } as InsertChatMessage);
+
+            // Update conversation timestamp
+            await db
+                .update(chatConversations)
+                .set({ updatedAt: new Date() })
+                .where(eq(chatConversations.id, convId));
+
+            return {
+                conversationId: convId,
+                message: fullResponse,
+                tokensUsed: totalTokens,
+            };
+        } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : "Unknown error";
+            logger.error("Chatbot message processing failed", { error: errorMsg, conversationId: convId });
+            // Save error as assistant message
+            await db.insert(chatMessages).values({
+                conversationId: convId,
+                role: "assistant",
+                content: "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
+            });
+
+            throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to process chat message. Please try again.",
+            });
+        }
+    }),
+});
+
+export type ChatbotRouter = typeof chatbotRouter;

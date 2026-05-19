@@ -1,0 +1,181 @@
+import { useState, useCallback } from "react";
+import { Upload, X, FileText, Image, Loader2 } from "lucide-react";
+import { Button } from "./ui/button";
+import { Progress } from "./ui/progress";
+
+interface FileUploaderProps {
+  accept?: string;
+  maxSize?: number;
+  value?: string;
+  onChange?: (url: string) => void;
+  disabled?: boolean;
+  label?: string;
+  hint?: string;
+}
+
+export function FileUploader({
+  accept = "image/*,.pdf",
+  maxSize = 15 * 1024 * 1024,
+  value,
+  onChange,
+  disabled,
+  label,
+  hint,
+}: FileUploaderProps) {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > maxSize) {
+        setError(`File size exceeds ${maxSize / 1024 / 1024}MB limit`);
+        return;
+      }
+
+      setUploading(true);
+      setError(null);
+      setProgress(0);
+
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const fileData = base64.split(",")[1];
+
+        setProgress(50);
+
+        const response = await fetch("/api/trpc/upload.upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            json: {
+              file: fileData,
+              fileName: file.name,
+              mimeType: file.type,
+              folder: "documents",
+            },
+          }),
+        });
+
+        const result = await response.json();
+        
+        console.log("Upload response:", result);
+        
+        // Handle batch response format
+        let url = null;
+        let errorMsg = "Upload failed - check server console";
+        
+        if (Array.isArray(result)) {
+          const firstResult = result[0];
+          console.log("First result:", firstResult);
+          
+          if (firstResult?.result?.data?.json) {
+            url = firstResult.result.data.json.url;
+          } else if (firstResult?.error) {
+            errorMsg = firstResult.error.message || firstResult.error.toString();
+          } else if (firstResult?.result?.data?.error) {
+            errorMsg = firstResult.result.data.error.message || firstResult.result.data.error.toString();
+          }
+        } else if (result?.result?.data?.json) {
+          url = result.result.data.json.url;
+        } else if (result?.error) {
+          errorMsg = result.error.message || result.error.toString();
+        } else if (result?.result?.data?.error) {
+          errorMsg = result.result.data.error.message || result.result.data.error.toString();
+        }
+        
+        if (url) {
+          setProgress(100);
+          onChange?.(url);
+        } else {
+          console.error("Upload full response:", JSON.stringify(result));
+          throw new Error(errorMsg);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Upload failed");
+      } finally {
+        setUploading(false);
+      }
+    },
+    [maxSize, onChange]
+  );
+
+  if (value) {
+    const isImage = value.match(/\.(jpeg|jpg|png|gif|webp)$/i);
+    return (
+      <div className="relative group">
+        <div className="flex items-center gap-3 p-4 border rounded-lg bg-background">
+          {isImage ? (
+            <Image className="h-8 w-8 text-green-500" />
+          ) : (
+            <FileText className="h-8 w-8 text-green-500" />
+          )}
+          <div className="flex-1 min-w-0">
+            <a
+              href={value}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-medium text-primary hover:underline truncate block"
+            >
+              View Uploaded File
+            </a>
+            <p className="text-xs text-muted-foreground">Click to open in new tab</p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => onChange?.("")}
+            disabled={disabled}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {label && <label className="text-sm font-medium">{label}</label>}
+      <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+        <input
+          type="file"
+          accept={accept}
+          onChange={handleFileSelect}
+          disabled={disabled || uploading}
+          className="hidden"
+          id="file-upload"
+        />
+        <label htmlFor="file-upload" className="cursor-pointer">
+          {uploading ? (
+            <div className="space-y-2">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <Progress value={progress} className="w-full" />
+              <p className="text-sm text-muted-foreground">Uploading... {progress}%</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+              <p className="text-sm font-medium">Click to upload</p>
+              <p className="text-xs text-muted-foreground">
+                PDF, PNG, JPEG up to {maxSize / 1024 / 1024}MB
+              </p>
+            </div>
+          )}
+        </label>
+      </div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}

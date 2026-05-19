@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778476270084,
+      "tag": "0000_minor_blockbuster",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1778816377515,
+      "tag": "0001_misty_iron_lad",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779078455992,
+      "tag": "0002_numerous_lilandra",
+      "breakpoints": true
+    }
+  ]
+}
