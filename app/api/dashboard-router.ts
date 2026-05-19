@@ -34,9 +34,11 @@ export const dashboardRouter = createRouter({
   }),
 
   monthlySales: adminQuery
-    .input(z.object({ year: z.string().default(new Date().getFullYear().toString()) }))
+    .input(z.object({ year: z.string().regex(/^\d{4}$/).default(new Date().getFullYear().toString()) }))
     .query(async ({ input }) => {
       const db = getDb();
+
+      const startOfYear = new Date(`${input.year}-01-01`);
 
       const results = await db
         .select({
@@ -48,7 +50,7 @@ export const dashboardRouter = createRouter({
         .where(
           and(
             eq(properties.workflowStatus, "completed"),
-            sql`${properties.completedAt} >= ${input.year}-01-01`
+            gte(properties.completedAt, startOfYear)
           )
         )
         .groupBy(sql`DATE_FORMAT(${properties.completedAt}, '%Y-%m')`)
@@ -68,6 +70,7 @@ export const dashboardRouter = createRouter({
       })
       .from(properties)
       .leftJoin(propertyTypes, eq(properties.propertyTypeId, propertyTypes.id))
+      .where(eq(properties.workflowStatus, "completed"))
       .groupBy(properties.propertyTypeId, propertyTypes.name)
       .orderBy(desc(count()));
 
@@ -75,8 +78,7 @@ export const dashboardRouter = createRouter({
   }),
 
   staffPerformance: adminQuery
-    .input(z.object({ month: z.string().optional() }))
-    .query(async ({ input }) => {
+    .query(async () => {
       const db = getDb();
 
       const results = await db
@@ -90,7 +92,7 @@ export const dashboardRouter = createRouter({
         })
         .from(properties)
         .leftJoin(localUsers, eq(properties.listedById, localUsers.id))
-        .groupBy(properties.listedById)
+        .groupBy(properties.listedById, localUsers.fullName)
         .orderBy(desc(count()));
 
       return results;

@@ -71,7 +71,23 @@ export const userRouter = createRouter({
     .query(async ({ input }) => {
       const db = getDb();
       const users = await db
-        .select()
+        .select({
+          id: localUsers.id,
+          fullName: localUsers.fullName,
+          email: localUsers.email,
+          role: localUsers.role,
+          phone: localUsers.phone,
+          address: localUsers.address,
+          profileImage: localUsers.profileImage,
+          status: localUsers.status,
+          pfNumber: localUsers.pfNumber,
+          pfPercentage: localUsers.pfPercentage,
+          employeeId: localUsers.employeeId,
+          lastLoginAt: localUsers.lastLoginAt,
+          loginAttempts: localUsers.loginAttempts,
+          createdAt: localUsers.createdAt,
+          updatedAt: localUsers.updatedAt,
+        })
         .from(localUsers)
         .where(eq(localUsers.id, input.id))
         .limit(1);
@@ -128,14 +144,28 @@ export const userRouter = createRouter({
       const { id, ...data } = input;
       const db = getDb();
 
+      const existing = await db.select().from(localUsers).where(eq(localUsers.id, id)).limit(1);
+      if (existing.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      if (data.role && existing[0].role === "admin" && data.role !== "admin") {
+        const otherAdmin = await db.select({ id: localUsers.id }).from(localUsers)
+          .where(and(eq(localUsers.role, "admin"), ne(localUsers.id, id)))
+          .limit(1);
+        if (otherAdmin.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cannot demote the last admin" });
+        }
+      }
+
       // Check email uniqueness if email is being updated
       if (data.email) {
-        const existing = await db
+        const duplicate = await db
           .select()
           .from(localUsers)
           .where(and(eq(localUsers.email, data.email), ne(localUsers.id, id)))
           .limit(1);
-        if (existing.length > 0) {
+        if (duplicate.length > 0) {
           throw new TRPCError({ code: "CONFLICT", message: "Email is already in use by another user" });
         }
       }
@@ -169,7 +199,30 @@ export const userRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
-      await db.delete(localUsers).where(eq(localUsers.id, input.id));
+
+      const userToDelete = await db.select().from(localUsers).where(eq(localUsers.id, input.id)).limit(1);
+      if (userToDelete.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+      }
+
+      if (userToDelete[0].role === "admin") {
+        const otherAdmin = await db.select({ id: localUsers.id }).from(localUsers)
+          .where(and(eq(localUsers.role, "admin"), ne(localUsers.id, input.id)))
+          .limit(1);
+        if (otherAdmin.length === 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cannot delete the last admin" });
+        }
+      }
+
+      try {
+        await db.delete(localUsers).where(eq(localUsers.id, input.id));
+      } catch (err: any) {
+        if (err.message?.includes("FOREIGN KEY") || err.code === "SQLITE_CONSTRAINT_FOREIGNKEY") {
+          throw new TRPCError({ code: "CONFLICT", message: "Cannot delete user with existing records (properties, attendance, etc.)" });
+        }
+        throw err;
+      }
+
       return { success: true };
     }),
 

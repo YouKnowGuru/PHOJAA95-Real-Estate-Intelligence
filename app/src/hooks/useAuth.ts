@@ -17,6 +17,7 @@ export type UnifiedUser = {
   pfNumber?: string | null;
   pfPercentage?: string | null;
   employeeId?: string | null;
+  sessionExpiresAt?: number | null;
 };
 
 export function useAuth() {
@@ -61,13 +62,11 @@ export function useAuth() {
   const logout = useCallback(() => {
     if (oauthUser) {
       logoutMutation.mutate();
-    }
-    if (localUser) {
+    } else if (localUser) {
       localLogoutMutation.mutate();
     }
     // Clear any residual state
     document.cookie = "local_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
-    setTimeout(() => window.location.reload(), 300);
   }, [oauthUser, localUser, logoutMutation, localLogoutMutation]);
 
   const user: UnifiedUser | null = useMemo(() => {
@@ -110,7 +109,7 @@ export function useAuth() {
   const isStaff = user?.role === "staff";
 
   // Session expiration for local auth users
-  const sessionExpiresAt = (localUser as any)?.sessionExpiresAt as number | null | undefined;
+  const sessionExpiresAt = localUser?.sessionExpiresAt;
 
   return {
     user,

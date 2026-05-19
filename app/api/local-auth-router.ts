@@ -2,7 +2,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import * as jose from "jose";
 import * as cookie from "cookie";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, rateLimitedQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -11,22 +11,24 @@ import { env } from "./lib/env";
 import { logger } from "./lib/logger";
 import { getSessionCookieOptions } from "./lib/cookies";
 import { sendPasswordResetEmail } from "./services/email";
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 
-const JWT_SECRET = new TextEncoder().encode(env.appSecret || "phojaa95-secret-key");
+if (!env.appSecret) {
+  throw new Error("APP_SECRET is required");
+}
+const JWT_SECRET = new TextEncoder().encode(env.appSecret);
 
 const DEFAULT_SESSION_HOURS = 24;
 const REMEMBER_ME_DAYS = 30;
 
 async function signLocalToken(
-  payload: { userId: number; email: string; role: string },
-  rememberMe = false
+  payload: { userId: number; email: string; role: string; rememberMe?: boolean }
 ) {
   const builder = new jose.SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt();
 
-  if (rememberMe) {
+  if (payload.rememberMe) {
     builder.setExpirationTime(`${REMEMBER_ME_DAYS}d`);
   } else {
     builder.setExpirationTime(`${DEFAULT_SESSION_HOURS}h`);
@@ -38,7 +40,7 @@ async function signLocalToken(
 export async function verifyLocalToken(token: string) {
   try {
     const { payload } = await jose.jwtVerify(token, JWT_SECRET, { clockTolerance: 60 });
-    return payload as unknown as { userId: number; email: string; role: string };
+    return payload as unknown as { userId: number; email: string; role: string; rememberMe?: boolean };
   } catch {
     return null;
   }
@@ -116,23 +118,18 @@ export const localAuthRouter = createRouter({
 
       const user = users[0];
 
-      if (user.status === "locked") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Account is locked. Contact administrator." });
-      }
-
-      if (user.status === "inactive") {
-        throw new TRPCError({ code: "FORBIDDEN", message: "Account is inactive. Contact administrator." });
+      if (user.status === "locked" || user.status === "inactive") {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       }
 
       const validPassword = await bcrypt.compare(input.password, user.password);
       if (!validPassword) {
         await db.update(localUsers)
-          .set({ loginAttempts: (user.loginAttempts || 0) + 1 })
+          .set({ loginAttempts: sql`${localUsers.loginAttempts} + 1` })
           .where(eq(localUsers.id, user.id));
 
         if ((user.loginAttempts || 0) + 1 >= 5) {
           await db.update(localUsers).set({ status: "locked" }).where(eq(localUsers.id, user.id));
-          throw new TRPCError({ code: "FORBIDDEN", message: "Account locked after 5 failed attempts." });
         }
 
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
@@ -144,8 +141,7 @@ export const localAuthRouter = createRouter({
 
       const rememberMe = input.rememberMe === true;
       const token = await signLocalToken(
-        { userId: user.id, email: user.email, role: user.role },
-        rememberMe
+        { userId: user.id, email: user.email, role: user.role, rememberMe }
       );
 
       const cookieMaxAge = rememberMe ? REMEMBER_ME_DAYS * 86400 : DEFAULT_SESSION_HOURS * 3600;
@@ -232,9 +228,10 @@ export const localAuthRouter = createRouter({
 
     const user = users[0];
     const newToken = await signLocalToken(
-      { userId: user.id, email: user.email, role: user.role }
+      { userId: user.id, email: user.email, role: user.role, rememberMe: claim.rememberMe }
     );
 
+    const cookieMaxAge = claim.rememberMe ? REMEMBER_ME_DAYS * 86400 : DEFAULT_SESSION_HOURS * 3600;
     const opts = getSessionCookieOptions(ctx.req.headers);
     ctx.resHeaders.append(
       "set-cookie",
@@ -243,11 +240,11 @@ export const localAuthRouter = createRouter({
         path: opts.path,
         sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
         secure: opts.secure,
-        maxAge: DEFAULT_SESSION_HOURS * 3600,
+        maxAge: cookieMaxAge,
       })
     );
 
-    return { success: true, sessionExpiresAt: Date.now() + DEFAULT_SESSION_HOURS * 3600 * 1000 };
+    return { success: true, sessionExpiresAt: Date.now() + cookieMaxAge * 1000 };
   }),
 
   logout: publicQuery.mutation(async ({ ctx }) => {
@@ -308,7 +305,24 @@ export const localAuthRouter = createRouter({
         .set({ password: hashedPassword })
         .where(eq(localUsers.id, ctx.unifiedUser!.id));
 
-      return { success: true };
+      // TODO: invalidate other sessions via tokenVersion or similar mechanism
+      const newToken = await signLocalToken(
+        { userId: user.id, email: user.email, role: user.role, rememberMe: false }
+      );
+
+      const opts = getSessionCookieOptions(ctx.req.headers);
+      ctx.resHeaders.append(
+        "set-cookie",
+        cookie.serialize("local_session", newToken, {
+          httpOnly: opts.httpOnly,
+          path: opts.path,
+          sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
+          secure: opts.secure,
+          maxAge: DEFAULT_SESSION_HOURS * 3600,
+        })
+      );
+
+      return { success: true, token: newToken };
     }),
 
   forgotPassword: rateLimitedQuery
@@ -333,11 +347,12 @@ export const localAuthRouter = createRouter({
       }
 
       const token = randomBytes(32).toString("hex");
+      const tokenHash = createHash("sha256").update(token).digest("hex");
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
       await db.insert(passwordResetTokens).values({
         userId: user.id,
-        token,
+        token: tokenHash,
         expiresAt,
       });
 
@@ -353,7 +368,7 @@ export const localAuthRouter = createRouter({
       return { success: true, message: "If the email exists, a password reset link will be sent." };
     }),
 
-  resetPassword: publicQuery
+  resetPassword: rateLimitedQuery
     .input(
       z.object({
         token: z.string(),
@@ -362,13 +377,14 @@ export const localAuthRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const tokenHash = createHash("sha256").update(input.token).digest("hex");
 
       const tokens = await db
         .select()
         .from(passwordResetTokens)
         .where(
           and(
-            eq(passwordResetTokens.token, input.token),
+            eq(passwordResetTokens.token, tokenHash),
             eq(passwordResetTokens.used, false),
             gt(passwordResetTokens.expiresAt, new Date())
           )
@@ -392,12 +408,12 @@ export const localAuthRouter = createRouter({
 
       await db.update(passwordResetTokens)
         .set({ used: true })
-        .where(eq(passwordResetTokens.userId, tokenRecord.userId));
+        .where(eq(passwordResetTokens.token, tokenHash));
 
       return { success: true, message: "Password has been reset successfully" };
     }),
 
-  verifyResetToken: publicQuery
+  verifyResetToken: rateLimitedQuery
     .input(
       z.object({
         token: z.string(),
@@ -405,13 +421,14 @@ export const localAuthRouter = createRouter({
     )
     .query(async ({ input }) => {
       const db = getDb();
+      const tokenHash = createHash("sha256").update(input.token).digest("hex");
 
       const tokens = await db
         .select()
         .from(passwordResetTokens)
         .where(
           and(
-            eq(passwordResetTokens.token, input.token),
+            eq(passwordResetTokens.token, tokenHash),
             eq(passwordResetTokens.used, false),
             gt(passwordResetTokens.expiresAt, new Date())
           )

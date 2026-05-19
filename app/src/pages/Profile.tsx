@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,22 @@ export default function Profile() {
     pfNumber: user?.pfNumber || "",
     employeeId: user?.employeeId || "",
     profileImage: user?.profileImage || "",
+    pfPercentage: user?.pfPercentage || "",
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        fullName: user.fullName || "",
+        phone: user.phone || "",
+        address: user.address || "",
+        pfNumber: user.pfNumber || "",
+        employeeId: user.employeeId || "",
+        profileImage: user.profileImage || "",
+        pfPercentage: user.pfPercentage || "",
+      });
+    }
+  }, [user]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +179,16 @@ export default function Profile() {
                       placeholder="e.g. PF12345"
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>PF Percentage (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={formData.pfPercentage}
+                    onChange={(e) => setFormData({ ...formData, pfPercentage: e.target.value })}
+                    placeholder="e.g. 10"
+                  />
                 </div>
                 <p className="text-[10px] text-muted-foreground">Identifiers used for official payslips and records</p>
                 <Button

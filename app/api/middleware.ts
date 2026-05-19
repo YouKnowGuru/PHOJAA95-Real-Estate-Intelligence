@@ -26,19 +26,15 @@ const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // max requests per window
 
 function getClientIp(ctx: TrpcContext): string {
-  // Try common proxy/forwarded headers first, then fall back to raw request IP
-  const headers = ctx.req.headers;
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0].trim();
-  const realIp = headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  // Fallback: use the raw request property if available
-  // Hono request object has raw property in Node.js adapter
-  const raw = (ctx.req as unknown as { raw?: Request }).raw;
-  return raw?.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? raw?.headers.get("x-real-ip")?.trim()
-    ?? (typeof raw !== "undefined" ? undefined : "unknown")
-    ?? "unknown";
+  const headers = ctx.req?.headers;
+  const raw = headers?.get("x-forwarded-for") || headers?.get("x-real-ip");
+  if (typeof raw === "string" && raw) {
+    return raw.split(",")[0].trim();
+  }
+  // fallback to connection remote address
+  const conn = (ctx.req as any)?.socket;
+  if (conn?.remoteAddress) return conn.remoteAddress;
+  return "unknown";
 }
 
 const rateLimitMiddleware = t.middleware(async (opts) => {
@@ -83,6 +79,13 @@ const requireAuth = t.middleware(async (opts) => {
     });
   }
 
+  if (ctx.unifiedUser.status === "locked") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Account locked" });
+  }
+  if (ctx.unifiedUser.status === "inactive") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Account inactive" });
+  }
+
   return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
 });
 
@@ -112,6 +115,6 @@ const requireStaff = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
 });
 
-export const authedQuery = t.procedure.use(requireAuth);
+export const authedQuery = t.procedure.use(sanitizeMiddleware).use(requireAuth);
 export const adminQuery = authedQuery.use(requireAdmin);
 export const staffQuery = authedQuery.use(requireStaff);

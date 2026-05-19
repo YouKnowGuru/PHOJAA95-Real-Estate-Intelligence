@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "build": "npm install --prefix app && npm run build --prefix app"
+  },
   "dependencies": {
     "@types/nodemailer": "^8.0.0",
     "jspdf": "^4.2.1",

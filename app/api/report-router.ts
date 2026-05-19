@@ -21,7 +21,7 @@ function generateCSV(data: Record<string, unknown>[], headers: string[]): string
     headers.map((h) => {
       const val = row[h];
       const str = val === null || val === undefined ? "" : String(val);
-      return str.includes(",") || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+      return str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r") ? `"${str.replace(/"/g, '""')}"` : str;
     }).join(",")
   );
   return [headerRow, ...rows].join("\n");
@@ -49,7 +49,11 @@ export const reportRouter = createRouter({
       if (input?.status) conditions.push(eq(properties.approvalStatus, input.status));
       if (input?.propertyTypeId) conditions.push(eq(properties.propertyTypeId, input.propertyTypeId));
       if (input?.dateFrom) conditions.push(gte(properties.createdAt, new Date(input.dateFrom)));
-      if (input?.dateTo) conditions.push(lte(properties.createdAt, new Date(input.dateTo)));
+      if (input?.dateTo) {
+        const endOfDay = new Date(input.dateTo);
+        endOfDay.setUTCHours(23, 59, 59, 999);
+        conditions.push(lte(properties.createdAt, endOfDay));
+      }
 
       const data = await db
         .select({
@@ -193,8 +197,8 @@ export const reportRouter = createRouter({
   revenueReport: adminQuery
     .input(
       z.object({
-        year: z.number().optional(),
-        month: z.number().optional(),
+        year: z.number().min(2000).max(2100).optional(),
+        month: z.number().min(1).max(12).optional(),
       }).optional()
     )
     .query(async ({ input }) => {
@@ -256,13 +260,7 @@ export const reportRouter = createRouter({
     }),
 
   staffPerformance: adminQuery
-    .input(
-      z.object({
-        dateFrom: z.string().optional(),
-        dateTo: z.string().optional(),
-      }).optional()
-    )
-    .query(async ({ input }) => {
+    .query(async () => {
       const db = getDb();
       const conditions = [eq(localUsers.role, "staff")];
 

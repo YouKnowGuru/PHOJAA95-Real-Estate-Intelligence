@@ -40,7 +40,7 @@ export const attendanceRouter = createRouter({
 
         const result = await tx.insert(attendance).values({
           userId,
-          date: new Date(localDateStr),
+          date: localDateStr,
           checkIn: now,
           status,
           notes: input.notes,
@@ -88,13 +88,14 @@ export const attendanceRouter = createRouter({
   }),
 
   myAttendance: staffQuery
-    .input(z.object({ month: z.string(), page: z.number().default(1), limit: z.number().default(30) }))
+    .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM"), page: z.number().default(1), limit: z.number().default(30) }))
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const userId = ctx.unifiedUser!.id;
       const [year, month] = input.month.split("-");
       const startDate = `${year}-${month}-01`;
-      const endDate = `${year}-${month}-31`;
+      const lastDay = new Date(Number(year), Number(month), 0).getDate();
+      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
 
       const results = await db.select().from(attendance)
         .where(
@@ -131,7 +132,7 @@ export const attendanceRouter = createRouter({
       z.object({
         userId: z.number().optional(),
         userName: z.string().optional(),
-        month: z.string().optional(),
+        month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM").optional(),
         status: z.enum(["present", "late", "absent", "half_day"]).optional(),
         page: z.number().default(1),
         limit: z.number().default(30),
@@ -146,8 +147,10 @@ export const attendanceRouter = createRouter({
       if (input.userName) conditions.push(sql`${localUsers.fullName} LIKE ${`%${input.userName}%`}`);
       if (input.month) {
         const [year, month] = input.month.split("-");
+        const lastDay = new Date(Number(year), Number(month), 0).getDate();
+        const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
         conditions.push(sql`${attendance.date} >= ${`${year}-${month}-01`}`);
-        conditions.push(sql`${attendance.date} <= ${`${year}-${month}-31`}`);
+        conditions.push(sql`${attendance.date} <= ${endDate}`);
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -178,36 +181,38 @@ export const attendanceRouter = createRouter({
   markAttendance: adminQuery
     .input(z.object({
       userId: z.number(),
-      date: z.string(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
       status: z.enum(["present", "absent", "late", "half_day"]),
       notes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = getDb();
 
-      const existing = await db.select().from(attendance)
-        .where(
-          and(
-            eq(attendance.userId, input.userId),
-            sql`DATE(${attendance.date}) = ${input.date}`
+      return await db.transaction(async (tx) => {
+        const existing = await tx.select().from(attendance)
+          .where(
+            and(
+              eq(attendance.userId, input.userId),
+              sql`DATE(${attendance.date}) = ${input.date}`
+            )
           )
-        )
-        .limit(1);
+          .limit(1);
 
-      if (existing.length > 0) {
-        await db.update(attendance)
-          .set({ status: input.status, notes: input.notes })
-          .where(eq(attendance.id, existing[0].id));
-      } else {
-        await db.insert(attendance).values({
-          userId: input.userId,
-          date: new Date(input.date),
-          status: input.status,
-          notes: input.notes,
-        });
-      }
+        if (existing.length > 0) {
+          await tx.update(attendance)
+            .set({ status: input.status, notes: input.notes })
+            .where(eq(attendance.id, existing[0].id));
+        } else {
+          await tx.insert(attendance).values({
+            userId: input.userId,
+            date: input.date,
+            status: input.status,
+            notes: input.notes,
+          });
+        }
 
-      return { success: true };
+        return { success: true };
+      });
     }),
 
   delete: adminQuery
@@ -219,12 +224,13 @@ export const attendanceRouter = createRouter({
     }),
 
   monthlySummary: adminQuery
-    .input(z.object({ month: z.string() }))
+    .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
       const [year, month] = input.month.split("-");
       const startDate = `${year}-${month}-01`;
-      const endDate = `${year}-${month}-31`;
+      const lastDay = new Date(Number(year), Number(month), 0).getDate();
+      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
 
       const summary = await db.select({
         userId: attendance.userId,
@@ -243,18 +249,19 @@ export const attendanceRouter = createRouter({
             sql`${attendance.date} <= ${endDate}`
           )
         )
-        .groupBy(attendance.userId);
+        .groupBy(attendance.userId, localUsers.fullName);
 
       return summary;
     }),
 
   allStaffStats: adminQuery
-    .input(z.object({ month: z.string() }))
+    .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
       const [year, month] = input.month.split("-");
       const startDate = `${year}-${month}-01`;
-      const endDate = `${year}-${month}-31`;
+      const lastDay = new Date(Number(year), Number(month), 0).getDate();
+      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
 
       const statsResult = await db.select({
         present: sql<number>`SUM(CASE WHEN ${attendance.status} = 'present' THEN 1 ELSE 0 END)`,
@@ -276,7 +283,7 @@ export const attendanceRouter = createRouter({
   dailyStatus: adminQuery
     .query(async () => {
       const db = getDb();
-      const today = new Date().toISOString().split("T")[0];
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
 
       const records = await db.select({
         status: attendance.status,

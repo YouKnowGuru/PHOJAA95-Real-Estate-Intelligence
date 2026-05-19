@@ -38,7 +38,9 @@ export const payrollRouter = createRouter({
           .from(localUsers)
           .where(eq(localUsers.id, input.userId))
           .limit(1);
-        pfPercent = user ? parseFloat(user.pfPercentage || "0") : 0;
+        if (!user) throw new TRPCError({ code: "BAD_REQUEST", message: "User not found" });
+        const rawPf = parseFloat(user.pfPercentage || "0");
+        pfPercent = Number.isNaN(rawPf) ? 0 : rawPf;
       }
       const base = parseMoney(input.baseSalary);
       const bonus = parseMoney(input.bonus);
@@ -113,7 +115,7 @@ export const payrollRouter = createRouter({
       const total = totalResult[0]?.count || 0;
 
       const page = input.page || 1;
-      const limit = input.limit || 20;
+      const limit = Math.max(1, input.limit || 20);
 
       const results = await db
         .select({
@@ -149,6 +151,8 @@ export const payrollRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      const [record] = await db.select().from(payroll).where(eq(payroll.id, input.id)).limit(1);
+      if (!record) throw new TRPCError({ code: "NOT_FOUND", message: "Payroll record not found" });
       await db.update(payroll)
         .set({
           paymentStatus: "paid",
@@ -208,6 +212,8 @@ export const payrollRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
+      const [record] = await db.select().from(payroll).where(eq(payroll.id, input.id)).limit(1);
+      if (!record) throw new TRPCError({ code: "NOT_FOUND", message: "Payroll record not found" });
       await db.delete(payroll).where(eq(payroll.id, input.id));
       return { success: true };
     }),

@@ -58,7 +58,7 @@ export default function Properties() {
   const { isAdmin } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<string>("all");
+  const [status, setStatus] = useState<"all" | "draft" | "submitted" | "pending_review" | "approved" | "rejected" | "completed" | "cancelled">("all");
   const [step, setStep] = useState<string>("all");
   const [propertyTypeId, setPropertyTypeId] = useState<string>("all");
   const [deleteId, setDeleteId] = useState<number | null>(null);
@@ -247,7 +247,7 @@ export default function Properties() {
             <Skeleton key={i} className="h-48 rounded-xl" />
           ))}
         </div>
-      ) : data?.items.length === 0 ? (
+      ) : data?.items?.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <Card className="border-border/50 bg-white/50 backdrop-blur-sm dark:bg-slate-800/50">
             <CardContent className="flex flex-col items-center justify-center py-20">
@@ -301,6 +301,7 @@ export default function Properties() {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={confirmDelete}
+                  disabled={deleteMutation.isPending}
                   className="bg-red-500 hover:bg-red-600 text-white"
                 >
                   Delete
@@ -528,7 +529,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                 <div className="flex flex-col min-w-0">
                   <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wider font-bold truncate">Price</p>
                   <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate">
-                    {parseFloat(property.sellingPrice).toLocaleString()}
+                    {parseFloat(property.sellingPrice ?? "0").toLocaleString()}
                   </p>
                 </div>
                 <div className="text-right flex flex-col items-end min-w-0">

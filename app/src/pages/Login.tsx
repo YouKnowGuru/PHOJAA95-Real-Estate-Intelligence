@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +21,10 @@ export default function Login() {
 
   const { data: branding } = trpc.settings.getPublicSettings.useQuery();
 
+  const navigate = useNavigate();
+
   const loginMutation = trpc.localAuth.login.useMutation({
-    onSuccess: () => { window.location.href = "/"; },
+    onSuccess: () => { navigate("/"); },
     onError: (err) => { setError(err.message); setLoading(false); },
   });
 
@@ -344,32 +347,7 @@ export default function Login() {
                   </motion.form>
                 )}
 
-                {/* Demo Credentials */}
-                <div className="mt-7 p-5 rounded-2xl bg-white/[0.03] border border-white/[0.06] space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                    </span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                      Demo Credentials
-                    </span>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-500 font-medium w-12 shrink-0">Admin</span>
-                      <code className="text-emerald-400 font-semibold text-xs">admin@phojaa95.com</code>
-                      <span className="text-slate-600">/</span>
-                      <code className="text-emerald-400 font-semibold text-xs">admin123</code>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-slate-500 font-medium w-12 shrink-0">Staff</span>
-                      <code className="text-emerald-400 font-semibold text-xs">karma@phojaa95.com</code>
-                      <span className="text-slate-600">/</span>
-                      <code className="text-emerald-400 font-semibold text-xs">staff123</code>
-                    </div>
-                  </div>
-                </div>
+
               </CardContent>
             </Card>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,13 +38,19 @@ function SummaryCard({ title, value, color, iconBg, icon: Icon, delay = 0 }: { t
 export default function Users() {
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState<number | null>(null);
-  const [showEdit, setShowEdit] = useState<any>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+  const [showEdit, setShowEdit] = useState<NonNullable<typeof data>["items"][number] | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
   const { data, isLoading } = trpc.user.list.useQuery({
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     page: 1,
     limit: 50,
   });
@@ -299,7 +305,12 @@ export default function Users() {
       )}
 
       {/* Add User Dialog */}
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
+      <Dialog open={showAdd} onOpenChange={(open) => {
+        if (!open) {
+          setShowAdd(false);
+          setFormData({ fullName: "", email: "", password: "", role: "staff", phone: "", address: "", pfNumber: "", pfPercentage: "0", employeeId: "" });
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Add Staff Member</DialogTitle>
@@ -432,7 +443,12 @@ export default function Users() {
       </Dialog>
 
       {/* Reset Password Dialog */}
-      <Dialog open={!!showResetPassword} onOpenChange={() => setShowResetPassword(null)}>
+      <Dialog open={!!showResetPassword} onOpenChange={(open) => {
+        if (!open) {
+          setShowResetPassword(null);
+          setNewPassword("");
+        }
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>

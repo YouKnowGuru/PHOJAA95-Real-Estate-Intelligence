@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, count, like, or, gte, lt } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { logger } from "./lib/logger";
@@ -19,7 +19,7 @@ import {
 const sendMessageSchema = z.object({
     conversationId: z.number().optional(),
     message: z.string().min(1).max(4000),
-    model: z.string().optional(),
+    model: z.enum(["openrouter/free", "openai/gpt-4o-mini", "anthropic/claude-3.5-sonnet", "google/gemini-1.5-flash"]).optional(),
 });
 
 const conversationIdSchema = z.object({
@@ -205,8 +205,22 @@ async function executeToolCall(
                     status?: string;
                     limit?: number;
                 };
-                const { properties, propertyImages } = await import("../db/schema");
-                const dbQuery = db.select({
+                const { properties } = await import("../db/schema");
+                const conditions = [];
+                if (status) {
+                    conditions.push(eq(properties.approvalStatus, status));
+                }
+                if (query) {
+                    const q = `%${query as string}%`;
+                    conditions.push(
+                        or(
+                            like(properties.propertyName, q),
+                            like(properties.address, q),
+                            like(properties.ownerName, q),
+                        ),
+                    );
+                }
+                const results = await db.select({
                     id: properties.id,
                     propertyName: properties.propertyName,
                     address: properties.address,
@@ -215,23 +229,8 @@ async function executeToolCall(
                     ownerName: properties.ownerName,
                     currentStep: properties.currentStep,
                 }).from(properties)
+                    .where(conditions.length > 0 ? and(...conditions) : undefined)
                     .limit(Math.min(limit as number, 10));
-
-                let results = await dbQuery;
-
-                if (status) {
-                    results = results.filter((p) => p.approvalStatus === status);
-                }
-
-                if (query) {
-                    const q = (query as string).toLowerCase();
-                    results = results.filter(
-                        (p) =>
-                            p.propertyName.toLowerCase().includes(q) ||
-                            p.address.toLowerCase().includes(q) ||
-                            p.ownerName.toLowerCase().includes(q),
-                    ).slice(0, limit as number);
-                }
 
                 return JSON.stringify({
                     count: results.length,
@@ -312,31 +311,33 @@ async function executeToolCall(
                 const stats: Record<string, unknown> = {};
 
                 if (statType === "all" || statType === "properties") {
-                    const allProps = await db.select().from(properties);
+                    const totalResult = await db.select({ count: count() }).from(properties);
+                    const byStatusResult = await db.select({ status: properties.approvalStatus, count: count() }).from(properties).groupBy(properties.approvalStatus);
                     const byStatus: Record<string, number> = {};
-                    for (const p of allProps) {
-                        byStatus[p.approvalStatus] = (byStatus[p.approvalStatus] || 0) + 1;
+                    for (const s of byStatusResult) {
+                        byStatus[s.status] = s.count;
                     }
-                    stats.properties = { total: allProps.length, byStatus };
+                    stats.properties = { total: totalResult[0]?.count || 0, byStatus };
                 }
 
                 if (statType === "all" || statType === "users") {
-                    const allUsers = await db.select().from(localUsers);
+                    const totalResult = await db.select({ count: count() }).from(localUsers);
+                    const byRoleResult = await db.select({ role: localUsers.role, count: count() }).from(localUsers).groupBy(localUsers.role);
                     const byRole: Record<string, number> = {};
-                    for (const u of allUsers) {
-                        byRole[u.role] = (byRole[u.role] || 0) + 1;
+                    for (const r of byRoleResult) {
+                        byRole[r.role] = r.count;
                     }
-                    stats.users = { total: allUsers.length, byRole };
+                    stats.users = { total: totalResult[0]?.count || 0, byRole };
                 }
 
                 if (statType === "all" || statType === "attendance") {
-                    const allAttendance = await db.select().from(attendance);
-                    stats.attendance = { totalRecords: allAttendance.length };
+                    const totalResult = await db.select({ count: count() }).from(attendance);
+                    stats.attendance = { totalRecords: totalResult[0]?.count || 0 };
                 }
 
                 if (statType === "all" || statType === "payroll") {
-                    const allPayroll = await db.select().from(payroll);
-                    stats.payroll = { totalRecords: allPayroll.length };
+                    const totalResult = await db.select({ count: count() }).from(payroll);
+                    stats.payroll = { totalRecords: totalResult[0]?.count || 0 };
                 }
 
                 return JSON.stringify(stats);
@@ -353,25 +354,31 @@ async function executeToolCall(
                 const targetUserId = userId || ctx.unifiedUser?.id;
                 if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
 
+                const [year, monthStr] = targetMonth.split("-");
+                const startDate = new Date(Number(year), Number(monthStr) - 1, 1);
+                const endDate = new Date(Number(year), Number(monthStr), 1);
+
                 const records = await db.select().from(attendance)
-                    .where(eq(attendance.userId, targetUserId as number))
+                    .where(
+                        and(
+                            eq(attendance.userId, targetUserId as number),
+                            gte(attendance.date, startDate),
+                            lt(attendance.date, endDate),
+                        ),
+                    )
                     .orderBy(attendance.date);
 
-                const filtered = records.filter(r =>
-                    String(r.date).startsWith(targetMonth)
-                );
-
                 const byStatus: Record<string, number> = {};
-                for (const r of filtered) {
+                for (const r of records) {
                     byStatus[r.status] = (byStatus[r.status] || 0) + 1;
                 }
 
                 return JSON.stringify({
                     userId: targetUserId,
                     month: targetMonth,
-                    total: filtered.length,
+                    total: records.length,
                     byStatus,
-                    records: filtered.map(r => ({
+                    records: records.map(r => ({
                         date: r.date,
                         checkIn: r.checkIn,
                         checkOut: r.checkOut,
@@ -484,12 +491,13 @@ export const chatbotRouter = createRouter({
     // ── Get single conversation with messages ───────────────────────
     conversation: authedQuery.input(conversationIdSchema).query(async (opts) => {
         const db = getDb();
+        const userId = opts.ctx.unifiedUser!.id;
         const { conversationId } = opts.input;
 
         const [conv] = await db
             .select()
             .from(chatConversations)
-            .where(eq(chatConversations.id, conversationId))
+            .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, userId)))
             .limit(1);
 
         if (!conv) return null;
@@ -507,12 +515,13 @@ export const chatbotRouter = createRouter({
     // ── Update conversation (title, archive) ────────────────────────
     updateConversation: authedQuery.input(updateConversationSchema).mutation(async (opts) => {
         const db = getDb();
+        const userId = opts.ctx.unifiedUser!.id;
         const { conversationId, ...updates } = opts.input;
 
         await db
             .update(chatConversations)
             .set(updates)
-            .where(eq(chatConversations.id, conversationId));
+            .where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, userId)));
 
         return { success: true };
     }),
@@ -520,10 +529,11 @@ export const chatbotRouter = createRouter({
     // ── Delete conversation ─────────────────────────────────────────
     deleteConversation: authedQuery.input(conversationIdSchema).mutation(async (opts) => {
         const db = getDb();
+        const userId = opts.ctx.unifiedUser!.id;
         const { conversationId } = opts.input;
 
         await db.delete(chatMessages).where(eq(chatMessages.conversationId, conversationId));
-        await db.delete(chatConversations).where(eq(chatConversations.id, conversationId));
+        await db.delete(chatConversations).where(and(eq(chatConversations.id, conversationId), eq(chatConversations.userId, userId)));
 
         return { success: true };
     }),
@@ -551,6 +561,15 @@ export const chatbotRouter = createRouter({
                     }),
                 } as InsertChatConversation);
             convId = Number(result[0].insertId);
+        } else {
+            const [conv] = await db
+                .select()
+                .from(chatConversations)
+                .where(and(eq(chatConversations.id, convId), eq(chatConversations.userId, userId)))
+                .limit(1);
+            if (!conv) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Conversation not found" });
+            }
         }
 
         // Save user message
@@ -615,6 +634,10 @@ export const chatbotRouter = createRouter({
                 max_tokens: 2000,
             });
 
+            if (!response.choices || response.choices.length === 0) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No response from AI model" });
+            }
+
             const choice = response.choices[0];
             totalTokens = response.usage?.total_tokens || 0;
 
@@ -668,6 +691,10 @@ export const chatbotRouter = createRouter({
                     temperature: 0.7,
                     max_tokens: 2000,
                 });
+
+                if (!finalResponse.choices || finalResponse.choices.length === 0) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No response from AI model" });
+                }
 
                 fullResponse = finalResponse.choices[0].message.content || "";
                 totalTokens += finalResponse.usage?.total_tokens || 0;

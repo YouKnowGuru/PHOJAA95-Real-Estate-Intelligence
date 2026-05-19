@@ -346,7 +346,11 @@ function AdminDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {recentActivity?.slice(0, 6).map((activity) => (
+              {(recentActivity?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  No recent activity
+                </div>
+              ) : recentActivity?.slice(0, 6).map((activity) => (
                 <div
                   key={activity.id}
                   className="flex items-start gap-3 rounded-lg border border-border/30 p-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
@@ -385,11 +389,7 @@ function AdminDashboard() {
                     {activity.action}
                   </Badge>
                 </div>
-              )) || (
-                <div className="text-center py-8 text-sm text-muted-foreground">
-                  No recent activity
-                </div>
-              )}
+              ))}
             </CardContent>
           </Card>
         </motion.div>
@@ -503,7 +503,11 @@ function StaffDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity?.map((activity) => (
+              {(recentActivity?.length ?? 0) === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  No recent properties
+                </div>
+              ) : recentActivity?.map((activity) => (
                 <div key={activity.id} className="flex flex-col gap-2 p-3 rounded-lg border border-border/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm">{activity.propertyName}</span>
@@ -520,11 +524,7 @@ function StaffDashboard() {
                     </Badge>
                   </div>
                 </div>
-              )) || (
-                <div className="text-center py-8 text-sm text-muted-foreground">
-                  No recent properties
-                </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>

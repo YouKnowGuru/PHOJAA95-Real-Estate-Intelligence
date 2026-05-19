@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,9 +46,10 @@ export default function PropertyWizard() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth();
-  const propertyId = id ? parseInt(id) : undefined;
+  const propertyId = id && !Number.isNaN(parseInt(id)) ? parseInt(id) : undefined;
+  const step = parseInt(searchParams.get("step") || "1");
   const [currentStep, setCurrentStep] = useState(
-    parseInt(searchParams.get("step") || "1")
+    Number.isNaN(step) ? 1 : Math.max(1, Math.min(5, step))
   );
 
   const { data: propertyTypes } = trpc.propertyType.list.useQuery();
@@ -111,9 +112,12 @@ export default function PropertyWizard() {
     completionCertificate: "",
   });
 
+  const hasHydrated = useRef(false);
+
   // Load existing data for all steps
   useEffect(() => {
-    if (!existingProperty) return;
+    if (!existingProperty || hasHydrated.current) return;
+    hasHydrated.current = true;
     
     const p = existingProperty.property;
     if (p) {
