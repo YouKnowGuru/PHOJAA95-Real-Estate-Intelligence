@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -66,17 +66,32 @@ export default function PropertyDetail() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState("");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const notesInitialized = useRef(false);
 
   useEffect(() => {
-    if (data?.property?.adminNotes) {
-      setAdminNotes(data.property.adminNotes);
+    if (data?.property?.adminNotes !== undefined && !notesInitialized.current) {
+      notesInitialized.current = true;
+      setAdminNotes(data.property.adminNotes ?? "");
     }
   }, [data?.property?.adminNotes]);
 
   const { data: allDocs } = trpc.property.getAllDocuments.useQuery({ propertyId }, { enabled: !!data });
   const { data: siteSettings } = trpc.settings.getPublicSettings.useQuery();
 
+  const validateUrl = (url: string) => {
+    try {
+      const u = new URL(url);
+      return u.protocol === "http:" || u.protocol === "https:";
+    } catch { return false; }
+  };
+
   const triggerDownload = (url: string, filename: string) => {
+    if (!validateUrl(url)) {
+      toast.error("Invalid download URL");
+      return;
+    }
+    const safeFilename = filename.replace(/[<>:\"/\\|?*\x00-\x1f]/g, "_");
+
     // If it's a Cloudinary URL, we can force download by adding fl_attachment
     let downloadUrl = url;
     if (url.includes("cloudinary.com")) {
@@ -87,7 +102,7 @@ export default function PropertyDetail() {
 
     const link = document.createElement("a");
     link.href = downloadUrl;
-    link.setAttribute("download", filename);
+    link.setAttribute("download", safeFilename);
     link.setAttribute("target", "_blank");
     document.body.appendChild(link);
     link.click();
@@ -678,7 +693,7 @@ export default function PropertyDetail() {
                           {step.id === 1 && (
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <span className="text-muted-foreground">Type: {property.propertyTypeName}</span>
-                              <span className="text-muted-foreground">Price: Nu. {parseFloat(property.sellingPrice).toLocaleString()}</span>
+                              <span className="text-muted-foreground">Price: Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString()}</span>
                             </div>
                           )}
                           {step.id === 2 && (
@@ -755,11 +770,11 @@ export default function PropertyDetail() {
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Selling Price</p>
-                <p className="text-sm font-bold">Nu. {parseFloat(property.sellingPrice).toLocaleString()}</p>
+                <p className="text-sm font-bold">Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">
                 <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Comm. (3%)</p>
-                <p className="text-sm font-bold text-primary dark:text-primary-foreground">Nu. {parseFloat(property.realEstateFee).toLocaleString()}</p>
+                <p className="text-sm font-bold text-primary dark:text-primary-foreground">Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString()}</p>
               </div>
             </div>
             {!!property.features && typeof property.features === 'object' && Object.keys(property.features as object).length > 0 && (

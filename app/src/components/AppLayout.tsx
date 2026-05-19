@@ -61,6 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const sessionWarnedRef = useRef(false);
 
   useEffect(() => {
@@ -98,14 +99,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           ? `${minutes} minute${minutes > 1 ? "s" : ""}`
           : `${seconds} second${seconds > 1 ? "s" : ""}`;
 
-        toast.warning(`Your session will expire in ${timeStr}.`, {
+        const toastId = toast.warning(`Your session will expire in ${timeStr}.`, {
           duration: Infinity,
           action: {
             label: "Refresh Session",
             onClick: () => {
               refreshSession();
               sessionWarnedRef.current = false;
-              toast.dismiss();
+              toast.dismiss(toastId);
             },
           },
           onDismiss: () => {
@@ -134,8 +135,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const siteName = branding?.site_name || "PHOJAA95";
   const siteLogo = branding?.site_logo;
+  const isValidLogo = siteLogo && (siteLogo.startsWith("http") || siteLogo.startsWith("/"));
 
-  const { data: notifData } = trpc.notification.getUnreadCount.useQuery(undefined, { refetchInterval: 30000 });
+  const { data: notifData } = trpc.notification.getUnreadCount.useQuery(undefined, { refetchInterval: 30000, refetchIntervalInBackground: false });
   const { data: adminStats } = trpc.property.dashboardStats.useQuery(undefined, { enabled: isAdmin });
   const { data: staffStats } = trpc.property.staffDashboardStats.useQuery(undefined, { enabled: !isAdmin });
 
@@ -176,8 +178,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Logo */}
         <div className="border-b border-border/50 px-4 py-5">
           <Link to="/" className="flex items-center gap-3">
-            {siteLogo ? (
-              <img src={siteLogo} alt={siteName} className="h-10 w-10 object-contain rounded-lg shadow-sm" />
+            {isValidLogo ? (
+              <img src={siteLogo} alt={siteName} className="h-10 w-10 object-contain rounded-lg shadow-sm" onError={(e) => { e.currentTarget.style.display = "none"; }} />
             ) : (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20">
                 <Building2 className="h-5 w-5 text-white" />
@@ -247,11 +249,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="border-t border-border/50 p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600">
-              {user?.avatar || user?.profileImage ? (
+              {!imgError && (user?.avatar || user?.profileImage) ? (
                 <img
                   src={user.avatar || user.profileImage || ""}
                   alt={user?.name}
                   className="h-9 w-9 rounded-full object-cover"
+                  onError={() => setImgError(true)}
                 />
               ) : (
                 <UserCircle className="h-5 w-5 text-slate-600 dark:text-slate-300" />

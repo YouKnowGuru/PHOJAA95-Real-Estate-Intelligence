@@ -76,6 +76,15 @@ export function ThemeProvider({
     return () => media.removeEventListener("change", listener);
   }, [themeState]);
 
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === storageKey) setThemeState((e.newValue as Theme) || "system");
+      if (e.key === `${storageKey}-color`) setColorThemeState((e.newValue as ColorTheme) || "emerald");
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [storageKey]);
+
   const value = {
     theme: themeState,
     colorTheme: colorThemeState,

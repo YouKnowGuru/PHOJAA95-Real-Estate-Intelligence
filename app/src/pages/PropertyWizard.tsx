@@ -269,34 +269,10 @@ export default function PropertyWizard() {
     onError: (err) => toast.error(err.message),
   });
 
-  const handleStep1Submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const buildStep1Payload = () => {
     const price = parseFloat(step1Data.sellingPrice);
     const fee = (price * 0.03).toFixed(2);
-
-    // If editing existing property (propertyId exists), use update instead of create
-    if (propertyId) {
-      updateMutation.mutate({
-        id: propertyId,
-        propertyName: step1Data.propertyName,
-        propertyTypeId: parseInt(step1Data.propertyTypeId) || 0,
-        address: step1Data.address,
-        latitude: step1Data.latitude || undefined,
-        longitude: step1Data.longitude || undefined,
-        ownerName: step1Data.ownerName,
-        ownerCID: step1Data.ownerCID,
-        ownerPhone: step1Data.ownerPhone,
-        ownerAddress: step1Data.ownerAddress,
-        sellingPrice: step1Data.sellingPrice,
-        realEstateFee: fee,
-        noObjectionLetter: step1Data.noObjectionLetter || undefined,
-        images: step1Data.images,
-        features: step1Data.features,
-      });
-      return;
-    }
-
-    createMutation.mutate({
+    return {
       propertyName: step1Data.propertyName,
       propertyTypeId: parseInt(step1Data.propertyTypeId) || 0,
       address: step1Data.address,
@@ -311,7 +287,19 @@ export default function PropertyWizard() {
       noObjectionLetter: step1Data.noObjectionLetter || undefined,
       images: step1Data.images,
       features: step1Data.features,
-    });
+    };
+  };
+
+  const handleStep1Submit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // If editing existing property (propertyId exists), use update instead of create
+    if (propertyId) {
+      updateMutation.mutate({ id: propertyId, ...buildStep1Payload() });
+      return;
+    }
+
+    createMutation.mutate(buildStep1Payload());
   };
 
   const handleStep2Submit = (e: React.FormEvent) => {
@@ -552,6 +540,10 @@ export default function PropertyWizard() {
                       value={key}
                       onChange={(e) => {
                         const newKey = e.target.value;
+                        if (newKey !== key && step1Data.features[newKey]) {
+                          toast.error("Feature key already exists");
+                          return;
+                        }
                         const newFeatures = {} as Record<string, string>;
                         Object.entries(step1Data.features).forEach(([k, v], i) => {
                           if (i === index) {
@@ -654,8 +646,20 @@ export default function PropertyWizard() {
 
             <div className="flex justify-end gap-3">
               {propertyId && (
-                <Button type="button" variant="outline" onClick={() => navigateToStep(2)}>
-                  Next Step
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  disabled={updateMutation.isPending}
+                  onClick={async () => {
+                    try {
+                      await updateMutation.mutateAsync({ id: propertyId, ...buildStep1Payload() });
+                      navigateToStep(2);
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Failed to save property");
+                    }
+                  }}
+                >
+                  {updateMutation.isPending ? "Saving..." : "Next Step"}
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               )}

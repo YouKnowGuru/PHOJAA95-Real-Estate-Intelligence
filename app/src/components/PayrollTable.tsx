@@ -1,5 +1,5 @@
 import { Download, X, User, Calendar, Wallet, TrendingUp, TrendingDown, Receipt } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Dialog, DialogContent, DialogFooter } from "./ui/dialog";
@@ -54,8 +54,10 @@ export function PayslipModal({ open, onOpenChange, record }: PayslipModalProps) 
   const totalDeductions = deduction + pfDeduction;
   const pfPercentage = record.pfPercentage || "0";
 
-  const monthLabel = format(new Date(record.month + "-01"), "MMMM yyyy");
-  const paidDate = record.paidAt ? format(new Date(record.paidAt), "MMM d, yyyy") : null;
+  const monthDate = new Date(record.month + "-01");
+  const monthLabel = isValid(monthDate) ? format(monthDate, "MMMM yyyy") : record.month;
+  const paidDateRaw = record.paidAt ? new Date(record.paidAt) : null;
+  const paidDate = paidDateRaw && isValid(paidDateRaw) ? format(paidDateRaw, "MMM d, yyyy") : null;
 
   const handleDownload = () => {
     const content = `
@@ -98,7 +100,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
     a.href = url;
     a.download = `payslip-${record.userName || record.userId}-${record.month}.txt`;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const earningItems = [
@@ -122,6 +124,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
 
           {/* Close button */}
           <button
+            type="button"
             onClick={() => onOpenChange(false)}
             className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
           >

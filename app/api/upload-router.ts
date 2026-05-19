@@ -17,8 +17,23 @@ export const uploadRouter = createRouter({
         step: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { file, fileName, mimeType, folder, propertyId, step } = input;
+
+      if (propertyId) {
+        const { getDb } = await import("./queries/connection");
+        const { properties } = await import("@db/schema");
+        const { eq } = await import("drizzle-orm");
+        const db = getDb();
+        const prop = await db.select({ listedById: properties.listedById }).from(properties).where(eq(properties.id, propertyId)).limit(1);
+        if (prop.length === 0) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
+        }
+        const user = ctx.unifiedUser!;
+        if (prop[0].listedById !== user.id && user.role !== "admin") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to upload to this property" });
+        }
+      }
 
       if (!validateFileType(mimeType)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "File type not allowed" });
@@ -65,7 +80,7 @@ export const uploadRouter = createRouter({
     }),
 
   getDownloadUrls: staffQuery
-    .input(z.object({ keys: z.array(z.string()) }))
+    .input(z.object({ keys: z.array(z.string()).max(50) }))
     .query(async ({ input }) => {
       const urls = await Promise.all(
         input.keys.map(async (key) => ({
@@ -78,9 +93,9 @@ export const uploadRouter = createRouter({
 
   getPropertyDocuments: staffQuery
     .input(z.object({ propertyId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const { getDb } = await import("./queries/connection");
-      const { properties, propertyAgreements, propertyDocuments, finalLagthrams, propertyTypes } = await import("@db/schema");
+      const { properties, propertyAgreements, propertyDocuments, finalLagthrams } = await import("@db/schema");
       const { eq } = await import("drizzle-orm");
 
       const db = getDb();
@@ -98,6 +113,11 @@ export const uploadRouter = createRouter({
 
       if (prop.length === 0) {
         return { documents: [] };
+      }
+
+      const user = ctx.unifiedUser!;
+      if (prop[0].listedById !== user.id && user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to view this property's documents" });
       }
 
       const agreement = await db

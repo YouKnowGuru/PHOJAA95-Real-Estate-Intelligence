@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { eq, and, desc, gt, count } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { notifications, localUsers, properties } from "@db/schema";
@@ -40,6 +41,8 @@ export const notificationRouter = createRouter({
       return {
         items,
         unreadCount: unreadCount[0]?.count || 0,
+        nextCursor: items.length > 0 ? items[items.length - 1].createdAt.getTime() : undefined,
+        hasMore: items.length === input.limit,
       };
     }),
 
@@ -47,9 +50,12 @@ export const notificationRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      await db.update(notifications)
+      const result = await db.update(notifications)
         .set({ isRead: true })
         .where(and(eq(notifications.id, input.id), eq(notifications.userId, ctx.unifiedUser!.id)));
+      if (result[0].affectedRows === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Notification not found" });
+      }
       return { success: true };
     }),
 
@@ -72,8 +78,11 @@ export const notificationRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      await db.delete(notifications)
+      const result = await db.delete(notifications)
         .where(and(eq(notifications.id, input.id), eq(notifications.userId, ctx.unifiedUser!.id)));
+      if (result[0].affectedRows === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Notification not found" });
+      }
       return { success: true };
     }),
 
@@ -88,8 +97,11 @@ export const notificationRouter = createRouter({
         entityId: z.number().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = getDb();
+      if (ctx.unifiedUser!.id !== input.userId && ctx.unifiedUser!.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Can only create notifications for yourself" });
+      }
       await db.insert(notifications).values(input);
       return { success: true };
     }),
@@ -97,7 +109,7 @@ export const notificationRouter = createRouter({
   createBulkNotification: adminQuery
     .input(
       z.object({
-        userIds: z.array(z.number()),
+        userIds: z.array(z.number()).max(1000),
         title: z.string().min(1).max(255),
         message: z.string().min(1),
         type: z.enum(["info", "success", "warning", "error", "approval"]).default("info"),
@@ -106,6 +118,7 @@ export const notificationRouter = createRouter({
       })
     )
     .mutation(async ({ input }) => {
+      if (input.userIds.length === 0) return { success: true, count: 0 };
       const db = getDb();
       const values = input.userIds.map((userId) => ({
         userId,

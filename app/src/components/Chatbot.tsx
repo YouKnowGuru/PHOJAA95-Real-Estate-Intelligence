@@ -46,7 +46,7 @@ interface Conversation {
 // ─── Simple Markdown Renderer ───────────────────────────────────────
 
 function SimpleMarkdown({ content }: { content: string }) {
-    const html = content
+    let processed = content
         // Bold
         .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
         // Italic
@@ -69,7 +69,10 @@ function SimpleMarkdown({ content }: { content: string }) {
         .replace(/\n\n/g, "<br/><br/>")
         .replace(/\n/g, "<br/>");
 
-    const sanitizedHtml = DOMPurify.sanitize(html, {
+    // Wrap consecutive <li> elements in <ul>
+    processed = processed.replace(/(<li[\s\S]*?<\/li>\s*)+/g, (match) => `<ul class="list-disc pl-4 my-1">${match}</ul>`);
+
+    const sanitizedHtml = DOMPurify.sanitize(processed, {
         ALLOWED_TAGS: ["b", "i", "em", "strong", "code", "pre", "h1", "h2", "h3", "li", "ul", "ol", "br", "p", "div", "span"],
         ALLOWED_ATTR: ["class"],
     });
@@ -328,18 +331,22 @@ export default function ChatbotPanel({
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
-        const checkMobile = () => {
-            const mobile = window.innerWidth < 768;
-            setIsMobile(mobile);
-            if (!mobile && open) {
-                setShowSidebar(true);
-            } else if (mobile) {
-                setShowSidebar(false);
-            }
+        let timeout: ReturnType<typeof setTimeout>;
+        const handleResize = () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                const mobile = window.innerWidth < 768;
+                setIsMobile(mobile);
+                if (!mobile && open) {
+                    setShowSidebar(true);
+                } else if (mobile) {
+                    setShowSidebar(false);
+                }
+            }, 150);
         };
-        checkMobile();
-        window.addEventListener("resize", checkMobile);
-        return () => window.removeEventListener("resize", checkMobile);
+        window.addEventListener("resize", handleResize);
+        handleResize();
+        return () => { window.removeEventListener("resize", handleResize); clearTimeout(timeout); };
     }, [open]);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -655,7 +662,7 @@ export function ChatbotFAB() {
                 </motion.div>
                 
                 {/* Notification dot */}
-                <span className="absolute right-2 sm:right-3 top-2 sm:top-3 flex h-2.5 sm:h-3.5 w-2.5 sm:h-3.5">
+                <span className="absolute right-2 sm:right-3 top-2 sm:top-3 flex h-2.5 sm:h-3.5 w-2.5 sm:w-3.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 sm:h-3.5 w-2.5 sm:w-3.5 bg-emerald-500 ring-2 ring-indigo-700"></span>
                 </span>

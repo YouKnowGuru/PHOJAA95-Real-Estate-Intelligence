@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -44,9 +44,15 @@ export function AttendanceCalendar({
 
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  const recordMap = useMemo(() => {
+    const map = new Map<string, AttendanceRecord>();
+    records.forEach((r) => map.set(r.date, r));
+    return map;
+  }, [records]);
+
   const getRecordForDate = (date: Date): AttendanceRecord | undefined => {
     const dateStr = format(date, "yyyy-MM-dd");
-    return records.find((r) => r.date === dateStr);
+    return recordMap.get(dateStr);
   };
 
   const getStatusColor = (status?: string) => {
@@ -72,6 +78,7 @@ export function AttendanceCalendar({
         <CardTitle className="text-base">{format(currentMonth, "MMMM yyyy")}</CardTitle>
         <div className="flex items-center gap-1">
           <Button
+            type="button"
             variant="outline"
             size="icon"
             onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1))}
@@ -79,6 +86,7 @@ export function AttendanceCalendar({
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
+            type="button"
             variant="outline"
             size="icon"
             onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1))}

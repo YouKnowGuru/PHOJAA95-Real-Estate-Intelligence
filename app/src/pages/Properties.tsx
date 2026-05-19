@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { trpc } from "@/lib/trpc";
+import type { RouterOutputs } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,7 @@ import {
   Layers,
   SlidersHorizontal,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { STEP_LABELS } from "@/constants/workflow";
@@ -76,7 +78,7 @@ export default function Properties() {
 
   const utils = trpc.useUtils();
 
-  const { data, isLoading } = trpc.property.list.useQuery({
+  const { data, isLoading, error } = trpc.property.list.useQuery({
     search: debouncedSearch || undefined,
     status: status === "all" ? undefined : status || undefined,
     step: step && step !== "all" ? parseInt(step) : undefined,
@@ -180,7 +182,7 @@ export default function Properties() {
           {/* Filter Controls */}
           <div className={`${showFilters ? "block" : "hidden"} sm:block`}>
             <div className="flex flex-wrap gap-2 sm:gap-3">
-              <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+              <Select value={status} onValueChange={(v) => { setStatus(v as typeof status); setPage(1); }}>
                 <SelectTrigger className="h-9 sm:h-10 w-[130px] sm:w-[150px]">
                   <Filter className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
                   <SelectValue placeholder="Status" className="text-xs sm:text-sm" />
@@ -247,6 +249,29 @@ export default function Properties() {
             <Skeleton key={i} className="h-48 rounded-xl" />
           ))}
         </div>
+      ) : error ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <Card className="border-red-200 bg-red-50/50 dark:bg-red-950/20">
+            <CardContent className="flex flex-col items-center justify-center py-20">
+              <div className="h-20 w-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mb-6">
+                <AlertTriangle className="h-10 w-10 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold text-red-700 dark:text-red-400">Failed to load properties</h3>
+              <p className="text-sm text-red-600 dark:text-red-300 mt-2 max-w-[280px] text-center">{error.message}</p>
+              <div className="mt-8 flex gap-3">
+                <Button variant="outline" onClick={clearFilters}>
+                  Clear Filters
+                </Button>
+                <Link to="/properties/new">
+                  <Button className="bg-primary text-white hover:bg-primary/90">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Property
+                  </Button>
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       ) : data?.items?.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <Card className="border-border/50 bg-white/50 backdrop-blur-sm dark:bg-slate-800/50">
@@ -439,8 +464,10 @@ export default function Properties() {
   );
 }
 
+type PropertyItem = RouterOutputs["property"]["list"]["items"][number];
+
 function PropertyCard({ property, index, isAdmin, onDelete }: { 
-  property: any; 
+  property: PropertyItem; 
   index: number; 
   isAdmin: boolean; 
   onDelete: (id: number, name: string) => void;
@@ -535,7 +562,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                 <div className="text-right flex flex-col items-end min-w-0">
                   <p className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-wider font-bold truncate">Comm.</p>
                   <p className="text-sm sm:text-base font-bold text-primary dark:text-primary-foreground truncate">
-                    {parseFloat(property.realEstateFee).toLocaleString()}
+                    {parseFloat(property.realEstateFee ?? "0").toLocaleString()}
                   </p>
                 </div>
               </div>

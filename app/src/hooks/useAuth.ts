@@ -65,8 +65,8 @@ export function useAuth() {
     } else if (localUser) {
       localLogoutMutation.mutate();
     }
-    // Clear any residual state
-    document.cookie = "local_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    // Clear any residual state (match common cookie attributes)
+    document.cookie = "local_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax;";
   }, [oauthUser, localUser, logoutMutation, localLogoutMutation]);
 
   const user: UnifiedUser | null = useMemo(() => {

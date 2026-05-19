@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { skipToken } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,7 @@ export default function ResetPassword() {
   const { data: branding } = trpc.settings.getPublicSettings.useQuery();
 
   const { data: tokenData, isLoading: verifyingToken, error: tokenError } = trpc.localAuth.verifyResetToken.useQuery(
-    { token: token || "" },
+    token ? { token } : skipToken,
     { enabled: !!token, retry: false }
   );
 
@@ -70,6 +71,10 @@ export default function ResetPassword() {
   };
 
   const isInvalid = !token || (tokenData && !tokenData.valid) || !!tokenError;
+
+  if (tokenError?.message?.includes("Network") || tokenError?.message?.includes("fetch")) {
+    return <div>Network error. Please check your connection.</div>;
+  }
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-slate-50 dark:bg-slate-950">
@@ -143,6 +148,7 @@ export default function ResetPassword() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         className="h-12 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-11 pr-11 text-slate-900 dark:text-white rounded-xl focus:ring-primary/20 transition-all shadow-sm"
+                        autoComplete="new-password"
                         required
                       />
                       <button
@@ -168,6 +174,7 @@ export default function ResetPassword() {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         className="h-12 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 pl-11 pr-11 text-slate-900 dark:text-white rounded-xl focus:ring-primary/20 transition-all shadow-sm"
+                        autoComplete="off"
                         required
                       />
                     </div>

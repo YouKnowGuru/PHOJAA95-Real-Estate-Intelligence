@@ -5,7 +5,7 @@ import { getDb } from "./queries/connection";
 import { activityLogs } from "@db/schema";
 
 export const activityLogRouter = createRouter({
-  create: staffQuery
+  create: adminQuery
     .input(
       z.object({
         action: z.string(),
@@ -30,7 +30,7 @@ export const activityLogRouter = createRouter({
         ipAddress: input.ipAddress,
       });
 
-      return { id: Number(result[0].insertId) };
+      return { id: Number(result[0]?.insertId) };
     }),
 
   list: adminQuery
@@ -41,8 +41,8 @@ export const activityLogRouter = createRouter({
         entityType: z.enum(["property", "user", "attendance", "payroll", "setting"]).optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
-        page: z.number().default(1),
-        limit: z.number().default(50),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).default(50),
       })
     )
     .query(async ({ input }) => {
@@ -81,7 +81,7 @@ export const activityLogRouter = createRouter({
     }),
 
   myActivity: staffQuery
-    .input(z.object({ page: z.number().default(1), limit: z.number().default(20) }))
+    .input(z.object({ page: z.number().min(1).default(1), limit: z.number().min(1).default(20) }))
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const userId = ctx.unifiedUser!.id;

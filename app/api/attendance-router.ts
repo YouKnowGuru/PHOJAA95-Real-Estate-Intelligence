@@ -40,7 +40,7 @@ export const attendanceRouter = createRouter({
 
         const result = await tx.insert(attendance).values({
           userId,
-          date: localDateStr,
+          date: new Date(`${localDateStr}T00:00:00+06:00`),
           checkIn: now,
           status,
           notes: input.notes,
@@ -205,7 +205,7 @@ export const attendanceRouter = createRouter({
         } else {
           await tx.insert(attendance).values({
             userId: input.userId,
-            date: input.date,
+            date: new Date(`${input.date}T00:00:00+06:00`),
             status: input.status,
             notes: input.notes,
           });

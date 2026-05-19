@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, desc, and, count, like, or, gte, lt } from "drizzle-orm";
+import { eq, desc, and, count, like, or, gte, lt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery } from "./middleware";
 import { logger } from "./lib/logger";
@@ -208,7 +208,7 @@ async function executeToolCall(
                 const { properties } = await import("../db/schema");
                 const conditions = [];
                 if (status) {
-                    conditions.push(eq(properties.approvalStatus, status));
+                    conditions.push(sql`${properties.approvalStatus} = ${status}`);
                 }
                 if (query) {
                     const q = `%${query as string}%`;

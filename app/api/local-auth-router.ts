@@ -18,6 +18,8 @@ if (!env.appSecret) {
 }
 const JWT_SECRET = new TextEncoder().encode(env.appSecret);
 
+const passwordSchema = z.string().min(6).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain uppercase, lowercase, and number");
+
 const DEFAULT_SESSION_HOURS = 24;
 const REMEMBER_ME_DAYS = 30;
 
@@ -65,7 +67,7 @@ export const localAuthRouter = createRouter({
       z.object({
         fullName: z.string().min(2).max(255),
         email: z.string().email(),
-        password: z.string().min(6),
+        password: passwordSchema,
         phone: z.string().optional(),
         address: z.string().optional(),
         role: z.enum(["staff", "admin"]).default("staff"),
@@ -105,7 +107,7 @@ export const localAuthRouter = createRouter({
     .input(
       z.object({
         email: z.string().email(),
-        password: z.string(),
+        password: passwordSchema,
         rememberMe: z.boolean().optional().default(false),
       })
     )
@@ -191,7 +193,7 @@ export const localAuthRouter = createRouter({
     // Decode token to get expiration time for session warning
     let sessionExpiresAt: number | null = null;
     try {
-      const { payload } = await jose.jwtVerify(token, JWT_SECRET, { clockTolerance: 0 });
+      const payload = jose.decodeJwt(token);
       sessionExpiresAt = payload.exp ? (payload.exp as number) * 1000 : null;
     } catch {
       // Token expired or invalid — will be caught by verifyLocalToken above
@@ -286,7 +288,7 @@ export const localAuthRouter = createRouter({
     .input(
       z.object({
         currentPassword: z.string(),
-        newPassword: z.string().min(6),
+        newPassword: passwordSchema,
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -360,7 +362,7 @@ export const localAuthRouter = createRouter({
         try {
           await sendPasswordResetEmail(user.email, token, env.appUrl);
         } catch (err) {
-          logger.error("Failed to send password reset email", { email: user.email, error: String(err) });
+          logger.error("Failed to send password reset email", { email: user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3"), error: String(err) });
           // Still return success to prevent email enumeration
         }
       }
@@ -372,7 +374,7 @@ export const localAuthRouter = createRouter({
     .input(
       z.object({
         token: z.string(),
-        newPassword: z.string().min(6),
+        newPassword: passwordSchema,
       })
     )
     .mutation(async ({ input }) => {

@@ -25,15 +25,28 @@ const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX = 10; // max requests per window
 
+function isPrivateIp(ip: string): boolean {
+  return (
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
+  );
+}
+
 function getClientIp(ctx: TrpcContext): string {
   const headers = ctx.req?.headers;
-  const raw = headers?.get("x-forwarded-for") || headers?.get("x-real-ip");
-  if (typeof raw === "string" && raw) {
-    return raw.split(",")[0].trim();
-  }
-  // fallback to connection remote address
+  // Only trust X-Forwarded-For when the direct connection is from a private/loopback address.
   const conn = (ctx.req as any)?.socket;
-  if (conn?.remoteAddress) return conn.remoteAddress;
+  const remoteAddress = conn?.remoteAddress as string | undefined;
+  if (remoteAddress && isPrivateIp(remoteAddress)) {
+    const raw = headers?.get("x-forwarded-for") || headers?.get("x-real-ip");
+    if (typeof raw === "string" && raw) {
+      return raw.split(",")[0].trim();
+    }
+  }
+  if (remoteAddress) return remoteAddress;
   return "unknown";
 }
 
@@ -58,7 +71,10 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
 });
 
-// Periodically clean up stale entries (every 5 minutes)
+// Periodically clean up stale entries (every 5 minutes).
+// NOTE: In serverless environments this setInterval may leak memory or not
+// run as expected. For production/multi-process deployments, replace this
+// in-memory store with Redis. TODO: migrate to Redis-backed rate limiting.
 setInterval(() => {
   const now = Date.now();
   for (const [key, val] of rateLimitStore) {

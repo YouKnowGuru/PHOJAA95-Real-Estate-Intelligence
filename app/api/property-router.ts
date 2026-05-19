@@ -194,22 +194,23 @@ export const propertyRouter = createRouter({
         step: z.number().optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
-        page: z.number().default(1),
-        limit: z.number().default(20),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).default(20),
       }).default(() => ({ page: 1, limit: 20 }))
     )
     .query(async ({ input, ctx }) => {
       const db = getDb();
       const conditions = [];
 
-      if (input.search) {
+      const escapedSearch = input.search?.replace(/[%_]/g, "\\$&");
+      if (escapedSearch) {
         conditions.push(
           or(
-            like(properties.propertyName, `%${input.search}%`),
-            like(properties.ownerName, `%${input.search}%`),
-            like(properties.ownerCID, `%${input.search}%`),
-            like(properties.buyerName, `%${input.search}%`),
-            like(properties.buyerCID, `%${input.search}%`)
+            like(properties.propertyName, `%${escapedSearch}%`),
+            like(properties.ownerName, `%${escapedSearch}%`),
+            like(properties.ownerCID, `%${escapedSearch}%`),
+            like(properties.buyerName, `%${escapedSearch}%`),
+            like(properties.buyerCID, `%${escapedSearch}%`)
           )
         );
       }
@@ -333,14 +334,14 @@ export const propertyRouter = createRouter({
 
       if (property.length === 0) return null;
 
+      if (ctx.unifiedUser!.role === "staff" && property[0].listedById !== ctx.unifiedUser!.id) {
+        return null;
+      }
+
       const images = await db
         .select()
         .from(propertyImages)
         .where(eq(propertyImages.propertyId, input.id));
-
-      if (ctx.unifiedUser!.role === "staff" && property[0].listedById !== ctx.unifiedUser!.id) {
-        return null;
-      }
 
       return { ...property[0], images };
     }),
@@ -394,6 +395,19 @@ export const propertyRouter = createRouter({
         data.realEstateFee = fee.toFixed(2);
       }
 
+      // Ownership check BEFORE any side effects
+      let staffProp: { listedById: number; approvalStatus: string } | null = null;
+      if (ctx.unifiedUser!.role === "staff") {
+        const prop = await db.select({ listedById: properties.listedById, approvalStatus: properties.approvalStatus })
+          .from(properties)
+          .where(eq(properties.id, id))
+          .limit(1);
+        if (prop.length === 0 || prop[0].listedById !== ctx.unifiedUser!.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this property" });
+        }
+        staffProp = prop[0];
+      }
+
       return await db.transaction(async (tx) => {
         // Handle image updates — delete old images from Cloudinary first
         if (images) {
@@ -423,16 +437,8 @@ export const propertyRouter = createRouter({
         }
 
         if (ctx.unifiedUser!.role === "staff") {
-          const prop = await tx.select({ listedById: properties.listedById, approvalStatus: properties.approvalStatus })
-            .from(properties)
-            .where(eq(properties.id, id))
-            .limit(1);
-          if (prop.length === 0 || prop[0].listedById !== ctx.unifiedUser!.id) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this property" });
-          }
-
           // If property was rejected, reset to submitted and clear stale rejection comments
-          if (prop[0].approvalStatus === "rejected") {
+          if (staffProp!.approvalStatus === "rejected") {
             await tx.update(properties)
               .set({ ...data, approvalStatus: "submitted", rejectionComments: null })
               .where(eq(properties.id, id));
@@ -459,7 +465,19 @@ export const propertyRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       return await db.transaction(async (tx) => {
-        // Cascade delete all related records first
+        // Delete Cloudinary images before wiping DB rows
+        const oldImages = await tx.select({ publicId: propertyImages.publicId })
+          .from(propertyImages)
+          .where(eq(propertyImages.propertyId, input.id));
+        const oldPublicIds = oldImages.map(i => i.publicId).filter(Boolean) as string[];
+        if (oldPublicIds.length > 0) {
+          const { deleteCloudinaryImages } = await import("./services/cloudinary");
+          deleteCloudinaryImages(oldPublicIds).catch((err: unknown) =>
+            logger.error("Cloudinary cleanup error", { error: String(err) })
+          );
+        }
+
+        // Cascade delete all related records
         await tx.delete(approvalHistory).where(eq(approvalHistory.propertyId, input.id));
         await tx.delete(notifications).where(and(eq(notifications.entityType, "property"), eq(notifications.entityId, input.id)));
         await tx.delete(finalLagthrams).where(eq(finalLagthrams.propertyId, input.id));
@@ -480,8 +498,8 @@ export const propertyRouter = createRouter({
         buyerCID: z.string().length(11, "⚠️ Buyer CID must be exactly 11 digits."),
         buyerPhone: z.string().min(1, "⚠️ Buyer Phone is required.").max(20),
         buyerAddress: z.string().min(1, "⚠️ Buyer Address is required."),
-        agreementFile: z.string().optional(),
-        paymentScreenshot: z.string().optional(),
+        agreementFile: z.string().min(1, "Agreement file is required"),
+        paymentScreenshot: z.string().min(1, "Payment screenshot is required"),
         commissionAmount: z.string().optional(),
         paymentAmount: z.string().optional(),
       })
@@ -870,7 +888,7 @@ export const propertyRouter = createRouter({
     .input(
       z.object({
         propertyId: z.number(),
-        finalDocument: z.string().optional(),
+        finalDocument: z.string().min(1, "Final document is required"),
         completionCertificate: z.string().optional(),
       })
     )
@@ -1082,8 +1100,19 @@ export const propertyRouter = createRouter({
 
   getAllDocuments: staffQuery
     .input(z.object({ propertyId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = getDb();
+
+      // Verify ownership for staff
+      if (ctx.unifiedUser!.role === "staff") {
+        const prop = await db.select({ listedById: properties.listedById })
+          .from(properties)
+          .where(eq(properties.id, input.propertyId))
+          .limit(1);
+        if (prop.length === 0 || prop[0].listedById !== ctx.unifiedUser!.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
+        }
+      }
 
       const agreement = await db.select().from(propertyAgreements).where(eq(propertyAgreements.propertyId, input.propertyId)).limit(1);
       const docs = await db.select().from(propertyDocuments).where(eq(propertyDocuments.propertyId, input.propertyId)).limit(1);
@@ -1396,7 +1425,7 @@ export const propertyRouter = createRouter({
       .from(properties)
       .where(eq(properties.approvalStatus, "rejected"));
     const totalRevenue = await db
-      .select({ total: sql<string>`COALESCE(SUM(${properties.realEstateFee}), 0)` })
+      .select({ total: sql<string>`COALESCE(CAST(SUM(${properties.realEstateFee}) AS DECIMAL), 0)` })
       .from(properties)
       .where(eq(properties.workflowStatus, "completed"));
 
@@ -1503,8 +1532,8 @@ export const propertyRouter = createRouter({
       z.object({
         search: z.string().optional(),
         status: z.string().optional(),
-        page: z.number().default(1),
-        limit: z.number().default(20),
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).default(20),
       }).default(() => ({ page: 1, limit: 20 }))
     )
     .query(async ({ input, ctx }) => {
@@ -1519,12 +1548,13 @@ export const propertyRouter = createRouter({
         conditions.push(eq(properties.listedById, userId));
       }
 
-      if (input.search) {
+      const escapedSearch = input.search?.replace(/[%_]/g, "\\$&");
+      if (escapedSearch) {
         conditions.push(
           or(
-            like(properties.propertyName, `%${input.search}%`),
-            like(properties.ownerName, `%${input.search}%`),
-            like(properties.buyerName, `%${input.search}%`)
+            like(properties.propertyName, `%${escapedSearch}%`),
+            like(properties.ownerName, `%${escapedSearch}%`),
+            like(properties.buyerName, `%${escapedSearch}%`)
           )
         );
       }
@@ -1578,8 +1608,8 @@ export const propertyRouter = createRouter({
 
       // Financial totals across all matching records (not just current page)
       const totalsResult = await db.select({
-        totalSellingPrice: sql<string>`COALESCE(SUM(${properties.sellingPrice}), 0)`,
-        totalCommission: sql<string>`COALESCE(SUM(COALESCE(${propertyAgreements.commissionAmount}, ${properties.realEstateFee}, 0)), 0)`,
+        totalSellingPrice: sql<string>`COALESCE(CAST(SUM(${properties.sellingPrice}) AS DECIMAL), 0)`,
+        totalCommission: sql<string>`COALESCE(SUM(COALESCE(CAST(${propertyAgreements.commissionAmount} AS DECIMAL), CAST(${properties.realEstateFee} AS DECIMAL), 0)), 0)`,
         totalPaymentAmount: sql<string>`COALESCE(SUM(
           CASE
             WHEN ${properties.currentStep} >= 3 THEN

@@ -71,7 +71,7 @@ export default function Reports() {
 
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.adminStats.useQuery();
   const { data: typeStats, isLoading: typeLoading } = trpc.dashboard.propertyTypeStats.useQuery();
-  const { data: staffPerf, isLoading: staffLoading } = trpc.dashboard.staffPerformance.useQuery({});
+  const { data: staffPerf, isLoading: staffLoading } = trpc.dashboard.staffPerformance.useQuery();
   const { data: workflowStats, isLoading: workflowLoading } = trpc.dashboard.workflowStats.useQuery();
   const { data: realMonthlyData, isLoading: monthlyLoading } = trpc.dashboard.monthlySales.useQuery({ year });
 

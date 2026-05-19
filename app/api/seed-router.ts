@@ -1,6 +1,8 @@
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
+import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import {
   propertyTypes,
   localUsers,
@@ -25,6 +27,7 @@ export const seedRouter = createRouter({
     try {
       const db = getDb();
 
+      return await db.transaction(async (tx) => {
       // ─── 1. PROPERTY TYPES ───────────────────────────────────────────
       const propertyTypeData = [
         { name: "Land", description: "Agricultural and non-agricultural land plots", requiresBuildingDocs: false },
@@ -36,16 +39,21 @@ export const seedRouter = createRouter({
       ];
 
       for (const pt of propertyTypeData) {
-        await db.insert(propertyTypes).values(pt).onDuplicateKeyUpdate({
+        await tx.insert(propertyTypes).values(pt).onDuplicateKeyUpdate({
           set: { name: pt.name, requiresBuildingDocs: pt.requiresBuildingDocs },
         });
       }
 
       // ─── 2. LOCAL USERS (Admin + Staff) ──────────────────────────────
-      const adminPassword = await bcrypt.hash("admin123", 12);
-      const staffPassword = await bcrypt.hash("staff123", 12);
+      const adminPass = crypto.randomBytes(8).toString("hex");
+      const staffPass = crypto.randomBytes(8).toString("hex");
+      console.log(`Admin password: ${adminPass}`);
+      console.log(`Staff password: ${staffPass}`);
 
-      await db.insert(localUsers).values([
+      const adminPassword = await bcrypt.hash(adminPass, 12);
+      const staffPassword = await bcrypt.hash(staffPass, 12);
+
+      await tx.insert(localUsers).values([
         {
           fullName: "Admin User",
           email: "admin@phojaa95.com",
@@ -87,7 +95,7 @@ export const seedRouter = createRouter({
           loginAttempts: 0,
         },
       ]).onDuplicateKeyUpdate({
-        set: { email: "admin@phojaa95.com" },
+        set: { email: sql`VALUES(email)` },
       });
 
       // ─── 3. SAMPLE PROPERTIES ────────────────────────────────────────
@@ -232,7 +240,9 @@ export const seedRouter = createRouter({
       ];
 
       for (const prop of sampleProperties) {
-        await db.insert(properties).values(prop);
+        await tx.insert(properties).values(prop).onDuplicateKeyUpdate({
+          set: { propertyName: sql`VALUES(propertyName)` },
+        });
       }
 
       // ─── 4. ATTENDANCE ───────────────────────────────────────────────
@@ -247,7 +257,7 @@ export const seedRouter = createRouter({
         for (const userId of [2, 3, 4]) {
           const status = statuses[Math.floor(Math.random() * statuses.length)];
 
-          await db.insert(attendance).values({
+          await tx.insert(attendance).values({
             userId,
             date: new Date(dateStr),
             checkIn: status !== "absent" ? new Date(date.setHours(8 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60))) : null,
@@ -267,7 +277,7 @@ export const seedRouter = createRouter({
           const deduction = Math.floor(Math.random() * 2000);
           const netSalary = baseSalary + bonus - deduction;
 
-          await db.insert(payroll).values({
+          await tx.insert(payroll).values({
             userId,
             month,
             baseSalary: baseSalary.toFixed(2),
@@ -296,7 +306,7 @@ export const seedRouter = createRouter({
       ];
 
       for (const hist of historyData) {
-        await db.insert(approvalHistory).values(hist);
+        await tx.insert(approvalHistory).values(hist);
       }
 
       // ─── 7. ACTIVITY LOGS ────────────────────────────────────────────
@@ -309,19 +319,20 @@ export const seedRouter = createRouter({
       ];
 
       for (const act of activityData) {
-        await db.insert(activityLogs).values(act);
+        await tx.insert(activityLogs).values(act);
       }
 
       // ─── 8. SYSTEM SETTINGS ──────────────────────────────────────────
-      await db.insert(systemSettings).values([
+      await tx.insert(systemSettings).values([
         { key: "company_name", value: "Phojaa95 Real Estate", description: "Company name displayed in the system" },
         { key: "commission_rate", value: "3", description: "Default commission rate percentage" },
         { key: "currency", value: "BTN", description: "Default currency code" },
       ]).onDuplicateKeyUpdate({
-        set: { key: "company_name" },
+        set: { key: sql`VALUES(key)` },
       });
 
       return { success: true, message: "Database seeded successfully" };
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Seed failed";
       return { success: false, message };

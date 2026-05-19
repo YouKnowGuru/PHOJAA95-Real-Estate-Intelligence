@@ -48,6 +48,27 @@ export default function Users() {
   }, [search]);
   const [showEdit, setShowEdit] = useState<NonNullable<typeof data>["items"][number] | null>(null);
   const [newPassword, setNewPassword] = useState("");
+  const [editForm, setEditForm] = useState({
+    fullName: "",
+    phone: "",
+    employeeId: "",
+    pfPercentage: "",
+    role: "staff" as "staff" | "admin",
+    status: "active" as "active" | "inactive" | "locked",
+  });
+
+  useEffect(() => {
+    if (showEdit) {
+      setEditForm({
+        fullName: showEdit.fullName,
+        phone: showEdit.phone || "",
+        employeeId: showEdit.employeeId || "",
+        pfPercentage: showEdit.pfPercentage || "0",
+        role: showEdit.role,
+        status: showEdit.status,
+      });
+    }
+  }, [showEdit]);
 
   const { data, isLoading } = trpc.user.list.useQuery({
     search: debouncedSearch || undefined,
@@ -377,41 +398,40 @@ export default function Users() {
           {showEdit && (
             <form onSubmit={(e) => {
               e.preventDefault();
-              const formData = new FormData(e.currentTarget);
               updateMutation.mutate({
                 id: showEdit.id,
-                fullName: formData.get("fullName") as string,
-                phone: formData.get("phone") as string,
-                pfPercentage: formData.get("pfPercentage") as string,
-                employeeId: formData.get("employeeId") as string,
-                role: formData.get("role") as "staff" | "admin",
-                status: formData.get("status") as "active" | "inactive" | "locked",
+                fullName: editForm.fullName,
+                phone: editForm.phone,
+                pfPercentage: editForm.pfPercentage,
+                employeeId: editForm.employeeId,
+                role: editForm.role,
+                status: editForm.status,
               });
             }} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Full Name</Label>
-                    <Input name="fullName" defaultValue={showEdit.fullName} required />
+                    <Input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} required />
                   </div>
                   <div className="space-y-2">
                     <Label>Phone</Label>
-                    <Input name="phone" defaultValue={showEdit.phone || ""} />
+                    <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
                   </div>
                 </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Employee ID</Label>
-                  <Input name="employeeId" defaultValue={showEdit.employeeId || ""} placeholder="e.g. EMP001" />
+                  <Input value={editForm.employeeId} onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })} placeholder="e.g. EMP001" />
                 </div>
                 <div className="space-y-2">
                   <Label>PF Percentage (%)</Label>
-                  <Input name="pfPercentage" type="number" step="0.01" defaultValue={showEdit.pfPercentage || "0"} />
+                  <Input type="number" step="0.01" value={editForm.pfPercentage} onChange={(e) => setEditForm({ ...editForm, pfPercentage: e.target.value })} />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select name="role" defaultValue={showEdit.role}>
+                  <Select value={editForm.role} onValueChange={(v: "staff" | "admin") => setEditForm({ ...editForm, role: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="staff">Staff</SelectItem>
@@ -421,7 +441,7 @@ export default function Users() {
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select name="status" defaultValue={showEdit.status}>
+                  <Select value={editForm.status} onValueChange={(v: "active" | "inactive" | "locked") => setEditForm({ ...editForm, status: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="active">Active</SelectItem>
