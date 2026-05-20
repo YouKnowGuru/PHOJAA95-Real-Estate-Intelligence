@@ -19,8 +19,39 @@ export function serveStaticFiles(app: App) {
     fs.mkdirSync(publicPath, { recursive: true });
   }
 
-  // Serve uploaded files from public/uploads
-  app.use("/uploads", serveStatic({ root: publicPath }));
+  // Serve uploaded files from public/uploads (explicit handler for reliability)
+  app.use("/uploads/*", async (c, next) => {
+    const reqPath = c.req.path;
+    const filePath = path.join(publicPath, reqPath);
+
+    // Security: ensure file is within publicPath
+    const resolvedFile = path.resolve(filePath);
+    const resolvedPublic = path.resolve(publicPath);
+    if (!resolvedFile.startsWith(resolvedPublic)) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return await next();
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      ".pdf": "application/pdf",
+      ".png": "image/png",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".gif": "image/gif",
+      ".webp": "image/webp",
+    };
+    const contentType = mimeTypes[ext] || "application/octet-stream";
+
+    const file = fs.readFileSync(filePath);
+    return c.newResponse(file, 200, {
+      "Content-Type": contentType,
+      "Content-Length": file.length.toString(),
+    });
+  });
 
   // Serve built assets
   app.use("*", serveStatic({ root: distPath }));
