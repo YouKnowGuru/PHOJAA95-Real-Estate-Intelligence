@@ -216,6 +216,7 @@ export const attendance = mysqlTable("attendance", {
   checkOut: timestamp("check_out"),
   status: mysqlEnum("status", ["present", "absent", "late", "half_day"]).default("absent").notNull(),
   notes: text("notes"),
+  deductionNotes: text("deduction_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 }, (table) => [
@@ -241,6 +242,7 @@ export const payroll = mysqlTable("payroll", {
   paidAt: timestamp("paid_at"),
   paidBy: bigint("paid_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
   notes: text("notes"),
+  deductionNotes: text("deduction_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
 }, (table) => [

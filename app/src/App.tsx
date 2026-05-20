@@ -38,7 +38,7 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
 
   useEffect(() => {
     if (!isLoading) {
-      const timer = setTimeout(() => setShowLoader(false), 6000);
+      const timer = setTimeout(() => setShowLoader(false), 2000);
       return () => clearTimeout(timer);
     }
   }, [isLoading]);

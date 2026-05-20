@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,9 @@ import {
   CircleDashed,
   AlertCircle,
   PackageOpen,
+  FileSpreadsheet,
+  FileJson,
+  FileType,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router";
@@ -704,6 +708,66 @@ export default function Billing() {
 
   const formatK = (n: number) => `Nu. ${(n / 1000).toFixed(0)}K`;
 
+  const utils = trpc.useUtils();
+  const [exporting, setExporting] = useState<null | "csv" | "json" | "pdf">(null);
+
+  const handleExport = async (format: "csv" | "json" | "pdf") => {
+    if (exporting) return;
+    setExporting(format);
+    try {
+      const result = await utils.client.property.exportBilling.query({
+        search: debouncedSearch || undefined,
+        status: status === "all" ? undefined : status,
+        format,
+      });
+
+      if (format === "csv" && "csv" in result && typeof result.csv === "string") {
+        const blob = new Blob([result.csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `billing-export-${new Date().toISOString().slice(0, 10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("CSV exported successfully");
+      } else if (format === "json" && "data" in result) {
+        const blob = new Blob([JSON.stringify(result.data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `billing-export-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("JSON exported successfully");
+      } else if (format === "pdf" && "pdfBase64" in result && typeof result.pdfBase64 === "string") {
+        const byteCharacters = atob(result.pdfBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `billing-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("PDF exported successfully");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Export failed. Please try again.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -793,6 +857,38 @@ export default function Billing() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
+              <div className="flex items-center gap-2 ml-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  disabled={isLoading || !!exporting}
+                  onClick={() => handleExport("csv")}
+                >
+                  <FileSpreadsheet className="h-3.5 w-3.5" />
+                  {exporting === "csv" ? "Exporting..." : "CSV"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  disabled={isLoading || !!exporting}
+                  onClick={() => handleExport("json")}
+                >
+                  <FileJson className="h-3.5 w-3.5" />
+                  {exporting === "json" ? "Exporting..." : "JSON"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  disabled={isLoading || !!exporting}
+                  onClick={() => handleExport("pdf")}
+                >
+                  <FileType className="h-3.5 w-3.5" />
+                  {exporting === "pdf" ? "Exporting..." : "PDF"}
+                </Button>
+              </div>
               {debouncedSearch && (
                 <Badge variant="secondary" className="h-9 px-3 gap-1">
                   <Search className="h-3 w-3" />

@@ -38,8 +38,8 @@ async function seed() {
   console.log("Property types seeded.");
 
   // ─── 2. LOCAL USERS (Admin + Staff) ──────────────────────────────
-  const adminPassword = await bcrypt.hash("admin123", 12);
-  const staffPassword = await bcrypt.hash("staff123", 12);
+  const adminPassword = await bcrypt.hash("Admin123", 12);
+  const staffPassword = await bcrypt.hash("Staff123", 12);
 
   await db.insert(schema.localUsers).values([
     {
@@ -83,7 +83,7 @@ async function seed() {
       loginAttempts: 0,
     },
   ]).onDuplicateKeyUpdate({
-    set: { email: sql`values(email)` },
+    set: { email: sql`values(email)`, password: sql`values(password)`, status: sql`values(status)`, loginAttempts: sql`values(loginAttempts)` },
   });
   console.log("Users seeded.");
 

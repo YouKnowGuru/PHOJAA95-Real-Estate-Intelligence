@@ -1,6 +1,9 @@
 import { z } from "zod";
 import { eq, and, like, desc, sql, or, count, ne, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { format } from "date-fns";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import { createRouter, adminQuery, staffQuery, publicQuery } from "./middleware";
 import { logger } from "./lib/logger";
 import { getDb } from "./queries/connection";
@@ -17,6 +20,23 @@ import {
   notifications,
   propertyImages,
 } from "@db/schema";
+
+function generateCSV(data: Record<string, unknown>[], headers: string[]): string {
+  const headerRow = headers.join(",");
+  const rows = data.map((row) =>
+    headers.map((h) => {
+      const val = row[h];
+      const str = val === null || val === undefined ? "" : String(val);
+      return str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r") ? `"${str.replace(/"/g, '""')}"` : str;
+    }).join(",")
+  );
+  return [headerRow, ...rows].join("\n");
+}
+
+function fmtPlain(val: string | number | null | undefined): string {
+  const n = typeof val === "number" ? val : parseFloat(val ?? "0");
+  return isNaN(n) ? "0.00" : n.toFixed(2);
+}
 
 export const propertyRouter = createRouter({
   create: staffQuery
@@ -1654,5 +1674,192 @@ export const propertyRouter = createRouter({
       const totals = totalsResult[0] ?? { totalSellingPrice: "0", totalCommission: "0", totalPaymentAmount: "0", totalRemainingDue: "0" };
 
       return { items: results, total, page, limit, totalPages: Math.ceil(total / limit), totals };
+    }),
+
+  exportBilling: staffQuery
+    .input(
+      z.object({
+        search: z.string().optional(),
+        status: z.string().optional(),
+        format: z.enum(["csv", "json", "pdf"]).default("csv"),
+      }).optional()
+    )
+    .query(async ({ input, ctx }) => {
+      const db = getDb();
+      const userRole = ctx.unifiedUser!.role;
+      const userId = ctx.unifiedUser!.id;
+
+      const conditions = [];
+
+      if (userRole === "staff") {
+        conditions.push(eq(properties.listedById, userId));
+      }
+
+      const escapedSearch = input?.search?.replace(/[%_]/g, "\\$&");
+      if (escapedSearch) {
+        conditions.push(
+          or(
+            like(properties.propertyName, `%${escapedSearch}%`),
+            like(properties.ownerName, `%${escapedSearch}%`),
+            like(properties.buyerName, `%${escapedSearch}%`)
+          )
+        );
+      }
+
+      if (input?.status) {
+        conditions.push(eq(properties.workflowStatus, input.status));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const results = await db
+        .select({
+          id: properties.id,
+          propertyName: properties.propertyName,
+          ownerName: properties.ownerName,
+          buyerName: properties.buyerName,
+          sellingPrice: properties.sellingPrice,
+          realEstateFee: properties.realEstateFee,
+          currentStep: properties.currentStep,
+          approvalStatus: properties.approvalStatus,
+          workflowStatus: properties.workflowStatus,
+          createdAt: properties.createdAt,
+          completedAt: properties.completedAt,
+          propertyTypeName: propertyTypes.name,
+          listedByName: localUsers.fullName,
+          commissionAmount: propertyAgreements.commissionAmount,
+          paymentAmount: propertyAgreements.paymentAmount,
+          remainingPaymentAmount: propertyDocuments.remainingPaymentAmount,
+        })
+        .from(properties)
+        .leftJoin(propertyTypes, eq(properties.propertyTypeId, propertyTypes.id))
+        .leftJoin(localUsers, eq(properties.listedById, localUsers.id))
+        .leftJoin(propertyAgreements, eq(propertyAgreements.propertyId, properties.id))
+        .leftJoin(propertyDocuments, eq(propertyDocuments.propertyId, properties.id))
+        .where(whereClause)
+        .orderBy(desc(properties.createdAt));
+
+      const formattedData = results.map((item) => {
+        const sellingPrice = parseFloat(item.sellingPrice ?? "0");
+        const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
+        const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : sellingPrice / 2;
+        const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
+        const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, sellingPrice - initialPayment);
+        const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
+
+        const isStep2Approved = item.currentStep >= 3;
+        const isStep3Approved = item.currentStep >= 4;
+
+        const initialReceived = isStep2Approved ? initialPayment : 0;
+        const remainingReceived = isStep3Approved ? remainingPayment : 0;
+        const totalReceived = initialReceived + remainingReceived;
+        const balanceDue = Math.max(0, sellingPrice - totalReceived);
+        const netToSeller = Math.max(0, sellingPrice - commission);
+
+        return {
+          id: item.id,
+          invoiceNo: `INV-${String(item.id).padStart(5, "0")}`,
+          propertyName: item.propertyName,
+          ownerName: item.ownerName,
+          buyerName: item.buyerName || "",
+          propertyType: item.propertyTypeName || "",
+          listedBy: item.listedByName || "",
+          status: item.workflowStatus,
+          sellingPrice: fmtPlain(item.sellingPrice),
+          initialPayment: fmtPlain(String(initialPayment)),
+          remainingPayment: fmtPlain(String(remainingPayment)),
+          totalReceived: fmtPlain(String(totalReceived)),
+          balanceDue: fmtPlain(String(balanceDue)),
+          commission: fmtPlain(String(commission)),
+          netToSeller: fmtPlain(String(netToSeller)),
+          percentPaid: sellingPrice > 0 ? Math.round((totalReceived / sellingPrice) * 100) : 0,
+          createdAt: item.createdAt ? format(item.createdAt, "yyyy-MM-dd") : "",
+          completedAt: item.completedAt ? format(item.completedAt, "yyyy-MM-dd") : "",
+        };
+      });
+
+      const exportFormat = input?.format || "csv";
+
+      if (exportFormat === "json") {
+        return { data: formattedData };
+      }
+
+      if (exportFormat === "pdf") {
+        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const now = new Date().toLocaleDateString("en-GB");
+
+        doc.setFontSize(18);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(15, 23, 42);
+        doc.text("Billing & Invoices Report", 14, 18);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Generated on ${now}  •  ${formattedData.length} records`, 14, 25);
+
+        if (input?.search || input?.status) {
+          const filters: string[] = [];
+          if (input.status) filters.push(`Status: ${input.status}`);
+          if (input.search) filters.push(`Search: ${input.search}`);
+          doc.text(`Filters: ${filters.join("  |  ")}`, 14, 30);
+        }
+
+        autoTable(doc, {
+          startY: input?.search || input?.status ? 34 : 30,
+          head: [["Invoice #", "Property", "Owner", "Buyer", "Status", "Selling Price", "Total Paid", "Balance Due", "Commission", "Net to Seller"]],
+          body: formattedData.map((row) => [
+            row.invoiceNo,
+            row.propertyName,
+            row.ownerName,
+            row.buyerName,
+            row.status,
+            row.sellingPrice,
+            row.totalReceived,
+            row.balanceDue,
+            row.commission,
+            row.netToSeller,
+          ]),
+          headStyles: {
+            fillColor: [15, 23, 42],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            fontSize: 9,
+          },
+          bodyStyles: {
+            fontSize: 9,
+            textColor: [51, 65, 85],
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          styles: {
+            overflow: "linebreak",
+            cellPadding: 2,
+          },
+          columnStyles: {
+            0: { cellWidth: 22 },
+            1: { cellWidth: "auto" },
+            5: { halign: "right" },
+            6: { halign: "right" },
+            7: { halign: "right" },
+            8: { halign: "right" },
+            9: { halign: "right" },
+          },
+          didDrawPage: (data) => {
+            doc.setFontSize(8);
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Page ${data.pageNumber}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 6, { align: "center" });
+          },
+        });
+
+        const pdfBase64 = doc.output("datauristring").split(",")[1];
+        return { pdfBase64 };
+      }
+
+      const headers = ["invoiceNo", "propertyName", "ownerName", "buyerName", "propertyType", "listedBy", "status", "sellingPrice", "initialPayment", "remainingPayment", "totalReceived", "balanceDue", "commission", "netToSeller", "percentPaid", "createdAt", "completedAt"];
+      const csv = generateCSV(formattedData, headers);
+      return { csv };
     }),
 });

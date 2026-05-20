@@ -23,6 +23,7 @@ interface PayrollRecord {
   employeeId?: string;
   pfNumber?: string;
   notes?: string;
+  deductionNotes?: string;
 }
 
 interface PayslipModalProps {
@@ -82,6 +83,7 @@ DEDUCTIONS
 ================================
 PF Deduction (${pfPercentage}%):  ${formatCurrency(pfDeduction.toString())}
 Other Deductions:     ${formatCurrency(record.deduction)}
+${record.deductionNotes ? `Deduction Notes:      ${record.deductionNotes}` : ""}
                 ---------------
 Total Deductions:  ${formatCurrency(totalDeductions.toString())}
 
@@ -110,7 +112,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
 
   const deductionItems = [
     { label: `PF Deduction (${pfPercentage}%)`, value: pfDeduction },
-    { label: "Other Deductions", value: deduction },
+    { label: "Other Deductions", value: deduction, notes: record.deductionNotes },
   ].filter(item => item.value > 0);
 
   return (
@@ -266,7 +268,12 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
                   return (
                     <div key={item.label}>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
+                        <span className="text-slate-600 dark:text-slate-400">
+                          {item.label}
+                          {(item as any).notes && (
+                            <span className="block text-[10px] text-slate-400 mt-0.5">{(item as any).notes}</span>
+                          )}
+                        </span>
                         <span className="font-medium text-slate-800 dark:text-slate-200">
                           -Nu. {item.value.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                         </span>

@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { localUsers } from "@db/schema";
+import { passwordSchema } from "./local-auth-router";
 
 export const userRouter = createRouter({
   list: adminQuery
@@ -100,7 +101,7 @@ export const userRouter = createRouter({
       z.object({
         fullName: z.string().min(2).max(255),
         email: z.string().email(),
-        password: z.string().min(6),
+        password: passwordSchema,
         role: z.enum(["staff", "admin"]),
         phone: z.string().optional(),
         address: z.string().optional(),
@@ -175,7 +176,7 @@ export const userRouter = createRouter({
     }),
 
   resetPassword: adminQuery
-    .input(z.object({ id: z.number(), newPassword: z.string().min(6) }))
+    .input(z.object({ id: z.number(), newPassword: passwordSchema }))
     .mutation(async ({ input }) => {
       const db = getDb();
       const hashedPassword = await bcrypt.hash(input.newPassword, 12);

@@ -45,8 +45,8 @@ export const seedRouter = createRouter({
       }
 
       // ─── 2. LOCAL USERS (Admin + Staff) ──────────────────────────────
-      const adminPass = crypto.randomBytes(8).toString("hex");
-      const staffPass = crypto.randomBytes(8).toString("hex");
+      const adminPass = "Admin123";
+      const staffPass = "Staff123";
       console.log(`Admin password: ${adminPass}`);
       console.log(`Staff password: ${staffPass}`);
 
@@ -95,7 +95,7 @@ export const seedRouter = createRouter({
           loginAttempts: 0,
         },
       ]).onDuplicateKeyUpdate({
-        set: { email: sql`VALUES(email)` },
+        set: { email: sql`VALUES(email)`, password: sql`VALUES(password)`, status: sql`VALUES(status)`, loginAttempts: sql`VALUES(loginAttempts)` },
       });
 
       // ─── 3. SAMPLE PROPERTIES ────────────────────────────────────────

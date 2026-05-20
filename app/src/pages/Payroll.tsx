@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -56,6 +57,7 @@ export default function PayrollPage() {
     deduction: "0",
     pfPercentage: "",
     notes: "",
+    deductionNotes: "",
   });
 
   const { data: payrollList, isLoading: payrollLoading } = trpc.payroll.list.useQuery(
@@ -84,6 +86,19 @@ export default function PayrollPage() {
     onSuccess: () => {
       toast.success("Payroll entry created");
       setShowAdd(false);
+      utils.payroll.list.invalidate();
+      utils.payroll.myPayroll.invalidate();
+      utils.payroll.salarySummary.invalidate();
+      setPayrollForm({
+        userId: "",
+        month: currentMonth,
+        baseSalary: "",
+        bonus: "0",
+        deduction: "0",
+        pfPercentage: "",
+        notes: "",
+        deductionNotes: "",
+      });
     },
     onError: (err) => toast.error(err.message),
   });
@@ -92,6 +107,7 @@ export default function PayrollPage() {
     onSuccess: () => {
       toast.success("Marked as paid");
       utils.payroll.list.invalidate();
+      utils.payroll.salarySummary.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -100,6 +116,7 @@ export default function PayrollPage() {
     onSuccess: () => {
       toast.success("Payroll entry deleted");
       utils.payroll.list.invalidate();
+      utils.payroll.salarySummary.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -267,6 +284,7 @@ export default function PayrollPage() {
         [{ content: "DEDUCTIONS", styles: { fillColor: [239, 68, 68], textColor: white, fontStyle: "bold", fontSize: 8 } }, { content: "", styles: { fillColor: [239, 68, 68], textColor: white } }],
         [`PF Deduction (${item.pfPercentage || "0"}%)`, `-${pfDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
         ["Other Deductions", `-${deduction.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
+        ...(item.deductionNotes ? [[`  Notes: ${item.deductionNotes}`, ""]] : []),
         [{ content: "Total Deductions", styles: { fontStyle: "bold", textColor: [220, 38, 38] } }, { content: `-${totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, styles: { fontStyle: "bold", textColor: [220, 38, 38] } }],
       ],
       theme: "grid",
@@ -570,6 +588,15 @@ export default function PayrollPage() {
               <Label>Other Deduction</Label>
               <Input type="number" value={payrollForm.deduction} onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })} />
             </div>
+            <div className="space-y-2">
+              <Label>Other Deduction Notes</Label>
+              <Textarea
+                value={payrollForm.deductionNotes}
+                onChange={(e) => setPayrollForm({ ...payrollForm, deductionNotes: e.target.value })}
+                placeholder="Reason for other deduction (e.g., advance, late fine)"
+                rows={2}
+              />
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
               <Button
@@ -587,6 +614,7 @@ export default function PayrollPage() {
                     deduction: payrollForm.deduction,
                     pfPercentage: payrollForm.pfPercentage || undefined,
                     notes: payrollForm.notes,
+                    deductionNotes: payrollForm.deductionNotes,
                   });
                 }}
                 disabled={createMutation.isPending}

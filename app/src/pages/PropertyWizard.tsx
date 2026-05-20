@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Plus,
   Trash2,
+  ExternalLink,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { WORKFLOW_STEPS } from "@/constants/workflow";
@@ -843,6 +844,16 @@ export default function PropertyWizard() {
             )}
 
             <div className="grid gap-6">
+              <a
+                href="https://esakor.nlcs.gov.bt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium h-10 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 transition-colors w-fit"
+              >
+                <ExternalLink className="h-4 w-4" />
+                eSakor Portal
+              </a>
+
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Gewog Endorse Document *</Label>

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, Eye, EyeOff, LogIn, Lock, Mail, Loader2, Sparkles, Shield, Zap, ArrowLeft } from "lucide-react";
+import { Building2, Eye, EyeOff, LogIn, Lock, Mail, Loader2, Sparkles, Shield, Zap, ArrowLeft, MailCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function Login() {
@@ -296,43 +296,74 @@ export default function Login() {
                     </motion.div>
                   </motion.form>
                 ) : (
-                  <motion.form
+                  <motion.div
                     key="forgot-form"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    onSubmit={handleForgotPassword}
                     className="space-y-5"
                   >
-                    <div className="space-y-2">
-                      <Label className="text-slate-300 font-semibold text-[11px] uppercase tracking-widest ml-1">
-                        Email Address
-                      </Label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
-                          <Mail className="h-[18px] w-[18px] text-slate-500" />
-                        </div>
-                        <Input
-                          type="email"
-                          autoComplete="email"
-                          placeholder="admin@phojaa95.com"
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          className="h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-[15px]"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} className="pt-1">
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-[15px] tracking-wide"
+                    {forgotSuccess ? (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="text-center space-y-5 py-4"
                       >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Reset Link"}
-                      </Button>
-                    </motion.div>
+                        <div className="mx-auto h-16 w-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                          <MailCheck className="h-8 w-8 text-emerald-400" />
+                        </div>
+                        <div className="space-y-2">
+                          <h3 className="text-lg font-bold text-white">Check Your Email</h3>
+                          <p className="text-sm text-slate-400 leading-relaxed">
+                            We've sent password reset instructions to<br />
+                            <span className="text-emerald-400 font-medium">{forgotEmail}</span>
+                          </p>
+                        </div>
+                        <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] px-4 py-3">
+                          <p className="text-xs text-slate-500">
+                            Didn't receive the email? Check your spam folder or try again in a few minutes.
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : (
+                      <motion.form
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onSubmit={handleForgotPassword}
+                        className="space-y-5"
+                      >
+                        <div className="space-y-2">
+                          <Label className="text-slate-300 font-semibold text-[11px] uppercase tracking-widest ml-1">
+                            Email Address
+                          </Label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+                              <Mail className="h-[18px] w-[18px] text-slate-500" />
+                            </div>
+                            <Input
+                              type="email"
+                              autoComplete="email"
+                              placeholder="admin@phojaa95.com"
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                              className="h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-[15px]"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} className="pt-1">
+                          <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-[15px] tracking-wide"
+                          >
+                            {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Reset Link"}
+                          </Button>
+                        </motion.div>
+                      </motion.form>
+                    )}
 
                     <div className="text-center pt-2">
                       <button
@@ -344,7 +375,7 @@ export default function Login() {
                         Back to Sign In
                       </button>
                     </div>
-                  </motion.form>
+                  </motion.div>
                 )}
 
 

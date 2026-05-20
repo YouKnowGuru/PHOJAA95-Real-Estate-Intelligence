@@ -24,6 +24,7 @@ export const payrollRouter = createRouter({
         deduction: z.string().default("0"),
         pfPercentage: z.string().optional(),
         notes: z.string().optional(),
+        deductionNotes: z.string().optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -68,6 +69,7 @@ export const payrollRouter = createRouter({
               pfPercentage: pfPercent.toString(),
               netSalary,
               notes: input.notes,
+              deductionNotes: input.deductionNotes,
             })
             .where(eq(payroll.id, existing[0].id));
 
@@ -85,6 +87,7 @@ export const payrollRouter = createRouter({
           netSalary,
           paymentStatus: "pending",
           notes: input.notes,
+          deductionNotes: input.deductionNotes,
         });
 
         return { id: Number(result[0].insertId), netSalary, pfDeduction };
@@ -131,6 +134,7 @@ export const payrollRouter = createRouter({
           paymentStatus: payroll.paymentStatus,
           paidAt: payroll.paidAt,
           notes: payroll.notes,
+          deductionNotes: payroll.deductionNotes,
           createdAt: payroll.createdAt,
           userName: localUsers.fullName,
           userEmail: localUsers.email,
@@ -193,6 +197,7 @@ export const payrollRouter = createRouter({
           paymentStatus: payroll.paymentStatus,
           paidAt: payroll.paidAt,
           notes: payroll.notes,
+          deductionNotes: payroll.deductionNotes,
           createdAt: payroll.createdAt,
           userName: localUsers.fullName,
           pfNumber: localUsers.pfNumber,

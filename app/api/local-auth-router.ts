@@ -18,7 +18,7 @@ if (!env.appSecret) {
 }
 const JWT_SECRET = new TextEncoder().encode(env.appSecret);
 
-const passwordSchema = z.string().min(6).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain uppercase, lowercase, and number");
+export const passwordSchema = z.string().min(6).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain uppercase, lowercase, and number");
 
 const DEFAULT_SESSION_HOURS = 24;
 const REMEMBER_ME_DAYS = 30;

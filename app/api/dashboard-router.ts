@@ -42,7 +42,7 @@ export const dashboardRouter = createRouter({
 
       const results = await db
         .select({
-          month: sql<string>`DATE_FORMAT(${properties.completedAt}, '%Y-%m')`,
+          month: sql<string>`DATE_FORMAT(COALESCE(${properties.completedAt}, ${properties.updatedAt}), '%Y-%m')`,
           count: count(),
           revenue: sql<string>`COALESCE(SUM(${properties.realEstateFee}), 0)`,
         })
@@ -50,11 +50,11 @@ export const dashboardRouter = createRouter({
         .where(
           and(
             eq(properties.workflowStatus, "completed"),
-            gte(properties.completedAt, startOfYear)
+            gte(sql`COALESCE(${properties.completedAt}, ${properties.updatedAt})`, startOfYear)
           )
         )
-        .groupBy(sql`DATE_FORMAT(${properties.completedAt}, '%Y-%m')`)
-        .orderBy(sql`DATE_FORMAT(${properties.completedAt}, '%Y-%m')`);
+        .groupBy(sql`DATE_FORMAT(COALESCE(${properties.completedAt}, ${properties.updatedAt}), '%Y-%m')`)
+        .orderBy(sql`DATE_FORMAT(COALESCE(${properties.completedAt}, ${properties.updatedAt}), '%Y-%m')`);
 
       return results;
     }),
