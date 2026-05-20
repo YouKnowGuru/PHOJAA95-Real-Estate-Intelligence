@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -18,8 +19,9 @@ const MAGIC_BYTES: Record<string, number[]> = {
   "application/pdf": [0x25, 0x50, 0x44, 0x46],
 };
 
-// Get app directory and create uploads path
-const APP_DIR = process.cwd();
+// Get app directory from bundled script location instead of process.cwd()
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const APP_DIR = path.resolve(__dirname, "../.."); // from api/services/ up to app/
 const UPLOAD_DIR = path.join(APP_DIR, "public", "uploads");
 
 // Ensure upload directory exists on startup

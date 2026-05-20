@@ -3,13 +3,16 @@ import type { HttpBindings } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 type App = Hono<{ Bindings: HttpBindings }>;
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const appDir = path.resolve(__dirname, "../.."); // from api/lib/ up to app/
+const distPath = path.join(appDir, "dist/public");
+const publicPath = path.join(appDir, "public");
+
 export function serveStaticFiles(app: App) {
-  const appDir = process.cwd();
-  const distPath = path.join(appDir, "dist/public");
-  const publicPath = path.join(appDir, "public");
 
   // Ensure public folder exists
   if (!fs.existsSync(publicPath)) {
@@ -20,7 +23,7 @@ export function serveStaticFiles(app: App) {
   app.use("/uploads", serveStatic({ root: publicPath }));
 
   // Serve built assets
-  app.use("*", serveStatic({ root: "./dist/public" }));
+  app.use("*", serveStatic({ root: distPath }));
 
   // Not found handler
   app.notFound((c) => {
