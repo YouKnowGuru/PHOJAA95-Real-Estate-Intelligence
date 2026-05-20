@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 type App = Hono<{ Bindings: HttpBindings }>;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const appDir = path.resolve(__dirname, "../.."); // from api/lib/ up to app/
+const appDir = path.resolve(__dirname, ".."); // from dist/ up to app/
 const distPath = path.join(appDir, "dist/public");
 const publicPath = path.join(appDir, "public");
 

@@ -21,7 +21,7 @@ const MAGIC_BYTES: Record<string, number[]> = {
 
 // Get app directory from bundled script location instead of process.cwd()
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_DIR = path.resolve(__dirname, "../.."); // from api/services/ up to app/
+const APP_DIR = path.resolve(__dirname, ".."); // from dist/ up to app/
 const UPLOAD_DIR = path.join(APP_DIR, "public", "uploads");
 
 // Ensure upload directory exists on startup
