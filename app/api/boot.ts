@@ -12,6 +12,9 @@ import { logger } from "./lib/logger";
 import { closeDb } from "./queries/connection";
 import { createOAuthCallbackHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
+import { UPLOAD_DIR } from "./lib/paths";
+import fs from "fs";
+import path from "path";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -103,6 +106,52 @@ app.use("/api/trpc/*", async (c) => {
     createContext,
   });
 });
+// ─── Dedicated file download endpoint (reliable fallback) ───────────
+app.get("/api/file/*", async (c) => {
+  const rawKey = c.req.path.replace("/api/file/", "");
+  const safeKey = rawKey.replace(/[\\/]/g, "_").replace(/\.{2,}/g, "_");
+  const filePath = path.join(UPLOAD_DIR, safeKey);
+
+  const resolvedFile = path.resolve(filePath);
+  const resolvedUploadDir = path.resolve(UPLOAD_DIR);
+  if (!resolvedFile.startsWith(resolvedUploadDir)) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    logger.warn("API file endpoint: file not found", { key: safeKey, filePath });
+    return c.json({ error: "File not found" }, 404);
+  }
+
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) {
+    return c.json({ error: "Not a file" }, 400);
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+  };
+  const contentType = mimeTypes[ext] || "application/octet-stream";
+  const file = fs.readFileSync(filePath);
+
+  const disposition = contentType === "application/pdf"
+    ? 'inline; filename="' + path.basename(filePath) + '"'
+    : 'inline';
+
+  return c.newResponse(file, 200, {
+    "Content-Type": contentType,
+    "Content-Length": file.length.toString(),
+    "Content-Disposition": disposition,
+    "Cache-Control": "public, max-age=86400",
+  });
+});
+
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
 export default app;

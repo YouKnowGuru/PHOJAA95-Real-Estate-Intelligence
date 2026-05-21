@@ -1,8 +1,9 @@
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 import * as path from "path";
-import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
+import { UPLOAD_DIR } from "../lib/paths";
+import { logger } from "../lib/logger";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
@@ -19,24 +20,6 @@ const MAGIC_BYTES: Record<string, number[]> = {
   "image/jpeg": [0xff, 0xd8, 0xff],
   "application/pdf": [0x25, 0x50, 0x44, 0x46],
 };
-
-// Get app directory — works in dev (api/services/ → api/ → app/) and prod (dist/ → app/)
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-let appDir = path.resolve(__dirname, "..");
-if (!fsSync.existsSync(path.join(appDir, "public"))) {
-  appDir = path.resolve(__dirname, "../..");
-}
-const APP_DIR = appDir;
-const UPLOAD_DIR = path.join(APP_DIR, "public", "uploads");
-
-// Ensure upload directory exists on startup
-(async () => {
-  try {
-    await fs.access(UPLOAD_DIR);
-  } catch {
-    await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  }
-})();
 
 function sanitizePath(input: string): string {
   // Prevent path traversal by removing any path separators and parent dir references
@@ -90,6 +73,8 @@ export async function uploadFile(
 
   const filePath = path.join(folderPath, `${uuid}.${ext}`);
   await fs.writeFile(filePath, file);
+
+  logger.info("File uploaded", { key, filePath, size: file.length, mimeType });
 
   const publicUrl = `/uploads/${key}`;
 
