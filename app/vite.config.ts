@@ -43,8 +43,14 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,jpg,webp,woff2}'],
         globIgnores: ['**/uploads/**'],
+        navigateFallbackDenylist: [/^\/uploads\//, /^\/api\//],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
+          {
+            urlPattern: /^https?:\/\/.*\/uploads\/.*/i,
+            handler: 'NetworkOnly',
+            options: { cacheName: 'uploads-network' },
+          },
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,
             handler: 'NetworkFirst',

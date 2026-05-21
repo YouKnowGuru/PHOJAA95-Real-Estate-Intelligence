@@ -5,22 +5,9 @@ import fs from "fs";
 import path from "path";
 import { PUBLIC_DIR, DIST_DIR, UPLOAD_DIR } from "./paths";
 import { logger } from "./logger";
+import { createUploadMiddleware } from "./serve-upload";
 
 type App = Hono<{ Bindings: HttpBindings }>;
-
-const mimeTypes: Record<string, string> = {
-  ".pdf": "application/pdf",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".jpeg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
-};
-
-function getContentType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  return mimeTypes[ext] || "application/octet-stream";
-}
 
 export function serveStaticFiles(app: App) {
   logger.info("Serving static files", {
@@ -29,63 +16,19 @@ export function serveStaticFiles(app: App) {
     uploadDir: UPLOAD_DIR,
   });
 
-  // ─── Explicit handler for uploaded files ────────────────────────────
-  app.use("/uploads/*", async (c, next) => {
-    const reqPath = c.req.path;
-    // reqPath is like "/uploads/documents/file.pdf"
-    // Strip "/uploads/" prefix and look in UPLOAD_DIR
-    const relativePath = reqPath.replace("/uploads/", "");
-    const filePath = path.join(UPLOAD_DIR, relativePath);
-
-    // Security: ensure file is within upload dir
-    const resolvedFile = path.resolve(filePath);
-    const resolvedUploadDir = path.resolve(UPLOAD_DIR);
-    if (!resolvedFile.startsWith(resolvedUploadDir)) {
-      logger.warn("Upload path traversal blocked", { reqPath, resolvedFile });
-      return c.json({ error: "Forbidden" }, 403);
-    }
-
-    if (!fs.existsSync(filePath)) {
-      logger.warn("Upload file not found", { reqPath, filePath });
-      return await next();
-    }
-
-    try {
-      const stat = fs.statSync(filePath);
-      if (!stat.isFile()) {
-        return await next();
-      }
-
-      const contentType = getContentType(filePath);
-      const file = fs.readFileSync(filePath);
-
-      logger.debug("Serving upload file", {
-        reqPath,
-        filePath,
-        size: file.length,
-        contentType,
-      });
-
-      return c.newResponse(file, 200, {
-        "Content-Type": contentType,
-        "Content-Length": file.length.toString(),
-        "Cache-Control": "public, max-age=86400",
-      });
-    } catch (err) {
-      logger.error("Error serving upload file", {
-        reqPath,
-        filePath,
-        error: String(err),
-      });
-      return await next();
-    }
-  });
+  app.use("/uploads/*", createUploadMiddleware());
 
   // ─── Serve built Vite assets ────────────────────────────────────────
   app.use("*", serveStatic({ root: DIST_DIR }));
 
   // ─── Not found handler (SPA fallback) ───────────────────────────────
   app.notFound((c) => {
+    if (c.req.path.startsWith("/uploads/")) {
+      return c.text("File not found", 404, {
+        "Content-Type": "text/plain",
+        "Cache-Control": "no-store",
+      });
+    }
     const accept = c.req.header("accept") ?? "";
     if (!accept.includes("text/html")) {
       return c.json({ error: "Not Found" }, 404);
