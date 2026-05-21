@@ -7,10 +7,11 @@ interface FileUploaderProps {
   accept?: string;
   maxSize?: number;
   value?: string;
-  onChange?: (url: string) => void;
+  onChange?: (url: string, meta?: { key: string; fileName: string; mimeType: string; fileSize: number }) => void;
   disabled?: boolean;
   label?: string;
   hint?: string;
+  folder?: "properties" | "agreements" | "documents" | "verification" | "final" | "profiles" | "payslips" | "library";
 }
 
 export function FileUploader({
@@ -21,6 +22,7 @@ export function FileUploader({
   disabled,
   label,
   hint,
+  folder = "documents",
 }: FileUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -61,7 +63,7 @@ export function FileUploader({
               file: fileData,
               fileName: file.name,
               mimeType: file.type,
-              folder: "documents",
+              folder,
             },
           }),
         });
@@ -71,7 +73,8 @@ export function FileUploader({
         console.log("Upload response:", result);
         
         // Handle batch response format
-        let url = null;
+        let url: string | null = null;
+        let uploadMeta: { key: string; fileName: string; mimeType: string; fileSize: number } | undefined;
         let errorMsg = "Upload failed - check server console";
         
         // Helper to extract tRPC error message (v11 format: error.json.message)
@@ -97,14 +100,18 @@ export function FileUploader({
           console.log("First result:", firstResult);
           
           if (firstResult?.result?.data?.json) {
-            url = firstResult.result.data.json.url;
+            const data = firstResult.result.data.json;
+            url = data.url;
+            uploadMeta = { key: data.key, fileName: data.fileName, mimeType: data.mimeType, fileSize: data.fileSize };
           } else if (firstResult?.error) {
             errorMsg = getErrorMessage(firstResult.error);
           } else if (firstResult?.result?.data?.error) {
             errorMsg = getErrorMessage(firstResult.result.data.error);
           }
         } else if (result?.result?.data?.json) {
-          url = result.result.data.json.url;
+          const data = result.result.data.json;
+          url = data.url;
+          uploadMeta = { key: data.key, fileName: data.fileName, mimeType: data.mimeType, fileSize: data.fileSize };
         } else if (result?.error) {
           errorMsg = getErrorMessage(result.error);
         } else if (result?.result?.data?.error) {
@@ -113,7 +120,7 @@ export function FileUploader({
         
         if (url) {
           setProgress(100);
-          onChange?.(url);
+          onChange?.(url, uploadMeta);
         } else {
           console.error("Upload full response:", JSON.stringify(result));
           throw new Error(errorMsg);
@@ -124,7 +131,7 @@ export function FileUploader({
         setUploading(false);
       }
     },
-    [maxSize, onChange]
+    [maxSize, onChange, folder]
   );
 
   if (value) {

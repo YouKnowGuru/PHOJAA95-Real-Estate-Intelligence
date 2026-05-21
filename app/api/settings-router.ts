@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { createRouter, adminQuery, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { systemSettings } from "@db/schema";
+import { DEFAULT_SITE_TAGLINE } from "@contracts/constants";
 
 export const settingsRouter = createRouter({
   getPublicSettings: publicQuery.query(async () => {
@@ -15,7 +16,7 @@ export const settingsRouter = createRouter({
     const result: Record<string, string> = {
       site_name: "PHOJAA95",
       site_logo: "",
-      site_tagline: "\u00a9 2026 PHOJAA95 Ecosystem. Powered by Advanced Real Estate Intelligence.",
+      site_tagline: DEFAULT_SITE_TAGLINE,
     };
 
     settings.forEach((s) => {

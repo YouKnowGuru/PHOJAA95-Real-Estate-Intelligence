@@ -24,6 +24,7 @@ import {
   X,
   Bell,
   Receipt,
+  FolderOpen,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -33,6 +34,7 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Building2, label: "Properties", href: "/properties" },
   { icon: Building2, label: "Property Types", href: "/property-types" },
+  { icon: FolderOpen, label: "Document Library", href: "/documents" },
   { icon: ClipboardList, label: "Approval Queue", href: "/approvals" },
   { icon: Receipt, label: "Billing", href: "/billing" },
   { icon: Users, label: "Staff Management", href: "/users" },
@@ -48,6 +50,7 @@ const adminNavItems = [
 const staffNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Building2, label: "My Properties", href: "/properties" },
+  { icon: FolderOpen, label: "Document Library", href: "/documents" },
   { icon: Receipt, label: "Billing", href: "/billing" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "My Payslips", href: "/payroll" },

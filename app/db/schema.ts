@@ -386,3 +386,26 @@ export const chatMessages = mysqlTable("chat_messages", {
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
+
+// ─── 19. LIBRARY DOCUMENTS (shared document storage) ─────────────────
+export const libraryDocuments = mysqlTable("library_documents", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: varchar("category", { length: 100 }).default("General").notNull(),
+  storageKey: varchar("storage_key", { length: 512 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  uploadedBy: bigint("uploaded_by", { mode: "number", unsigned: true }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_library_docs_category").on(table.category),
+  index("idx_library_docs_uploaded_by").on(table.uploadedBy),
+  index("idx_library_docs_created").on(table.createdAt),
+]);
+
+export type LibraryDocument = typeof libraryDocuments.$inferSelect;
+export type InsertLibraryDocument = typeof libraryDocuments.$inferInsert;

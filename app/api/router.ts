@@ -13,6 +13,7 @@ import { notificationRouter } from "./notification-router";
 import { reportRouter } from "./report-router";
 import { settingsRouter } from "./settings-router";
 import { chatbotRouter } from "./chatbot-router";
+import { documentLibraryRouter } from "./document-library-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -32,6 +33,7 @@ export const appRouter = createRouter({
   report: reportRouter,
   settings: settingsRouter,
   chatbot: chatbotRouter,
+  documentLibrary: documentLibraryRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -43,6 +43,10 @@ app/.env.*.local
 *.sqlite
 *.sqlite3
 
+# User-uploaded files (stored on server, not in git)
+uploads/
+app/public/uploads/
+
 # Agent testing / scratch files
 dummy500.txt
 test_*.txt

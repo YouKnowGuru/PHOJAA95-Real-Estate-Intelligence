@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building2, Eye, EyeOff, LogIn, Lock, Mail, Loader2, Sparkles, Shield, Zap, ArrowLeft, MailCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { DEFAULT_SITE_TAGLINE } from "@contracts/constants";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -60,10 +61,8 @@ export default function Login() {
     { icon: Sparkles, label: "AI-Powered Insights" },
   ];
 
-  const defaultTagline = "\u00A9 " + new Date().getFullYear() + " " + (branding?.site_name || "PHOJAA95") + " Ecosystem. Powered by Advanced Real Estate Intelligence.";
-
   return (
-    <div className="relative min-h-screen w-full flex items-center justify-center overflow-hidden bg-[#0a0f1e]">
+    <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-x-hidden overflow-y-auto lg:overflow-hidden bg-[#0a0f1e] py-6 sm:py-8 lg:py-0 pt-safe pb-safe">
       {/* Deep space background with subtle noise texture */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/40 via-[#0a0f1e] to-[#0a0f1e]" />
 
@@ -72,12 +71,12 @@ export default function Login() {
         <motion.div
           animate={{ x: ["-20%", "10%", "-20%"], y: ["-10%", "5%", "-10%"], scale: [1, 1.15, 1] }}
           transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-[30%] -left-[10%] w-[600px] sm:w-[900px] h-[600px] sm:h-[900px] rounded-full bg-gradient-to-br from-emerald-400/25 via-teal-500/15 to-cyan-500/10 blur-[180px]"
+          className="absolute -top-[20%] -left-[20%] w-[280px] sm:w-[600px] lg:w-[900px] h-[280px] sm:h-[600px] lg:h-[900px] rounded-full bg-gradient-to-br from-emerald-400/25 via-teal-500/15 to-cyan-500/10 blur-[100px] sm:blur-[180px]"
         />
         <motion.div
           animate={{ x: ["10%", "-15%", "10%"], y: ["5%", "-10%", "5%"], scale: [1.1, 0.95, 1.1] }}
           transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-[30%] -right-[10%] w-[500px] sm:w-[800px] h-[500px] sm:h-[800px] rounded-full bg-gradient-to-tl from-blue-500/20 via-indigo-500/15 to-purple-500/10 blur-[180px]"
+          className="absolute -bottom-[20%] -right-[20%] w-[240px] sm:w-[500px] lg:w-[800px] h-[240px] sm:h-[500px] lg:h-[800px] rounded-full bg-gradient-to-tl from-blue-500/20 via-indigo-500/15 to-purple-500/10 blur-[100px] sm:blur-[180px]"
         />
         <motion.div
           animate={{ opacity: [0.3, 0.6, 0.3], scale: [0.9, 1.1, 0.9] }}
@@ -91,51 +90,54 @@ export default function Login() {
         className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
+          backgroundSize: "40px 40px",
         }}
       />
 
-      {/* Main content */}
-      <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-24">
-        {/* Left: Branding */}
+      {/* Main content — login card first on mobile */}
+      <div className="relative z-10 w-full max-w-6xl px-3 xs:px-4 sm:px-6 flex flex-col-reverse lg:flex-row items-center gap-6 sm:gap-10 lg:gap-24">
+        {/* Branding (below form on mobile, left on desktop) */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.9, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="flex-1 text-center lg:text-left space-y-6 sm:space-y-10"
+          className="flex-1 w-full text-center lg:text-left space-y-4 sm:space-y-6 lg:space-y-10"
         >
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.08, rotate: -5 }}
             transition={{ type: "spring", stiffness: 250, damping: 15 }}
-            className="inline-flex h-16 w-16 sm:h-28 sm:w-28 items-center justify-center rounded-2xl sm:rounded-[2rem] bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent border border-emerald-400/20 shadow-[0_0_60px_-15px_rgba(52,211,153,0.3)] p-4 sm:p-6 backdrop-blur-sm"
+            className="inline-flex h-14 w-14 sm:h-20 sm:w-20 lg:h-28 lg:w-28 items-center justify-center rounded-xl sm:rounded-2xl lg:rounded-[2rem] bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent border border-emerald-400/20 shadow-[0_0_60px_-15px_rgba(52,211,153,0.3)] p-3 sm:p-4 lg:p-6 backdrop-blur-sm"
           >
             {branding?.site_logo ? (
               <img src={branding.site_logo} alt={branding?.site_name} className="w-full h-full object-contain" />
             ) : (
-              <Building2 className="h-10 w-10 sm:h-14 sm:w-14 text-emerald-400" />
+              <Building2 className="h-8 w-8 sm:h-10 sm:w-10 lg:h-14 lg:w-14 text-emerald-400" />
             )}
           </motion.div>
 
           {/* Headline */}
-          <div className="space-y-4 sm:space-y-6">
-            <h1 className="text-3xl sm:text-5xl lg:text-8xl font-black tracking-tighter leading-[0.9] break-words">
+          <div className="space-y-2 sm:space-y-4 lg:space-y-6">
+            <h1 className="text-2xl min-[375px]:text-3xl sm:text-4xl lg:text-6xl xl:text-8xl font-black tracking-tighter leading-[1] break-words px-1">
               <span className="bg-gradient-to-b from-white via-white to-white/70 bg-clip-text text-transparent">
                 {branding?.site_name || "PHOJAA95"}
               </span>
             </h1>
-            <div className="space-y-2 sm:space-y-3">
-              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-400 tracking-wide">
+            <div className="space-y-1.5 sm:space-y-3">
+              <p className="text-base sm:text-lg lg:text-2xl font-bold text-emerald-400 tracking-wide">
                 Real Estate Intelligence
               </p>
-              <p className="text-sm sm:text-base lg:text-lg text-slate-400/80 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+              <p className="hidden sm:block text-sm sm:text-base lg:text-lg text-slate-400/80 max-w-lg mx-auto lg:mx-0 leading-relaxed">
                 The most advanced property management ecosystem. Streamline portfolios, automate payroll, and unlock AI-driven insights — all from one unified dashboard.
+              </p>
+              <p className="sm:hidden text-xs text-slate-400/80 max-w-xs mx-auto leading-relaxed">
+                Property management, payroll, and insights in one dashboard.
               </p>
             </div>
           </div>
 
-          {/* Feature pills */}
-          <div className="flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-3">
+          {/* Feature pills — hidden on very small screens */}
+          <div className="hidden min-[400px]:flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-3">
             {features.map(({ icon: Icon, label }, i) => (
               <motion.div
                 key={label}
@@ -152,21 +154,36 @@ export default function Login() {
           </div>
         </motion.div>
 
-        {/* Right: Login Card */}
+        {/* Login Card — shown first on mobile */}
         <motion.div
           initial={{ opacity: 0, scale: 0.92, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="w-full max-w-[440px]"
+          className="w-full max-w-[440px] shrink-0"
         >
+          {/* Compact brand — mobile only, above login card */}
+          <div className="lg:hidden flex items-center justify-center gap-3 mb-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-400/10 border border-emerald-400/20 p-2">
+              {branding?.site_logo ? (
+                <img src={branding.site_logo} alt="" className="h-full w-full object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 text-emerald-400" />
+              )}
+            </div>
+            <div className="text-left min-w-0">
+              <p className="text-sm font-bold text-white truncate">{branding?.site_name || "PHOJAA95"}</p>
+              <p className="text-[11px] text-emerald-400/90">Real Estate Intelligence</p>
+            </div>
+          </div>
+
           {/* Outer glow ring */}
           <div className="relative p-[1px] rounded-2xl sm:rounded-[2rem] bg-gradient-to-b from-white/[0.12] via-white/[0.04] to-transparent shadow-[0_0_80px_-20px_rgba(52,211,153,0.15)]">
             <Card className="relative border-0 bg-[#0f1525]/80 backdrop-blur-3xl rounded-[calc(1rem-1px)] sm:rounded-[1.9rem] overflow-hidden shadow-2xl">
               {/* Inner top glow */}
               <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
 
-              <CardHeader className="relative space-y-1 pb-4 sm:pb-7 pt-5 sm:pt-8 px-5 sm:px-8">
-                <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+              <CardHeader className="relative space-y-1 pb-3 sm:pb-7 pt-4 sm:pt-8 px-4 sm:px-8">
+                <CardTitle className="text-lg min-[375px]:text-xl sm:text-2xl font-bold tracking-tight text-white">
                   {view === "login" ? "Welcome Back" : "Reset Password"}
                 </CardTitle>
                 <CardDescription className="text-slate-400 text-xs sm:text-sm">
@@ -210,10 +227,10 @@ export default function Login() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     onSubmit={handleLogin}
-                    className="space-y-5"
+                    className="space-y-4 sm:space-y-5"
                   >
                     {/* Email */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       <Label className="text-slate-300 font-semibold text-[11px] uppercase tracking-widest ml-1">
                         Email Address
                       </Label>
@@ -227,22 +244,22 @@ export default function Login() {
                           placeholder="admin@phojaa95.com"
                           value={loginData.email}
                           onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                          className="h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-[15px]"
+                          className="h-11 min-[375px]:h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-base sm:text-[15px]"
                           required
                         />
                       </div>
                     </div>
 
                     {/* Password */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between ml-1">
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 ml-1">
                         <Label className="text-slate-300 font-semibold text-[11px] uppercase tracking-widest">
                           Password
                         </Label>
                         <button
                           type="button"
                           onClick={() => { setView("forgot"); setError(""); setForgotSuccess(""); }}
-                          className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest"
+                          className="text-[11px] font-semibold text-emerald-400 hover:text-emerald-300 transition-colors uppercase tracking-widest shrink-0"
                         >
                           Forgot?
                         </button>
@@ -257,7 +274,7 @@ export default function Login() {
                           placeholder="••••••••"
                           value={loginData.password}
                           onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                          className="h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-12 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-[15px]"
+                          className="h-11 min-[375px]:h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-12 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-base sm:text-[15px]"
                           required
                         />
                         <button
@@ -288,14 +305,14 @@ export default function Login() {
                       <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-sm sm:text-[15px] tracking-wide"
+                        className="w-full h-11 min-[375px]:h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-sm sm:text-[15px] tracking-wide touch-manipulation"
                       >
                         {loading ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <>
-                            <LogIn className="mr-2 h-5 w-5 shrink-0" />
-                            <span className="truncate">Sign In to Dashboard</span>
+                            <LogIn className="mr-2 h-4 w-4 sm:h-5 sm:w-5 shrink-0" />
+                            <span className="truncate">Sign In</span>
                           </>
                         )}
                       </Button>
@@ -353,17 +370,17 @@ export default function Login() {
                               placeholder="admin@phojaa95.com"
                               value={forgotEmail}
                               onChange={(e) => setForgotEmail(e.target.value)}
-                              className="h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-[15px]"
-                              required
-                            />
-                          </div>
+                            className="h-11 min-[375px]:h-12 border-white/[0.08] bg-white/[0.03] pl-11 pr-4 text-white placeholder:text-slate-600 rounded-xl focus:ring-1 focus:ring-emerald-400/40 focus:border-emerald-400/40 transition-all duration-300 text-base sm:text-[15px]"
+                            required
+                          />
                         </div>
+                      </div>
 
                         <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} className="pt-1">
                           <Button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-[15px] tracking-wide"
+                            className="w-full h-11 min-[375px]:h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-sm sm:text-[15px] tracking-wide touch-manipulation"
                           >
                             {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Reset Link"}
                           </Button>
@@ -385,18 +402,24 @@ export default function Login() {
                 )}
 
 
+                {/* Footer tagline — inside card so it stays visible on phones */}
+                <div className="mt-4 sm:mt-6 pt-4 border-t border-white/[0.06]">
+                  <p className="text-center text-[10px] min-[375px]:text-[11px] font-semibold text-slate-500/80 uppercase tracking-[0.12em] sm:tracking-[0.18em] leading-relaxed px-1 break-words">
+                    {branding?.site_tagline || DEFAULT_SITE_TAGLINE}
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Footer Tagline */}
+          {/* Footer tagline — duplicate below card on large screens only */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
-            className="mt-8 text-center text-[11px] font-semibold text-slate-500/70 uppercase tracking-[0.2em]"
+            className="hidden lg:block mt-8 text-center text-[11px] font-semibold text-slate-500/70 uppercase tracking-[0.2em] leading-relaxed px-2 break-words"
           >
-            {branding?.site_tagline || defaultTagline}
+            {branding?.site_tagline || DEFAULT_SITE_TAGLINE}
           </motion.p>
         </motion.div>
       </div>

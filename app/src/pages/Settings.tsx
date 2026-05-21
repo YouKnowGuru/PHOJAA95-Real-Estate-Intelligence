@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { DEFAULT_SITE_TAGLINE } from "@contracts/constants";
 import { Shield, Moon, Sun, Monitor, Lock, Globe, Building2, Save, Settings as SettingsIcon, User, Hash } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { trpc } from "@/lib/trpc";
@@ -32,7 +33,7 @@ export default function Settings() {
     if (brandingData) {
       setSiteName(brandingData.site_name || "PHOJAA95");
       setSiteLogo(brandingData.site_logo || "");
-      setSiteTagline(brandingData.site_tagline || "\u00a9 2026 PHOJAA95 Ecosystem. Powered by Advanced Real Estate Intelligence.");
+      setSiteTagline(brandingData.site_tagline || DEFAULT_SITE_TAGLINE);
     }
   }, [brandingData]);
 
@@ -184,9 +185,9 @@ export default function Settings() {
                   <Input
                     value={siteTagline}
                     onChange={(e) => setSiteTagline(e.target.value)}
-                    placeholder="e.g. Ecosystem. Powered by Advanced Real Estate Intelligence."
+                    placeholder="© 2027 PHOJAA95 Ecosystem. Powered by Advanced Real Estate Intelligence."
                   />
-                  <p className="text-[10px] text-muted-foreground italic">Appears in the login page footer after the site name</p>
+                  <p className="text-[10px] text-muted-foreground italic">Shown in the login page footer on all screen sizes</p>
                 </div>
                 <div className="space-y-3">
                   <Label>Site Logo</Label>

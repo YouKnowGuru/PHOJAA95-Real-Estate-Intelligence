@@ -12,7 +12,7 @@ export const uploadRouter = createRouter({
         file: z.string(),
         fileName: z.string(),
         mimeType: z.string(),
-        folder: z.enum(["properties", "agreements", "documents", "verification", "final", "profiles", "payslips"]),
+        folder: z.enum(["properties", "agreements", "documents", "verification", "final", "profiles", "payslips", "library"]),
         propertyId: z.number().optional(),
         step: z.number().optional(),
       })

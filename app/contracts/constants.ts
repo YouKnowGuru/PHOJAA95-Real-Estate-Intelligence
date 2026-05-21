@@ -12,3 +12,7 @@ export const Paths = {
   login: "/login",
   oauthCallback: "/api/oauth/callback",
 } as const;
+
+/** Default login / site footer line (Settings → Site Tagline). */
+export const DEFAULT_SITE_TAGLINE =
+  "© 2027 PHOJAA95 Ecosystem. Powered by Advanced Real Estate Intelligence.";

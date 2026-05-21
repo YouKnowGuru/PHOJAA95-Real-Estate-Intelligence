@@ -23,6 +23,7 @@ const Reports = lazy(() => import("./pages/Reports"));
 const PropertyTypes = lazy(() => import("./pages/PropertyTypes"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Billing = lazy(() => import("./pages/Billing"));
+const DocumentLibrary = lazy(() => import("./pages/DocumentLibrary"));
 
 function PageLoader() {
   return (
@@ -213,6 +214,16 @@ export default function App() {
           <ProtectedRoute>
             <Suspense fallback={<PageLoader />}>
               <Billing />
+            </Suspense>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute>
+            <Suspense fallback={<PageLoader />}>
+              <DocumentLibrary />
             </Suspense>
           </ProtectedRoute>
         }
