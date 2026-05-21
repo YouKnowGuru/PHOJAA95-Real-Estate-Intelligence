@@ -62,13 +62,14 @@ export const uploadRouter = createRouter({
         fileName: result.fileName,
         fileSize: result.fileSize,
         mimeType: result.mimeType,
+        publicId: result.publicId,
       };
     }),
 
   delete: adminQuery
-    .input(z.object({ key: z.string() }))
+    .input(z.object({ key: z.string(), publicId: z.string().optional() }))
     .mutation(async ({ input }) => {
-      await deleteFile(input.key);
+      await deleteFile(input.key, input.publicId);
       return { success: true };
     }),
 
