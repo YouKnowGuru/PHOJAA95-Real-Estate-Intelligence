@@ -1,6 +1,7 @@
 import * as fs from "fs/promises";
 import * as fsSync from "fs";
 import * as path from "path";
+import * as os from "os";
 import { nanoid } from "nanoid";
 import { UPLOAD_DIR } from "../lib/paths";
 import { cloudinary, isCloudinaryConfigured } from "../lib/cloudinary";
@@ -15,7 +16,6 @@ const ALLOWED_TYPES = [
   "image/jpg",
 ];
 
-// File magic bytes for validation
 const MAGIC_BYTES: Record<string, number[]> = {
   "image/png": [0x89, 0x50, 0x4e, 0x47],
   "image/jpeg": [0xff, 0xd8, 0xff],
@@ -42,7 +42,60 @@ export interface UploadResult {
   fileName: string;
   fileSize: number;
   mimeType: string;
-  publicId?: string; // Cloudinary public_id if using Cloudinary
+  publicId?: string;
+}
+
+async function uploadToCloudinary(
+  file: Buffer,
+  mimeType: string,
+  folder: string,
+  uuid: string
+): Promise<{ secure_url: string; public_id: string }> {
+  const resourceType = mimeType.startsWith("image/") ? "image" : "raw";
+  const cloudinaryFolder = `phojaa95/${folder}`;
+  const tempFile = path.join(os.tmpdir(), `upload-${uuid}`);
+
+  try {
+    // Write buffer to temp file — cloudinary.uploader.upload() is more reliable than streams
+    await fs.writeFile(tempFile, file);
+    logger.debug("Cloudinary temp file written", { tempFile, size: file.length });
+
+    const result = await cloudinary.uploader.upload(tempFile, {
+      folder: cloudinaryFolder,
+      resource_type: resourceType,
+      public_id: uuid,
+      overwrite: true,
+    });
+
+    if (!result || !result.secure_url) {
+      throw new Error("Cloudinary returned empty result");
+    }
+
+    logger.info("Cloudinary upload success", {
+      publicId: result.public_id,
+      url: result.secure_url,
+      resourceType,
+      folder: cloudinaryFolder,
+    });
+
+    return { secure_url: result.secure_url, public_id: result.public_id };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    logger.error("Cloudinary upload failed", {
+      error: errorMsg,
+      folder: cloudinaryFolder,
+      resourceType,
+      uuid,
+    });
+    throw new Error(`Cloudinary upload failed: ${errorMsg}`);
+  } finally {
+    // Always clean up temp file
+    try {
+      await fs.unlink(tempFile);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
 }
 
 export async function uploadFile(
@@ -71,46 +124,23 @@ export async function uploadFile(
 
   // ─── Cloudinary upload (preferred if configured) ──────────────────
   if (isCloudinaryConfigured) {
-    const resourceType = mimeType.startsWith("image/") ? "image" : "raw";
-    const cloudinaryFolder = `phojaa95/${safeFolder}`;
-
-    const uploadResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: cloudinaryFolder,
-          resource_type: resourceType,
-          public_id: uuid,
-          use_filename: false,
-          unique_filename: false,
-        },
-        (err, result) => {
-          if (err || !result) {
-            reject(err || new Error("Cloudinary upload failed"));
-          } else {
-            resolve({ secure_url: result.secure_url, public_id: result.public_id });
-          }
-        }
-      );
-      stream.end(file);
-    });
-
-    logger.info("File uploaded to Cloudinary", {
-      key,
-      publicId: uploadResult.public_id,
-      url: uploadResult.secure_url,
-      size: file.length,
-      mimeType,
-    });
-
-    return {
-      key,
-      url: uploadResult.secure_url,
-      signedUrl: uploadResult.secure_url,
-      fileName: safeFileName,
-      fileSize: file.length,
-      mimeType,
-      publicId: uploadResult.public_id,
-    };
+    try {
+      const cdn = await uploadToCloudinary(file, mimeType, safeFolder, uuid);
+      return {
+        key,
+        url: cdn.secure_url,
+        signedUrl: cdn.secure_url,
+        fileName: safeFileName,
+        fileSize: file.length,
+        mimeType,
+        publicId: cdn.public_id,
+      };
+    } catch (err) {
+      // If Cloudinary fails, fall back to local disk so the user isn't blocked
+      logger.warn("Cloudinary failed, falling back to local disk", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   // ─── Local disk fallback ──────────────────────────────────────────
@@ -135,7 +165,6 @@ export async function uploadFile(
 }
 
 export async function deleteFile(key: string, publicId?: string): Promise<void> {
-  // Delete from Cloudinary if we have a public_id
   if (isCloudinaryConfigured && publicId) {
     try {
       await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
@@ -143,11 +172,9 @@ export async function deleteFile(key: string, publicId?: string): Promise<void> 
       return;
     } catch (err) {
       logger.error("Cloudinary delete failed", { publicId, error: String(err) });
-      // Fall through to local delete as fallback
     }
   }
 
-  // Local disk delete
   const safeKey = sanitizePath(key);
   const filePath = path.join(UPLOAD_DIR, safeKey);
   const resolvedPath = path.resolve(filePath);
@@ -158,7 +185,7 @@ export async function deleteFile(key: string, publicId?: string): Promise<void> 
   try {
     await fs.unlink(resolvedPath);
   } catch {
-    // File may not exist; ignore
+    // ignore
   }
 }
 
@@ -193,7 +220,7 @@ export async function deleteFolder(prefix: string): Promise<void> {
   try {
     await fs.rm(resolvedPath, { recursive: true, force: true });
   } catch {
-    // Folder may not exist; ignore
+    // ignore
   }
 }
 

@@ -795,7 +795,21 @@ export default function PropertyWizard() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigateToStep(3)}
+                  onClick={() => {
+                    // Auto-save step 2 before navigating forward
+                    if (step2Data.agreementFile && step2Data.paymentScreenshot && step2Data.buyerName.trim()) {
+                      submitStep2Mutation.mutate({
+                        propertyId: propertyId!,
+                        ...step2Data,
+                        commissionAmount: step2Data.commissionAmount || undefined,
+                        paymentAmount: step2Data.paymentAmount || undefined,
+                      }, {
+                        onSuccess: () => navigateToStep(3),
+                      });
+                    } else {
+                      navigateToStep(3);
+                    }
+                  }}
                   className="w-full sm:w-auto"
                 >
                   Next Step
@@ -960,7 +974,30 @@ export default function PropertyWizard() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigateToStep(4)}
+                  onClick={() => {
+                    // Auto-save step 3 before navigating forward
+                    const typeName = existingProperty?.property?.propertyTypeName ?? "";
+                    const selectedType = propertyTypes?.find(pt => pt.id === parseInt(step1Data.propertyTypeId));
+                    const typeNameFromForm = selectedType?.name ?? "";
+                    const finalTypeName = typeName || typeNameFromForm;
+                    const BUILDING_TYPES = ["Building", "Flat", "Apartment", "Duplex", "Bungalow"];
+                    const requiresBuildingDocs = BUILDING_TYPES.includes(finalTypeName);
+
+                    const hasRequiredDocs = step3Data.gewogCertification &&
+                      step3Data.remainingPaymentScreenshot &&
+                      (!requiresBuildingDocs || (step3Data.internalAgreement && step3Data.occupancyCertificate && step3Data.plrVerification));
+
+                    if (hasRequiredDocs) {
+                      submitStep3Mutation.mutate({
+                        propertyId: propertyId!,
+                        ...step3Data,
+                      }, {
+                        onSuccess: () => navigateToStep(4),
+                      });
+                    } else {
+                      navigateToStep(4);
+                    }
+                  }}
                   className="w-full sm:w-auto"
                 >
                   Next Step
