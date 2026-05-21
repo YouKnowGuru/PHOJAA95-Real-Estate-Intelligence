@@ -74,6 +74,24 @@ export function FileUploader({
         let url = null;
         let errorMsg = "Upload failed - check server console";
         
+        // Helper to extract tRPC error message (v11 format: error.json.message)
+        const getErrorMessage = (error: unknown): string => {
+          if (!error) return "Unknown error";
+          if (typeof error === "string") return error;
+          const err = error as Record<string, unknown>;
+          // tRPC v11: error.json.message
+          const jsonMsg = (err.json as Record<string, unknown>)?.message;
+          if (typeof jsonMsg === "string") return jsonMsg;
+          // Direct message
+          if (typeof err.message === "string") return err.message;
+          // Fallback
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return "Unknown error";
+          }
+        };
+        
         if (Array.isArray(result)) {
           const firstResult = result[0];
           console.log("First result:", firstResult);
@@ -81,16 +99,16 @@ export function FileUploader({
           if (firstResult?.result?.data?.json) {
             url = firstResult.result.data.json.url;
           } else if (firstResult?.error) {
-            errorMsg = firstResult.error.message || firstResult.error.toString();
+            errorMsg = getErrorMessage(firstResult.error);
           } else if (firstResult?.result?.data?.error) {
-            errorMsg = firstResult.result.data.error.message || firstResult.result.data.error.toString();
+            errorMsg = getErrorMessage(firstResult.result.data.error);
           }
         } else if (result?.result?.data?.json) {
           url = result.result.data.json.url;
         } else if (result?.error) {
-          errorMsg = result.error.message || result.error.toString();
+          errorMsg = getErrorMessage(result.error);
         } else if (result?.result?.data?.error) {
-          errorMsg = result.result.data.error.message || result.result.data.error.toString();
+          errorMsg = getErrorMessage(result.result.data.error);
         }
         
         if (url) {
