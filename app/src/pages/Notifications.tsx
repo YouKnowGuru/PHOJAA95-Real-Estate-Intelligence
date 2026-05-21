@@ -47,14 +47,14 @@ function SummaryCard({
       <motion.div whileHover={{ y: -4 }} className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
         <Card className="border-0 bg-transparent shadow-none">
           <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1 sm:space-y-2 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground truncate">{title}</p>
+                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-foreground truncate">{value}</h3>
               </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
+              <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
+                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color.replace("bg-", "text-")}`} />
               </div>
             </div>
           </CardContent>
@@ -138,20 +138,21 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Bell className="h-7 w-7 text-primary" />
-            Notifications Center
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-2 truncate">
+            <Bell className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0" />
+            <span className="truncate">Notifications Center</span>
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your alerts and stay updated</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage your alerts and stay updated</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button 
             variant="outline" 
             size="sm" 
             onClick={() => markAllReadMutation.mutate()}
             disabled={markAllReadMutation.isPending || !data?.unreadCount}
+            className="h-9"
           >
             <CheckCheck className="h-4 w-4 mr-2" />
             Mark all read
@@ -159,7 +160,7 @@ export default function NotificationsPage() {
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-red-500 hover:text-red-600 hover:bg-red-50"
+            className="text-red-500 hover:text-red-600 hover:bg-red-50 h-9"
             onClick={() => {
               if (window.confirm("Clear all read notifications?")) {
                 clearHistoryMutation.mutate();
@@ -196,12 +197,12 @@ export default function NotificationsPage() {
         <div className="lg:col-span-2 space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b border-border/50">
-              <div className="flex items-center justify-between">
-                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg self-start">
                   <button 
                     onClick={() => setActiveTab("all")}
                     className={cn(
-                      "px-4 py-1.5 text-xs font-medium rounded-md transition-all",
+                      "px-3 sm:px-4 py-1.5 text-xs font-medium rounded-md transition-all",
                       activeTab === "all" ? "bg-white dark:bg-slate-800 shadow-sm" : "text-muted-foreground"
                     )}
                   >
@@ -210,7 +211,7 @@ export default function NotificationsPage() {
                   <button 
                     onClick={() => setActiveTab("unread")}
                     className={cn(
-                      "px-4 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
+                      "px-3 sm:px-4 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
                       activeTab === "unread" ? "bg-white dark:bg-slate-800 shadow-sm" : "text-muted-foreground"
                     )}
                   >
@@ -222,14 +223,14 @@ export default function NotificationsPage() {
                     ) : null}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
                   <Clock className="h-3 w-3" />
                   Showing last 50 alerts
                 </p>
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[600px]">
+              <ScrollArea className="max-h-[70vh] sm:h-[600px]">
                 {(!data?.items || data.items.length === 0) && !isLoading ? (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-4">
                     <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
@@ -290,17 +291,17 @@ export default function NotificationsPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2">
-                                  <h4 className={cn("text-sm font-semibold truncate", !notif.isRead && "text-primary")}>
+                                  <h4 className={cn("text-sm font-semibold truncate min-w-0", !notif.isRead && "text-primary")}>
                                     {notif.title}
                                   </h4>
-                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5">
+                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5 shrink-0">
                                     {notif.createdAt && formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
                                   </span>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                                   {notif.message}
                                 </p>
-                                <div className="flex items-center gap-3 mt-2">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-2">
                                   <Badge variant="secondary" className={cn("text-[10px] border-0", typeColors[notif.type])}>
                                     {notif.type}
                                   </Badge>

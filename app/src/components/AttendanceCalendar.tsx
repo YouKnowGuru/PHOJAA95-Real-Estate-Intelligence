@@ -73,14 +73,15 @@ export function AttendanceCalendar({
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   return (
-    <Card className={className}>
+    <Card className={cn("overflow-hidden", className)}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base">{format(currentMonth, "MMMM yyyy")}</CardTitle>
+        <CardTitle className="text-sm sm:text-base">{format(currentMonth, "MMMM yyyy")}</CardTitle>
         <div className="flex items-center gap-1">
           <Button
             type="button"
             variant="outline"
             size="icon"
+            className="h-8 w-8 sm:h-9 sm:w-9"
             onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1))}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -89,6 +90,7 @@ export function AttendanceCalendar({
             type="button"
             variant="outline"
             size="icon"
+            className="h-8 w-8 sm:h-9 sm:w-9"
             onClick={() => setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1))}
           >
             <ChevronRight className="h-4 w-4" />
@@ -100,9 +102,10 @@ export function AttendanceCalendar({
           {weekDays.map((day) => (
             <div
               key={day}
-              className="text-center text-xs font-medium text-muted-foreground py-2"
+              className="text-center text-[10px] sm:text-xs font-medium text-muted-foreground py-1 sm:py-2"
             >
-              {day}
+              <span className="hidden sm:inline">{day}</span>
+              <span className="sm:hidden">{day.charAt(0)}</span>
             </div>
           ))}
 
@@ -119,7 +122,7 @@ export function AttendanceCalendar({
                 onClick={() => onDateClick?.(day)}
                 disabled={!isCurrentMonth}
                 className={cn(
-                  "aspect-square p-1 rounded-lg text-sm transition-all relative",
+                  "aspect-square min-h-[36px] min-w-[36px] p-1 rounded-lg text-xs sm:text-sm transition-all relative flex items-center justify-center",
                   isCurrentMonth ? "hover:bg-muted" : "opacity-30 cursor-not-allowed",
                   isSelected && "ring-2 ring-primary",
                   isTodayDate && "font-bold"
@@ -131,7 +134,7 @@ export function AttendanceCalendar({
                 {record && (
                   <div
                     className={cn(
-                      "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full",
+                      "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-2 h-2 sm:w-1.5 sm:h-1.5 rounded-full",
                       getStatusColor(record.status)
                     )}
                   />
@@ -141,7 +144,7 @@ export function AttendanceCalendar({
           })}
         </div>
 
-        <div className="flex items-center gap-4 mt-4 pt-4 border-t text-xs">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 pt-4 border-t text-xs">
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-green-500" />
             <span>Present</span>

@@ -1,4 +1,5 @@
 import * as fs from "fs/promises";
+import * as fsSync from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
@@ -19,9 +20,13 @@ const MAGIC_BYTES: Record<string, number[]> = {
   "application/pdf": [0x25, 0x50, 0x44, 0x46],
 };
 
-// Get app directory from bundled script location instead of process.cwd()
+// Get app directory — works in dev (api/services/ → api/ → app/) and prod (dist/ → app/)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const APP_DIR = path.resolve(__dirname, ".."); // from dist/ up to app/
+let appDir = path.resolve(__dirname, "..");
+if (!fsSync.existsSync(path.join(appDir, "public"))) {
+  appDir = path.resolve(__dirname, "../..");
+}
+const APP_DIR = appDir;
 const UPLOAD_DIR = path.join(APP_DIR, "public", "uploads");
 
 // Ensure upload directory exists on startup

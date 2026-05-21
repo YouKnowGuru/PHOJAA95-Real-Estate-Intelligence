@@ -155,7 +155,7 @@ export default function Properties() {
         <CardContent className="p-3 sm:p-4">
           {/* Mobile Filter Toggle */}
           <div className="flex items-center gap-2 mb-3 sm:mb-0">
-            <div className="relative flex-1 min-w-[180px]">
+            <div className="relative flex-1 min-w-[120px] sm:min-w-[180px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search properties..."

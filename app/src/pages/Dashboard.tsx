@@ -71,7 +71,7 @@ function KPICard({
                   {title}
                 </p>
                 <div className="flex items-baseline gap-2">
-                  <h3 className="text-2xl font-bold tracking-tight text-foreground">
+                  <h3 className="text-2xl font-bold tracking-tight text-foreground truncate max-w-[140px] sm:max-w-none">
                     {value}
                   </h3>
                   {trend && (
@@ -283,7 +283,7 @@ function AdminDashboard() {
                   />
                 </PieChart>
               </ResponsiveContainer>
-              <div className="flex justify-center gap-4 mt-2">
+              <div className="flex flex-wrap justify-center gap-4 mt-2">
                 {statusData.map((s) => (
                   <div key={s.name} className="flex items-center gap-1.5">
                     <div className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />

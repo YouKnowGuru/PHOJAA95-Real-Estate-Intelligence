@@ -23,8 +23,14 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  const utils = trpc.useUtils();
+
   const loginMutation = trpc.localAuth.login.useMutation({
-    onSuccess: () => { navigate("/"); },
+    onSuccess: () => {
+      utils.localAuth.me.invalidate();
+      utils.auth.me.invalidate();
+      navigate("/");
+    },
     onError: (err) => { setError(err.message); setLoading(false); },
   });
 
@@ -66,17 +72,17 @@ export default function Login() {
         <motion.div
           animate={{ x: ["-20%", "10%", "-20%"], y: ["-10%", "5%", "-10%"], scale: [1, 1.15, 1] }}
           transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-[30%] -left-[10%] w-[900px] h-[900px] rounded-full bg-gradient-to-br from-emerald-400/25 via-teal-500/15 to-cyan-500/10 blur-[180px]"
+          className="absolute -top-[30%] -left-[10%] w-[600px] sm:w-[900px] h-[600px] sm:h-[900px] rounded-full bg-gradient-to-br from-emerald-400/25 via-teal-500/15 to-cyan-500/10 blur-[180px]"
         />
         <motion.div
           animate={{ x: ["10%", "-15%", "10%"], y: ["5%", "-10%", "5%"], scale: [1.1, 0.95, 1.1] }}
           transition={{ duration: 30, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-[30%] -right-[10%] w-[800px] h-[800px] rounded-full bg-gradient-to-tl from-blue-500/20 via-indigo-500/15 to-purple-500/10 blur-[180px]"
+          className="absolute -bottom-[30%] -right-[10%] w-[500px] sm:w-[800px] h-[500px] sm:h-[800px] rounded-full bg-gradient-to-tl from-blue-500/20 via-indigo-500/15 to-purple-500/10 blur-[180px]"
         />
         <motion.div
           animate={{ opacity: [0.3, 0.6, 0.3], scale: [0.9, 1.1, 0.9] }}
           transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-gradient-to-r from-emerald-300/10 via-teal-400/8 to-cyan-400/5 blur-[140px]"
+          className="absolute top-[40%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] rounded-full bg-gradient-to-r from-emerald-300/10 via-teal-400/8 to-cyan-400/5 blur-[140px]"
         />
       </div>
 
@@ -90,46 +96,46 @@ export default function Login() {
       />
 
       {/* Main content */}
-      <div className="relative z-10 w-full max-w-6xl px-6 flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+      <div className="relative z-10 w-full max-w-6xl px-4 sm:px-6 flex flex-col lg:flex-row items-center gap-8 sm:gap-12 lg:gap-24">
         {/* Left: Branding */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.9, ease: [0.25, 0.46, 0.45, 0.94] }}
-          className="flex-1 text-center lg:text-left space-y-10"
+          className="flex-1 text-center lg:text-left space-y-6 sm:space-y-10"
         >
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.08, rotate: -5 }}
             transition={{ type: "spring", stiffness: 250, damping: 15 }}
-            className="inline-flex h-28 w-28 items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent border border-emerald-400/20 shadow-[0_0_60px_-15px_rgba(52,211,153,0.3)] p-6 backdrop-blur-sm"
+            className="inline-flex h-16 w-16 sm:h-28 sm:w-28 items-center justify-center rounded-2xl sm:rounded-[2rem] bg-gradient-to-br from-emerald-400/20 via-emerald-500/10 to-transparent border border-emerald-400/20 shadow-[0_0_60px_-15px_rgba(52,211,153,0.3)] p-4 sm:p-6 backdrop-blur-sm"
           >
             {branding?.site_logo ? (
               <img src={branding.site_logo} alt={branding?.site_name} className="w-full h-full object-contain" />
             ) : (
-              <Building2 className="h-14 w-14 text-emerald-400" />
+              <Building2 className="h-10 w-10 sm:h-14 sm:w-14 text-emerald-400" />
             )}
           </motion.div>
 
           {/* Headline */}
-          <div className="space-y-6">
-            <h1 className="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.9]">
+          <div className="space-y-4 sm:space-y-6">
+            <h1 className="text-3xl sm:text-5xl lg:text-8xl font-black tracking-tighter leading-[0.9] break-words">
               <span className="bg-gradient-to-b from-white via-white to-white/70 bg-clip-text text-transparent">
                 {branding?.site_name || "PHOJAA95"}
               </span>
             </h1>
-            <div className="space-y-3">
-              <p className="text-xl lg:text-2xl font-bold text-emerald-400 tracking-wide">
+            <div className="space-y-2 sm:space-y-3">
+              <p className="text-lg sm:text-xl lg:text-2xl font-bold text-emerald-400 tracking-wide">
                 Real Estate Intelligence
               </p>
-              <p className="text-base lg:text-lg text-slate-400/80 max-w-lg mx-auto lg:mx-0 leading-relaxed">
+              <p className="text-sm sm:text-base lg:text-lg text-slate-400/80 max-w-lg mx-auto lg:mx-0 leading-relaxed">
                 The most advanced property management ecosystem. Streamline portfolios, automate payroll, and unlock AI-driven insights — all from one unified dashboard.
               </p>
             </div>
           </div>
 
           {/* Feature pills */}
-          <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+          <div className="flex flex-wrap justify-center lg:justify-start gap-2 sm:gap-3">
             {features.map(({ icon: Icon, label }, i) => (
               <motion.div
                 key={label}
@@ -137,10 +143,10 @@ export default function Login() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.6 + i * 0.12 }}
                 whileHover={{ scale: 1.04, y: -3 }}
-                className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md hover:bg-white/[0.07] hover:border-white/[0.14] transition-all duration-300"
+                className="flex items-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl bg-white/[0.04] border border-white/[0.08] backdrop-blur-md hover:bg-white/[0.07] hover:border-white/[0.14] transition-all duration-300"
               >
-                <Icon className="h-4 w-4 text-emerald-400" />
-                <span className="text-xs font-semibold text-slate-300 uppercase tracking-widest">{label}</span>
+                <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400" />
+                <span className="text-[10px] sm:text-xs font-semibold text-slate-300 uppercase tracking-widest">{label}</span>
               </motion.div>
             ))}
           </div>
@@ -154,23 +160,23 @@ export default function Login() {
           className="w-full max-w-[440px]"
         >
           {/* Outer glow ring */}
-          <div className="relative p-[1px] rounded-[2rem] bg-gradient-to-b from-white/[0.12] via-white/[0.04] to-transparent shadow-[0_0_80px_-20px_rgba(52,211,153,0.15)]">
-            <Card className="relative border-0 bg-[#0f1525]/80 backdrop-blur-3xl rounded-[1.9rem] overflow-hidden shadow-2xl">
+          <div className="relative p-[1px] rounded-2xl sm:rounded-[2rem] bg-gradient-to-b from-white/[0.12] via-white/[0.04] to-transparent shadow-[0_0_80px_-20px_rgba(52,211,153,0.15)]">
+            <Card className="relative border-0 bg-[#0f1525]/80 backdrop-blur-3xl rounded-[calc(1rem-1px)] sm:rounded-[1.9rem] overflow-hidden shadow-2xl">
               {/* Inner top glow */}
               <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-emerald-400/30 to-transparent" />
 
-              <CardHeader className="relative space-y-1.5 pb-7 pt-8 px-8">
-                <CardTitle className="text-2xl font-bold tracking-tight text-white">
+              <CardHeader className="relative space-y-1 pb-4 sm:pb-7 pt-5 sm:pt-8 px-5 sm:px-8">
+                <CardTitle className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   {view === "login" ? "Welcome Back" : "Reset Password"}
                 </CardTitle>
-                <CardDescription className="text-slate-400 text-sm">
+                <CardDescription className="text-slate-400 text-xs sm:text-sm">
                   {view === "login"
                     ? "Sign in to access your intelligent dashboard"
                     : "Enter your email to receive reset instructions"}
                 </CardDescription>
               </CardHeader>
 
-              <CardContent className="relative px-8 pb-8">
+              <CardContent className="relative px-4 sm:px-8 pb-5 sm:pb-8">
                 <AnimatePresence mode="wait">
                   {error && (
                     <motion.div
@@ -282,14 +288,14 @@ export default function Login() {
                       <Button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-[15px] tracking-wide"
+                        className="w-full h-12 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 hover:from-emerald-400 hover:via-emerald-400 hover:to-teal-400 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all duration-300 text-sm sm:text-[15px] tracking-wide"
                       >
                         {loading ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <>
-                            <LogIn className="mr-2 h-5 w-5" />
-                            Sign In to Dashboard
+                            <LogIn className="mr-2 h-5 w-5 shrink-0" />
+                            <span className="truncate">Sign In to Dashboard</span>
                           </>
                         )}
                       </Button>
@@ -369,7 +375,7 @@ export default function Login() {
                       <button
                         type="button"
                         onClick={() => { setView("login"); setError(""); setForgotSuccess(""); }}
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-400 hover:text-white transition-colors"
                       >
                         <ArrowLeft className="h-4 w-4" />
                         Back to Sign In

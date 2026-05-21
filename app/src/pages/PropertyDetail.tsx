@@ -222,7 +222,7 @@ export default function PropertyDetail() {
             <h1 className="text-2xl font-bold tracking-tight text-foreground">
               {property.propertyName}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <Badge className={`${config.bg} ${config.color} border-0`}>
                 <StatusIcon className="mr-1 h-3 w-3" />
                 {property.approvalStatus?.replace("_", " ")}
@@ -253,7 +253,7 @@ export default function PropertyDetail() {
             />
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {property.approvalStatus === "completed" && (
             <Button
               variant="outline"
@@ -331,7 +331,7 @@ export default function PropertyDetail() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 h-full">
+          <div className="grid grid-cols-2 gap-3 md:h-full">
             {data.images.slice(1, 5).map((img, idx) => (
               <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-slate-50 dark:bg-slate-900 group">
                 {!thumbError[idx] ? (
@@ -606,7 +606,7 @@ export default function PropertyDetail() {
               </div>
 
               {/* Signature line - More space for physical stamps/signatures */}
-              <div className="grid grid-cols-2 gap-16 max-w-lg mx-auto mb-6">
+              <div className="grid grid-cols-2 gap-4 sm:gap-8 md:gap-16 max-w-lg mx-auto mb-6">
                 <div className="text-center space-y-2">
                   <div className="h-24" /> {/* Space for physical stamp */}
                   <div className="h-px bg-gradient-to-r from-transparent via-[#8B4513] to-transparent" />

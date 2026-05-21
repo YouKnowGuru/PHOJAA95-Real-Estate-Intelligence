@@ -442,7 +442,7 @@ export default function PayrollPage() {
                         </Badge>
                       </td>
                       <td className="py-2 px-3 text-center">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
                           <Button
                             size="sm"
                             variant="ghost"
@@ -550,7 +550,7 @@ export default function PayrollPage() {
               <Label>Base Salary (Nu.) *</Label>
               <Input type="number" value={payrollForm.baseSalary} onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Bonus</Label>
                 <Input type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })} />
@@ -568,7 +568,7 @@ export default function PayrollPage() {
                     onChange={(e) => setPayrollForm({ ...payrollForm, pfPercentage: e.target.value })}
                     className="flex-1"
                   />
-                  <div className="flex items-center justify-center px-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-border min-w-[100px]">
+                  <div className="flex items-center justify-center px-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-border min-w-0">
                     <span className="text-[10px] font-bold text-amber-600">
                       {(() => {
                         const staff = staffList?.items.find((u: any) => u.id.toString() === payrollForm.userId);

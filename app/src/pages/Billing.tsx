@@ -599,7 +599,7 @@ function BillingRow({
           {sublabel && <p className="text-[10px] text-muted-foreground/70">{sublabel}</p>}
         </div>
       </div>
-      <p className={`text-sm shrink-0 ${accent}`}>{value}</p>
+      <p className={`text-xs sm:text-sm shrink-0 truncate max-w-[120px] sm:max-w-none ${accent}`}>{value}</p>
     </div>
   );
 }
@@ -633,15 +633,15 @@ function SummaryCard({
       >
         <Card className="border-0 bg-transparent shadow-none">
           <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
-                {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="space-y-1 sm:space-y-2 min-w-0">
+                <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground truncate">{title}</p>
+                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-foreground truncate">{value}</h3>
+                {sub && <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{sub}</p>}
               </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
+              <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
+                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color.replace("bg-", "text-")}`} />
               </div>
             </div>
           </CardContent>
@@ -791,7 +791,7 @@ export default function Billing() {
       {isLoading ? (
         <SummarySkeleton />
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <SummaryCard
             title="Total Sales Value"
             value={formatK(totalSellingPrice)}
@@ -836,7 +836,7 @@ export default function Billing() {
         <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
           <CardContent className="pt-4 pb-4">
             <div className="flex flex-wrap gap-3 items-center">
-              <div className="relative flex-1 min-w-[240px]">
+              <div className="relative flex-1 min-w-[140px] sm:min-w-[240px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by property, owner or buyer..."
@@ -857,7 +857,7 @@ export default function Billing() {
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="flex items-center gap-2 ml-auto">
+              <div className="flex flex-wrap items-center gap-2 ml-auto">
                 <Button
                   size="sm"
                   variant="outline"
@@ -943,7 +943,7 @@ export default function Billing() {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="flex items-center justify-center gap-2 pt-2"
+          className="flex flex-wrap items-center justify-center gap-2 pt-2"
         >
           <Button
             variant="outline"

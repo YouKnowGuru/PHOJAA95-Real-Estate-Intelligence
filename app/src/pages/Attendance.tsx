@@ -179,7 +179,7 @@ export default function AttendancePage() {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Track and manage attendance records</p>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm p-2">
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm p-2">
           <select
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
@@ -192,7 +192,7 @@ export default function AttendancePage() {
             ))}
           </select>
           {isAdmin ? (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={exportToCSV}>
                 <Download className="h-4 w-4 mr-2" />
                 Export CSV
@@ -380,7 +380,7 @@ export default function AttendancePage() {
                 const count = dailyStatus.breakdown.find((b) => b.status === status)?.count || 0;
                 return (
                   <div key={status} className="space-y-1">
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground capitalize">{status.replace("_", " ")}</p>
+                    <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">{status.replace("_", " ")}</p>
                     <p
                       className={`text-xl font-bold ${
                         status === "present"
@@ -404,7 +404,7 @@ export default function AttendancePage() {
 
       {/* Records */}
       <Card className="border-border/50">
-        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+        <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="text-base">{isAdmin ? "Attendance Logs" : "My Attendance Records"}</CardTitle>
           {isAdmin && (
             <div className="flex items-center gap-2">
@@ -448,7 +448,7 @@ export default function AttendancePage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: index * 0.02 }}
-                  className="flex items-center justify-between p-3 rounded-lg border border-border/30 hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-border/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 gap-2"
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
@@ -463,7 +463,7 @@ export default function AttendancePage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4">
                     <div className="text-right">
                       {record.checkIn && (
                         <p className="text-xs text-muted-foreground">In: {new Date(record.checkIn).toLocaleTimeString()}</p>

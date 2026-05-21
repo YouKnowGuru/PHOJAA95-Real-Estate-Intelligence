@@ -535,7 +535,7 @@ export default function PropertyWizard() {
                   </Button>
                 </div>
                 {Object.entries(step1Data.features || {}).map(([key, value], index) => (
-                  <div key={index} className="flex gap-2 items-start">
+                  <div key={index} className="flex flex-col sm:flex-row gap-2 items-start">
                     <Input
                       placeholder="Feature Name (e.g., Bedrooms, Land Area)"
                       value={key}
@@ -645,7 +645,7 @@ export default function PropertyWizard() {
               />
             </div>
 
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
               {propertyId && (
                 <Button 
                   type="button" 
@@ -667,7 +667,7 @@ export default function PropertyWizard() {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
                   disabled={createMutation.isPending || updateMutation.isPending}
                 >
                   {(createMutation.isPending || updateMutation.isPending) ? "Saving..." : (propertyId ? "Update & Resubmit" : isAdmin ? "Create Property" : "Submit Property Info")}
@@ -780,28 +780,30 @@ export default function PropertyWizard() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigateToStep(1)}
+                className="w-full sm:w-auto"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Button>
-              <div className="flex gap-3">
+              <div className="flex flex-col-reverse sm:flex-row gap-3">
                 <LinkToProperty id={propertyId} />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigateToStep(3)}
+                  className="w-full sm:w-auto"
                 >
                   Next Step
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
                   disabled={submitStep2Mutation.isPending || (!isAdmin && existingProperty?.agreement?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review")}
                 >
                   {submitStep2Mutation.isPending
@@ -943,28 +945,30 @@ export default function PropertyWizard() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigateToStep(2)}
+                className="w-full sm:w-auto"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Button>
-              <div className="flex gap-3">
+              <div className="flex flex-col-reverse sm:flex-row gap-3">
                 <LinkToProperty id={propertyId} />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigateToStep(4)}
+                  className="w-full sm:w-auto"
                 >
                   Next Step
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
                   disabled={submitStep3Mutation.isPending || (!isAdmin && existingProperty?.documents?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review")}
                 >
                   {submitStep3Mutation.isPending
@@ -1047,28 +1051,30 @@ export default function PropertyWizard() {
             <p className="text-sm text-muted-foreground">
               Both lagthram processing and loan processing must be completed before moving to the final step.
             </p>
-            <div className="flex justify-between gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigateToStep(3)}
+                className="w-full sm:w-auto"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Button>
-              <div className="flex gap-3">
+              <div className="flex flex-col-reverse sm:flex-row gap-3">
                 <LinkToProperty id={propertyId} />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigateToStep(5)}
+                  className="w-full sm:w-auto"
                 >
                   Next Step
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
                   disabled={submitStep4Mutation.isPending || (!isAdmin && existingProperty?.property?.approvalStatus === "pending_review" && existingProperty?.property?.currentStep === 4)}
                 >
                   {submitStep4Mutation.isPending
@@ -1125,20 +1131,21 @@ export default function PropertyWizard() {
                 />
               </div>
             </div>
-            <div className="flex justify-between gap-3">
+            <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigateToStep(4)}
+                className="w-full sm:w-auto"
               >
                 <ChevronLeft className="mr-2 h-4 w-4" />
                 Previous
               </Button>
-              <div className="flex gap-3">
+              <div className="flex flex-col-reverse sm:flex-row gap-3">
                 <LinkToProperty id={propertyId} />
                 <Button
                   type="submit"
-                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                  className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
                   disabled={submitStep5Mutation.isPending || (!isAdmin && existingProperty?.finalLagthram?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review")}
                 >
                   {submitStep5Mutation.isPending

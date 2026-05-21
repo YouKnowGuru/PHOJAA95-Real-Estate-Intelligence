@@ -246,12 +246,12 @@ export default function Users() {
                 <Card className="relative border-border/50 bg-white/70 dark:bg-slate-800/70 overflow-hidden transition-shadow hover:shadow-lg hover:shadow-primary/5">
                   <div className={`absolute left-0 top-0 h-full w-1 ${accentColor}`} />
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
                       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
                         <UserCircle className="h-5 w-5 text-slate-500" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-bold text-foreground">{user.fullName}</h3>
                           <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-[10px]">
                             {user.role}
@@ -264,7 +264,7 @@ export default function Users() {
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground">{user.email}</p>
-                        <div className="flex gap-3 mt-1">
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                           {user.phone && <p className="text-[10px] text-muted-foreground">📞 {user.phone}</p>}
                           {user.pfNumber && <p className="text-[10px] text-primary font-medium">🆔 PF: {user.pfNumber}</p>}
                           {user.employeeId && <p className="text-[10px] text-indigo-600 font-medium">👤 ID: {user.employeeId}</p>}
@@ -273,7 +273,7 @@ export default function Users() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {user.status === "locked" && (
                           <Button
                             size="sm"
@@ -364,7 +364,7 @@ export default function Users() {
               <Label>Phone</Label>
               <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Employee ID</Label>
                 <Input value={formData.employeeId} onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })} placeholder="e.g. EMP001" />
@@ -408,7 +408,7 @@ export default function Users() {
                 status: editForm.status,
               });
             }} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Full Name</Label>
                     <Input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} required />
@@ -418,7 +418,7 @@ export default function Users() {
                     <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
                   </div>
                 </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Employee ID</Label>
                   <Input value={editForm.employeeId} onChange={(e) => setEditForm({ ...editForm, employeeId: e.target.value })} placeholder="e.g. EMP001" />
@@ -428,7 +428,7 @@ export default function Users() {
                   <Input type="number" step="0.01" value={editForm.pfPercentage} onChange={(e) => setEditForm({ ...editForm, pfPercentage: e.target.value })} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Role</Label>
                   <Select value={editForm.role} onValueChange={(v: "staff" | "admin") => setEditForm({ ...editForm, role: v })}>

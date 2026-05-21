@@ -237,7 +237,7 @@ export default function ApprovalQueue() {
                         <div className="flex items-center gap-1.5">
                           <Layers className="h-3 w-3 text-muted-foreground" />
                           <span className="text-muted-foreground">Owner CID:</span>
-                          <span className="font-medium text-foreground">{property.ownerCID}</span>
+                          <span className="font-medium text-foreground truncate">{property.ownerCID}</span>
                         </div>
                       </div>
                       
@@ -260,7 +260,7 @@ export default function ApprovalQueue() {
                     {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0">
                       <Link to={`/properties/${property.id}`}>
-                        <Button variant="outline" size="sm" className="rounded-lg">
+                        <Button variant="outline" size="sm" className="rounded-lg h-9">
                           View
                           <ArrowRight className="ml-1 h-3 w-3" />
                         </Button>
@@ -268,17 +268,19 @@ export default function ApprovalQueue() {
                       <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        className="rounded-lg border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-9 w-9 p-0"
                         onClick={() => handleReject(property.id, property.currentStep)}
                         disabled={processingId === property.id}
+                        title="Reject"
                       >
                         <XCircle className="h-4 w-4" />
                       </Button>
                       <Button
                         size="sm"
-                        className="rounded-lg bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20"
+                        className="rounded-lg bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 h-9 w-9 p-0"
                         onClick={() => handleApprove(property.id, property.currentStep)}
                         disabled={processingId === property.id}
+                        title="Approve"
                       >
                         {processingId === property.id && action === "approve" ? (
                           <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />

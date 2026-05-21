@@ -113,7 +113,7 @@ export function NotificationBell({ className }: { className?: string }) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className={cn("relative", className)} onClick={handleBellClick}>
+        <Button variant="ghost" size="icon" className={cn("relative h-10 w-10", className)} onClick={handleBellClick}>
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-[10px] font-bold text-white flex items-center justify-center">
@@ -122,8 +122,8 @@ export function NotificationBell({ className }: { className?: string }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between p-3 border-b">
+      <PopoverContent className="w-[calc(100vw-2rem)] max-w-sm p-0" align="end">
+        <div className="flex flex-wrap items-center justify-between p-3 border-b gap-2">
           <h3 className="font-semibold">Notifications</h3>
           {unreadCount > 0 && (
             <Button
@@ -131,6 +131,7 @@ export function NotificationBell({ className }: { className?: string }) {
               size="sm"
               onClick={() => markAllRead.mutate()}
               disabled={markAllRead.isPending}
+              className="h-8"
             >
               <CheckCheck className="h-4 w-4 mr-1" />
               Mark all read
@@ -138,7 +139,7 @@ export function NotificationBell({ className }: { className?: string }) {
           )}
         </div>
 
-        <ScrollArea className="h-[300px]">
+        <ScrollArea className="max-h-[60vh]">
           {isLoading ? (
             <div className="flex items-center justify-center p-4">
               <p className="text-sm text-muted-foreground">Loading...</p>
@@ -156,7 +157,7 @@ export function NotificationBell({ className }: { className?: string }) {
                   <div
                     key={notification.id}
                     className={cn(
-                      "p-3 hover:bg-muted/50 transition-colors cursor-pointer",
+                      "p-3 hover:bg-muted/50 transition-colors cursor-pointer min-h-[44px]",
                       !notification.isRead && "bg-primary/5"
                     )}
                     onClick={() => {
@@ -180,7 +181,7 @@ export function NotificationBell({ className }: { className?: string }) {
                     <div className="flex items-start gap-3">
                       <div
                         className={cn(
-                          "mt-0.5 p-1.5 rounded-full",
+                          "mt-0.5 p-2 rounded-full shrink-0",
                           notification.type === "success" && "bg-green-500/10 text-green-500",
                           notification.type === "error" && "bg-red-500/10 text-red-500",
                           notification.type === "warning" && "bg-yellow-500/10 text-yellow-500",
@@ -202,7 +203,7 @@ export function NotificationBell({ className }: { className?: string }) {
                         </p>
                       </div>
                       {!notification.isRead && (
-                        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-primary flex-shrink-0 mt-2 shrink-0" />
                       )}
                     </div>
                   </div>

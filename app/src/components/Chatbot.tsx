@@ -102,13 +102,13 @@ function MessageBubble({ message, isStreaming }: { message: Message; isStreaming
         >
             <div
                 className={cn(
-                    "flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-md ring-2 ring-background",
+                    "flex h-9 w-9 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-xl shadow-md ring-2 ring-background",
                     isUser
                         ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
                         : "bg-gradient-to-br from-violet-500 to-indigo-600 text-white",
                 )}
             >
-                {isUser ? <User className="h-3.5 sm:h-4 w-3.5 sm:w-4" /> : <Bot className="h-3.5 sm:h-4 w-3.5 sm:w-4" />}
+                {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
             </div>
             <div
                 className={cn(
@@ -184,7 +184,7 @@ function ChatInput({
                         placeholder="Ask me anything..."
                         disabled={isLoading}
                         rows={1}
-                        className="w-full min-h-[44px] sm:min-h-[52px] max-h-[120px] sm:max-h-[150px] rounded-xl sm:rounded-2xl border-border/50 bg-white dark:bg-slate-950 pr-10 sm:pr-12 shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all resize-none py-2.5 sm:py-3.5 overflow-y-auto text-sm sm:text-base"
+                        className="w-full min-h-[52px] max-h-[120px] sm:max-h-[150px] rounded-xl sm:rounded-2xl border-border/50 bg-white dark:bg-slate-950 pr-12 shadow-sm focus-visible:ring-primary focus-visible:border-primary transition-all resize-none py-3 sm:py-3.5 overflow-y-auto text-sm sm:text-base"
                     />
                 </div>
                 <Button
@@ -192,12 +192,12 @@ function ChatInput({
                     onClick={handleSend}
                     disabled={isLoading || !input.trim()}
                     className={cn(
-                        "absolute right-1.5 sm:right-2 bottom-1.5 sm:bottom-2 h-8 w-8 sm:h-9 sm:w-9 rounded-xl transition-all duration-300",
+                        "absolute right-2 bottom-2 h-9 w-9 rounded-xl transition-all duration-300",
                         input.trim() ? "bg-primary text-primary-foreground shadow-md hover:scale-105 active:scale-95" : "bg-muted text-muted-foreground"
                     )}
                 >
                     {isLoading ? (
-                        <Loader2 className="h-3.5 sm:h-4 w-3.5 sm:w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                         <Send className="h-3.5 sm:h-4 w-3.5 sm:w-4 ml-0.5" />
                     )}

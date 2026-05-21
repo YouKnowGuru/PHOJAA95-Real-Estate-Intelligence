@@ -117,7 +117,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-2xl">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-lg p-0 overflow-hidden rounded-2xl border-0 shadow-2xl">
         {/* Gradient Header */}
         <div className="relative bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-6 pt-6 pb-8">
           {/* Decorative elements */}
@@ -128,7 +128,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="absolute top-4 right-4 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            className="absolute top-4 right-4 p-2.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
           >
             <X className="h-4 w-4 text-white" />
           </button>
@@ -143,7 +143,7 @@ Generated: ${format(new Date(), "MMMM d, yyyy HH:mm")}
           </div>
 
           {/* Employee info */}
-          <div className="relative mt-5 grid grid-cols-2 gap-3">
+          <div className="relative mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
               <User className="h-3.5 w-3.5 text-slate-400 shrink-0" />
               <div className="min-w-0">
