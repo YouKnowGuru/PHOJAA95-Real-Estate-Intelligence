@@ -10,16 +10,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  */
 function resolvePublicDir(): string {
   const candidates = [
-    path.resolve(__dirname, "..", "public"),
     path.resolve(__dirname, "..", "..", "public"),
+    path.resolve(__dirname, "..", "public"),
     path.resolve(__dirname, "..", "app", "public"),
     path.resolve(__dirname, "..", "..", "app", "public"),
     path.resolve(process.cwd(), "public"),
     path.resolve(process.cwd(), "app", "public"),
   ];
 
+  // Prefer directories that contain actual public assets (not just an uploads subdir)
   for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) {
+    if (fs.existsSync(candidate) && (fs.existsSync(path.join(candidate, "loader.png")) || fs.existsSync(path.join(candidate, "favicon.svg")) || fs.existsSync(path.join(candidate, "index.html")))) {
       logger.info("Resolved public directory", {
         path: candidate,
         matchedFrom: candidates.indexOf(candidate),
@@ -30,7 +31,15 @@ function resolvePublicDir(): string {
     }
   }
 
-  const fallback = path.resolve(__dirname, "..", "public");
+  // Fallback: any existing directory
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      logger.info("Resolved public directory (fallback)", { path: candidate });
+      return candidate;
+    }
+  }
+
+  const fallback = path.resolve(__dirname, "..", "..", "public");
   logger.warn("Public directory not found; creating fallback", { fallback });
   fs.mkdirSync(fallback, { recursive: true });
   return fallback;
