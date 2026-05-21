@@ -30,16 +30,17 @@ export function serveStaticFiles(app: App) {
   });
 
   // ─── Explicit handler for uploaded files ────────────────────────────
-  // This runs BEFORE the catch-all serveStatic so uploads are served
-  // reliably even if the bundled dist path is mis-resolved.
   app.use("/uploads/*", async (c, next) => {
     const reqPath = c.req.path;
-    const filePath = path.join(PUBLIC_DIR, reqPath);
+    // reqPath is like "/uploads/documents/file.pdf"
+    // Strip "/uploads/" prefix and look in UPLOAD_DIR
+    const relativePath = reqPath.replace("/uploads/", "");
+    const filePath = path.join(UPLOAD_DIR, relativePath);
 
-    // Security: ensure file is within public dir
+    // Security: ensure file is within upload dir
     const resolvedFile = path.resolve(filePath);
-    const resolvedPublic = path.resolve(PUBLIC_DIR);
-    if (!resolvedFile.startsWith(resolvedPublic)) {
+    const resolvedUploadDir = path.resolve(UPLOAD_DIR);
+    if (!resolvedFile.startsWith(resolvedUploadDir)) {
       logger.warn("Upload path traversal blocked", { reqPath, resolvedFile });
       return c.json({ error: "Forbidden" }, 403);
     }
