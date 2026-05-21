@@ -60,7 +60,7 @@ export default defineConfig({
         ],
       },
     }),
-    devServer({ entry: "api/boot.ts", exclude: [/^\/api\//] }),
+    devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
     inspectAttr(),
     react(),
   ],

@@ -154,6 +154,49 @@ app.get("/api/file/*", async (c) => {
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
+// ─── Serve uploaded files in BOTH dev and production ────────────────
+// Dev: Vite dev server excludes /uploads/* from its handling, so Hono
+// must serve these files. Production: this is also handled by
+// serveStaticFiles(), but registering it here ensures it works in dev.
+app.use("/uploads/*", async (c, next) => {
+  const reqPath = c.req.path;
+  const relativePath = reqPath.replace("/uploads/", "");
+  const filePath = path.join(UPLOAD_DIR, relativePath);
+
+  const resolvedFile = path.resolve(filePath);
+  const resolvedUploadDir = path.resolve(UPLOAD_DIR);
+  if (!resolvedFile.startsWith(resolvedUploadDir)) {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return await next();
+  }
+
+  const stat = fs.statSync(filePath);
+  if (!stat.isFile()) {
+    return await next();
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+  };
+  const contentType = mimeTypes[ext] || "application/octet-stream";
+  const file = fs.readFileSync(filePath);
+
+  return c.newResponse(file, 200, {
+    "Content-Type": contentType,
+    "Content-Length": file.length.toString(),
+    "Cache-Control": "public, max-age=86400",
+  });
+});
+
 export default app;
 
 if (env.isProduction) {
