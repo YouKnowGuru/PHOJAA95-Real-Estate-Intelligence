@@ -369,17 +369,33 @@ export const propertyRouter = createRouter({
       const db = getDb();
       const conditions = [];
 
-      const escapedSearch = input.search?.replace(/[%_]/g, "\\$&");
-      if (escapedSearch) {
-        conditions.push(
-          or(
-            like(properties.propertyName, `%${escapedSearch}%`),
-            like(properties.ownerName, `%${escapedSearch}%`),
-            like(properties.ownerCID, `%${escapedSearch}%`),
-            like(properties.buyerName, `%${escapedSearch}%`),
-            like(properties.buyerCID, `%${escapedSearch}%`)
-          )
-        );
+      // Improved search: split by spaces, search each term across multiple fields
+      const rawSearch = input.search?.trim();
+      if (rawSearch) {
+        const searchTerms = rawSearch.split(/\s+/).filter(t => t.length > 0);
+        const searchConditions = searchTerms.map((term) => {
+          const escaped = term.replace(/[%_]/g, "\\$&");
+          return or(
+            like(properties.propertyName, `%${escaped}%`),
+            like(properties.ownerName, `%${escaped}%`),
+            like(properties.ownerCID, `%${escaped}%`),
+            like(properties.ownerPhone, `%${escaped}%`),
+            like(properties.ownerAddress, `%${escaped}%`),
+            like(properties.buyerName, `%${escaped}%`),
+            like(properties.buyerCID, `%${escaped}%`),
+            like(properties.buyerPhone, `%${escaped}%`),
+            like(properties.buyerAddress, `%${escaped}%`),
+            like(properties.address, `%${escaped}%`),
+            like(properties.thramNumber, `%${escaped}%`),
+            like(properties.plotNumber, `%${escaped}%`)
+          );
+        });
+        if (searchConditions.length === 1) {
+          conditions.push(searchConditions[0]);
+        } else if (searchConditions.length > 1) {
+          // All terms must match (AND logic) — but each term can match any field
+          conditions.push(and(...searchConditions));
+        }
       }
 
       if (input.status) conditions.push(eq(properties.approvalStatus, input.status));
