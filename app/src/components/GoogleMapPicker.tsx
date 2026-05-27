@@ -50,6 +50,7 @@ export function GoogleMapPicker({
   const isInitializedRef = useRef(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const defaultCenter: [number, number] = [27.4728, 89.6393];
   const lat = value?.lat ? parseFloat(value.lat) : defaultCenter[0];
@@ -181,6 +182,8 @@ export function GoogleMapPicker({
       if (addressStr) {
         setAddress(addressStr);
         setSearchQuery(addressStr);
+        // Hide suggestions when setting from map click to prevent overlay blocking the page
+        setShowSuggestions(false);
       }
       onChange?.({ lat: latStr, lng: lngStr, address: addressStr });
     } catch {
@@ -228,6 +231,19 @@ export function GoogleMapPicker({
       }
     };
   }, [searchQuery, fetchSuggestions]);
+
+  // Close suggestions when clicking outside the search container
+  useEffect(() => {
+    if (!showSuggestions) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+        setActiveIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showSuggestions]);
 
   const selectSuggestion = (result: SearchResult) => {
     setSearchQuery(result.display_name);
@@ -370,7 +386,7 @@ export function GoogleMapPicker({
       )}
 
       {/* Search Bar with Autocomplete */}
-      <div className="relative">
+      <div className="relative" ref={searchContainerRef}>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -436,16 +452,7 @@ export function GoogleMapPicker({
           </div>
         )}
 
-        {/* Click outside to close suggestions */}
-        {showSuggestions && (
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => {
-              setShowSuggestions(false);
-              setActiveIndex(-1);
-            }}
-          />
-        )}
+
       </div>
 
       {/* Map Container */}
