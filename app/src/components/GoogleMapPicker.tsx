@@ -51,6 +51,8 @@ export function GoogleMapPicker({
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const defaultCenter: [number, number] = [27.4728, 89.6393];
   const lat = value?.lat ? parseFloat(value.lat) : defaultCenter[0];
@@ -171,7 +173,8 @@ export function GoogleMapPicker({
     const latStr = newLat.toFixed(8);
     const lngStr = newLng.toFixed(8);
 
-    onChange?.({ lat: latStr, lng: lngStr });
+    // Use ref to always call the latest onChange (avoids stale closure)
+    onChangeRef.current?.({ lat: latStr, lng: lngStr });
 
     try {
       const response = await fetch(
@@ -185,7 +188,7 @@ export function GoogleMapPicker({
         // Hide suggestions when setting from map click to prevent overlay blocking the page
         setShowSuggestions(false);
       }
-      onChange?.({ lat: latStr, lng: lngStr, address: addressStr });
+      onChangeRef.current?.({ lat: latStr, lng: lngStr, address: addressStr });
     } catch {
       console.error("Failed to reverse geocode");
     }
@@ -255,7 +258,7 @@ export function GoogleMapPicker({
     const newLat = parseFloat(result.lat);
     const newLon = parseFloat(result.lon);
 
-    onChange?.({
+    onChangeRef.current?.({
       lat: result.lat,
       lng: result.lon,
       address: result.display_name,
@@ -322,7 +325,7 @@ export function GoogleMapPicker({
 
         setAddress(display_name);
         setSearchQuery(display_name);
-        onChange?.({ lat: resultLat, lng: resultLon, address: display_name });
+        onChangeRef.current?.({ lat: resultLat, lng: resultLon, address: display_name });
 
         if (mapInstanceRef.current && markerRef.current) {
           mapInstanceRef.current.flyTo([newLat, newLon], 16);
