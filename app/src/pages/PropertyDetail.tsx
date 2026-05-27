@@ -79,6 +79,8 @@ export default function PropertyDetail() {
   const { data: siteSettings } = trpc.settings.getPublicSettings.useQuery();
 
   const validateUrl = (url: string) => {
+    // Accept relative URLs (e.g., /uploads/...) and absolute URLs
+    if (url.startsWith("/")) return true;
     try {
       const u = new URL(url);
       return u.protocol === "http:" || u.protocol === "https:";
