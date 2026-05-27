@@ -133,6 +133,12 @@ export const properties = mysqlTable("properties", {
   index("idx_properties_listed_by").on(table.listedById),
   index("idx_properties_owner_cid").on(table.ownerCID),
   index("idx_properties_step").on(table.currentStep),
+  // Search optimization indexes
+  index("idx_properties_name").on(table.propertyName),
+  index("idx_properties_owner_name").on(table.ownerName),
+  index("idx_properties_owner_phone").on(table.ownerPhone),
+  index("idx_properties_thram").on(table.thramNumber),
+  index("idx_properties_plot").on(table.plotNumber),
 ]);
 
 export type Property = typeof properties.$inferSelect;

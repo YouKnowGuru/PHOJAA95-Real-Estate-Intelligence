@@ -369,14 +369,17 @@ export const propertyRouter = createRouter({
       const db = getDb();
       const conditions = [];
 
-      // Improved search: split by spaces, search each term across multiple fields
+      // Fast property search: property name prioritized, then other fields
       const rawSearch = input.search?.trim();
       if (rawSearch) {
         const searchTerms = rawSearch.split(/\s+/).filter(t => t.length > 0);
+        
         const searchConditions = searchTerms.map((term) => {
           const escaped = term.replace(/[%_]/g, "\\$&");
+          // Priority: property name gets prefix match (fastest with index), others get contains
           return or(
-            like(properties.propertyName, `%${escaped}%`),
+            like(properties.propertyName, `${escaped}%`),     // prefix match — fastest
+            like(properties.propertyName, `%${escaped}%`),    // contains — medium
             like(properties.ownerName, `%${escaped}%`),
             like(properties.ownerCID, `%${escaped}%`),
             like(properties.ownerPhone, `%${escaped}%`),
