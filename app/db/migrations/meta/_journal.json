@@ -22,6 +22,27 @@
       "when": 1779078455992,
       "tag": "0002_numerous_lilandra",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1779363601515,
+      "tag": "0003_red_turbo",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1779786535100,
+      "tag": "0004_land_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1779788237204,
+      "tag": "0005_thram_plot",
+      "breakpoints": true
     }
   ]
 }

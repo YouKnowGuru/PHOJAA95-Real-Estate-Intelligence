@@ -11,6 +11,8 @@ const MIME_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 };
 
 type ResolveResult =
@@ -58,6 +60,11 @@ export function buildUploadFileResponse(filePath: string): Response {
   };
   if (contentType === "application/pdf") {
     headers["Content-Disposition"] = `inline; filename="${path.basename(filePath)}"`;
+  } else if (
+    contentType === "application/msword" ||
+    contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ) {
+    headers["Content-Disposition"] = `attachment; filename="${path.basename(filePath)}"`;
   }
   return new Response(file, { status: 200, headers });
 }

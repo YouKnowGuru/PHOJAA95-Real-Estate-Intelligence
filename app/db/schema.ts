@@ -87,6 +87,19 @@ export const properties = mysqlTable("properties", {
   buyerAddress: text("buyer_address"),
   sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
   realEstateFee: decimal("real_estate_fee", { precision: 15, scale: 2 }).notNull(),
+  // ── Land Pricing Fields ────────────────────────────────────────────
+  pricePerDecimal: decimal("price_per_decimal", { precision: 15, scale: 4 }),
+  landSizeDecimal: decimal("land_size_decimal", { precision: 15, scale: 4 }),
+  negotiatedPrice: decimal("negotiated_price", { precision: 15, scale: 2 }),
+  discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }),
+  finalSellingPrice: decimal("final_selling_price", { precision: 15, scale: 2 }),
+  priceOverrideBy: bigint("price_override_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  priceOverrideAt: timestamp("price_override_at"),
+  priceOverrideReason: text("price_override_reason"),
+  // ── Land Document Fields ───────────────────────────────────────────
+  thramNumber: varchar("thram_number", { length: 100 }),
+  plotNumber: varchar("plot_number", { length: 100 }),
+  // ────────────────────────────────────────────────────────────────────
   currentStep: int("current_step").default(1).notNull(),
   approvalStatus: mysqlEnum("approval_status", [
     "draft",
@@ -306,6 +319,25 @@ export const notifications = mysqlTable("notifications", {
 ]);
 
 export type Notification = typeof notifications.$inferSelect;
+
+// ─── 14. PROPERTY PRICE HISTORY ────────────────────────────────────
+export const propertyPriceHistory = mysqlTable("property_price_history", {
+  id: serial("id").primaryKey(),
+  propertyId: bigint("property_id", { mode: "number", unsigned: true }).notNull().references(() => properties.id, { onDelete: "cascade" }),
+  fieldName: varchar("field_name", { length: 50 }).notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedBy: bigint("changed_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  changedByName: varchar("changed_by_name", { length: 255 }),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_price_history_property").on(table.propertyId),
+  index("idx_price_history_created").on(table.createdAt),
+]);
+
+export type PropertyPriceHistory = typeof propertyPriceHistory.$inferSelect;
+export type InsertPropertyPriceHistory = typeof propertyPriceHistory.$inferInsert;
 
 // ─── 14. SYSTEM SETTINGS ───────────────────────────────────────────
 export const systemSettings = mysqlTable("system_settings", {

@@ -19,6 +19,7 @@ import {
   activityLogs,
   notifications,
   propertyImages,
+  propertyPriceHistory,
 } from "@db/schema";
 
 function generateCSV(data: Record<string, unknown>[], headers: string[]): string {
@@ -57,12 +58,20 @@ export const propertyRouter = createRouter({
         buyerAddress: z.string().optional(),
         sellingPrice: z.string().min(1, "⚠️ Selling Price is required. Please enter the property selling price."),
         realEstateFee: z.string().min(1, "⚠️ Commission amount is required. Please try again."),
+        pricePerDecimal: z.string().optional(),
+        landSizeDecimal: z.string().optional(),
+        negotiatedPrice: z.string().optional(),
+        discountAmount: z.string().optional(),
+        finalSellingPrice: z.string().optional(),
+        priceOverrideReason: z.string().optional(),
+        thramNumber: z.string().optional(),
+        plotNumber: z.string().optional(),
         noObjectionLetter: z.string().optional(),
         images: z.array(z.object({
           url: z.string(),
           publicId: z.string().optional()
         })).optional(),
-        features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        features: z.record(z.string(), z.any()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -99,9 +108,59 @@ export const propertyRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Commission amount could not be calculated. Please try again." });
       }
 
-      // Convert to proper types for database
-      const sellingPriceNum = parseFloat(input.sellingPrice).toFixed(2);
-      const realEstateFeeNum = parseFloat(input.realEstateFee).toFixed(2);
+      // Fetch property type to determine if Land
+      const propType = await db.select({ name: propertyTypes.name })
+        .from(propertyTypes)
+        .where(eq(propertyTypes.id, Number(input.propertyTypeId)))
+        .limit(1);
+      const isLandType = propType[0]?.name === "Land";
+
+      // ── Land Pricing Calculation ──────────────────────────────────────
+      function parseDecimal(val: string | undefined, scale: number): string | null {
+        if (!val || val.trim() === "") return null;
+        const n = parseFloat(val);
+        if (isNaN(n) || n < 0) return null;
+        return n.toFixed(scale);
+      }
+
+      let sellingPriceNum: string;
+      let realEstateFeeNum: string;
+      let pricePerDecimal: string | null = null;
+      let landSizeDecimal: string | null = null;
+      let negotiatedPrice: string | null = null;
+      let discountAmount: string | null = null;
+      let finalSellingPriceNum: string | null = null;
+
+      if (isLandType) {
+        pricePerDecimal = parseDecimal(input.pricePerDecimal, 4);
+        landSizeDecimal = parseDecimal(input.landSizeDecimal, 4);
+        negotiatedPrice = parseDecimal(input.negotiatedPrice, 2);
+        discountAmount = parseDecimal(input.discountAmount, 2);
+
+        // Auto-calculate sellingPrice from pricePerDecimal × landSizeDecimal if both provided
+        let computedSellingPrice = parseFloat(input.sellingPrice);
+        if (pricePerDecimal && landSizeDecimal) {
+          computedSellingPrice = parseFloat(pricePerDecimal) * parseFloat(landSizeDecimal);
+        }
+        sellingPriceNum = computedSellingPrice.toFixed(2);
+
+        // Calculate finalSellingPrice
+        let finalPrice = computedSellingPrice;
+        if (negotiatedPrice) {
+          finalPrice = parseFloat(negotiatedPrice) - parseFloat(discountAmount || "0");
+        } else if (discountAmount) {
+          finalPrice = computedSellingPrice - parseFloat(discountAmount);
+        }
+        finalSellingPriceNum = finalPrice > 0 ? finalPrice.toFixed(2) : sellingPriceNum;
+
+        // Commission is 3% of final selling price
+        realEstateFeeNum = (parseFloat(finalSellingPriceNum) * 0.03).toFixed(2);
+      } else {
+        // Non-Land: use manual selling price
+        const sp = parseFloat(input.sellingPrice);
+        sellingPriceNum = sp.toFixed(2);
+        realEstateFeeNum = (sp * 0.03).toFixed(2);
+      }
 
       // Validate and convert latitude/longitude to proper decimal format
       let latitudeVal: string | null = null;
@@ -120,6 +179,8 @@ export const propertyRouter = createRouter({
       }
 
       const isAdmin = ctx.unifiedUser!.role === "admin";
+      const isPriceOverride = isAdmin && input.priceOverrideReason && input.priceOverrideReason.trim().length > 0;
+
       const result = await db.transaction(async (tx) => {
         const insertResult = await tx.insert(properties).values({
           propertyName: input.propertyName,
@@ -137,12 +198,22 @@ export const propertyRouter = createRouter({
           buyerAddress: input.buyerAddress || null,
           sellingPrice: sellingPriceNum,
           realEstateFee: realEstateFeeNum,
+          pricePerDecimal,
+          landSizeDecimal,
+          negotiatedPrice,
+          discountAmount,
+          finalSellingPrice: finalSellingPriceNum,
+          priceOverrideBy: isPriceOverride ? userId : null,
+          priceOverrideAt: isPriceOverride ? new Date() : null,
+          priceOverrideReason: isPriceOverride ? input.priceOverrideReason : null,
+          thramNumber: isLandType ? (input.thramNumber || null) : null,
+          plotNumber: isLandType ? (input.plotNumber || null) : null,
           noObjectionLetter: input.noObjectionLetter || null,
           currentStep: isAdmin ? 2 : 1,
           approvalStatus: isAdmin ? "approved" : "submitted",
           workflowStatus: isAdmin ? "processing" : "pending",
           listedById: Number(userId),
-          features: input.features,
+          features: input.features ? JSON.stringify(input.features) : null,
         });
 
         const propertyId = Number(insertResult[0].insertId);
@@ -163,8 +234,84 @@ export const propertyRouter = createRouter({
           action: "PROPERTY_CREATED",
           entityType: "property",
           entityId: propertyId,
-          metadata: { propertyName: input.propertyName },
+          metadata: {
+            propertyName: input.propertyName,
+            sellingPrice: sellingPriceNum,
+            finalSellingPrice: finalSellingPriceNum,
+            pricePerDecimal,
+            landSizeDecimal,
+          },
         });
+
+        // Log price history if land pricing fields provided
+        if (pricePerDecimal || landSizeDecimal) {
+          const historyEntries = [];
+          if (pricePerDecimal) {
+            historyEntries.push({
+              propertyId,
+              fieldName: "pricePerDecimal",
+              oldValue: null,
+              newValue: pricePerDecimal,
+              changedBy: userId,
+              changedByName: userName,
+              reason: isPriceOverride ? input.priceOverrideReason : "Auto-calculated on creation",
+            });
+          }
+          if (landSizeDecimal) {
+            historyEntries.push({
+              propertyId,
+              fieldName: "landSizeDecimal",
+              oldValue: null,
+              newValue: landSizeDecimal,
+              changedBy: userId,
+              changedByName: userName,
+              reason: isPriceOverride ? input.priceOverrideReason : "Auto-calculated on creation",
+            });
+          }
+          if (negotiatedPrice) {
+            historyEntries.push({
+              propertyId,
+              fieldName: "negotiatedPrice",
+              oldValue: null,
+              newValue: negotiatedPrice,
+              changedBy: userId,
+              changedByName: userName,
+              reason: isPriceOverride ? input.priceOverrideReason : "Negotiated price on creation",
+            });
+          }
+          if (discountAmount) {
+            historyEntries.push({
+              propertyId,
+              fieldName: "discountAmount",
+              oldValue: null,
+              newValue: discountAmount,
+              changedBy: userId,
+              changedByName: userName,
+              reason: isPriceOverride ? input.priceOverrideReason : "Discount applied on creation",
+            });
+          }
+          historyEntries.push({
+            propertyId,
+            fieldName: "sellingPrice",
+            oldValue: null,
+            newValue: sellingPriceNum,
+            changedBy: userId,
+            changedByName: userName,
+            reason: isPriceOverride ? input.priceOverrideReason : "Auto-calculated from pricePerDecimal × landSizeDecimal",
+          });
+          historyEntries.push({
+            propertyId,
+            fieldName: "finalSellingPrice",
+            oldValue: null,
+            newValue: finalSellingPriceNum,
+            changedBy: userId,
+            changedByName: userName,
+            reason: isPriceOverride ? input.priceOverrideReason : "Auto-calculated final price",
+          });
+          if (historyEntries.length > 0) {
+            await tx.insert(propertyPriceHistory).values(historyEntries);
+          }
+        }
 
         if (isAdmin) {
           await tx.insert(approvalHistory).values({
@@ -272,6 +419,16 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          pricePerDecimal: properties.pricePerDecimal,
+          landSizeDecimal: properties.landSizeDecimal,
+          negotiatedPrice: properties.negotiatedPrice,
+          discountAmount: properties.discountAmount,
+          finalSellingPrice: properties.finalSellingPrice,
+          priceOverrideBy: properties.priceOverrideBy,
+          priceOverrideAt: properties.priceOverrideAt,
+          priceOverrideReason: properties.priceOverrideReason,
+          thramNumber: properties.thramNumber,
+          plotNumber: properties.plotNumber,
           currentStep: properties.currentStep,
           approvalStatus: properties.approvalStatus,
           workflowStatus: properties.workflowStatus,
@@ -331,6 +488,16 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          pricePerDecimal: properties.pricePerDecimal,
+          landSizeDecimal: properties.landSizeDecimal,
+          negotiatedPrice: properties.negotiatedPrice,
+          discountAmount: properties.discountAmount,
+          finalSellingPrice: properties.finalSellingPrice,
+          priceOverrideBy: properties.priceOverrideBy,
+          priceOverrideAt: properties.priceOverrideAt,
+          priceOverrideReason: properties.priceOverrideReason,
+          thramNumber: properties.thramNumber,
+          plotNumber: properties.plotNumber,
           currentStep: properties.currentStep,
           approvalStatus: properties.approvalStatus,
           workflowStatus: properties.workflowStatus,
@@ -385,21 +552,134 @@ export const propertyRouter = createRouter({
         buyerAddress: z.string().optional(),
         sellingPrice: z.string().optional(),
         realEstateFee: z.string().optional(),
+        pricePerDecimal: z.string().optional(),
+        landSizeDecimal: z.string().optional(),
+        negotiatedPrice: z.string().optional(),
+        discountAmount: z.string().optional(),
+        finalSellingPrice: z.string().optional(),
+        priceOverrideReason: z.string().optional(),
         noObjectionLetter: z.string().optional(),
         adminNotes: z.string().optional(),
         rejectionComments: z.string().optional(),
+        thramNumber: z.string().optional(),
+        plotNumber: z.string().optional(),
         images: z.array(z.object({
           url: z.string(),
           publicId: z.string().optional()
         })).optional(),
-        features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+        features: z.record(z.string(), z.any()).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const { id, images, adminNotes, rejectionComments, ...data } = input;
       const db = getDb();
 
-      // Validate numeric fields if provided
+      // Stringify features for MySQL JSON column
+      if (data.features !== undefined) {
+        data.features = data.features ? JSON.stringify(data.features) : null;
+      }
+
+      // ── Land Pricing Calculation for Update ───────────────────────────
+      function parseDecimalUpd(val: string | undefined, scale: number): string | null {
+        if (!val || val.trim() === "") return null;
+        const n = parseFloat(val);
+        if (isNaN(n) || n < 0) return null;
+        return n.toFixed(scale);
+      }
+
+      // Fetch existing property for comparison
+      const existingProp = await db.select({
+        sellingPrice: properties.sellingPrice,
+        realEstateFee: properties.realEstateFee,
+        pricePerDecimal: properties.pricePerDecimal,
+        landSizeDecimal: properties.landSizeDecimal,
+        negotiatedPrice: properties.negotiatedPrice,
+        discountAmount: properties.discountAmount,
+        finalSellingPrice: properties.finalSellingPrice,
+        propertyTypeId: properties.propertyTypeId,
+        listedById: properties.listedById,
+        approvalStatus: properties.approvalStatus,
+      }).from(properties).where(eq(properties.id, id)).limit(1);
+
+      if (existingProp.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
+      }
+      const oldProp = existingProp[0];
+
+      // Check if property type is Land
+      const propType = await db.select({ name: propertyTypes.name })
+        .from(propertyTypes)
+        .where(eq(propertyTypes.id, oldProp.propertyTypeId))
+        .limit(1);
+      const isLandType = propType[0]?.name === "Land";
+
+      const userId = ctx.unifiedUser!.id;
+      const userName = ctx.unifiedUser!.name;
+      const isAdmin = ctx.unifiedUser!.role === "admin";
+      const isPriceOverride = isAdmin && data.priceOverrideReason && data.priceOverrideReason.trim().length > 0;
+
+      let sellingPriceNum: string;
+      let realEstateFeeNum: string;
+      let newPricePerDecimal: string | null = oldProp.pricePerDecimal;
+      let newLandSizeDecimal: string | null = oldProp.landSizeDecimal;
+      let newNegotiatedPrice: string | null = oldProp.negotiatedPrice;
+      let newDiscountAmount: string | null = oldProp.discountAmount;
+      let finalSellingPriceNum: string | null = oldProp.finalSellingPrice;
+
+      if (isLandType) {
+        // Parse new pricing values for Land
+        newPricePerDecimal = data.pricePerDecimal !== undefined ? parseDecimalUpd(data.pricePerDecimal, 4) : oldProp.pricePerDecimal;
+        newLandSizeDecimal = data.landSizeDecimal !== undefined ? parseDecimalUpd(data.landSizeDecimal, 4) : oldProp.landSizeDecimal;
+        newNegotiatedPrice = data.negotiatedPrice !== undefined ? parseDecimalUpd(data.negotiatedPrice, 2) : oldProp.negotiatedPrice;
+        newDiscountAmount = data.discountAmount !== undefined ? parseDecimalUpd(data.discountAmount, 2) : oldProp.discountAmount;
+
+        // Auto-recalculate sellingPrice if land pricing fields changed
+        let computedSellingPrice = data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) : parseFloat(oldProp.sellingPrice || "0");
+        if (newPricePerDecimal && newLandSizeDecimal) {
+          computedSellingPrice = parseFloat(newPricePerDecimal) * parseFloat(newLandSizeDecimal);
+        }
+        sellingPriceNum = computedSellingPrice.toFixed(2);
+
+        // Calculate finalSellingPrice
+        let finalPrice = computedSellingPrice;
+        if (newNegotiatedPrice) {
+          finalPrice = parseFloat(newNegotiatedPrice) - parseFloat(newDiscountAmount || "0");
+        } else if (newDiscountAmount) {
+          finalPrice = computedSellingPrice - parseFloat(newDiscountAmount);
+        }
+        finalSellingPriceNum = finalPrice > 0 ? finalPrice.toFixed(2) : sellingPriceNum;
+
+        // Commission is 3% of final selling price
+        realEstateFeeNum = (parseFloat(finalSellingPriceNum) * 0.03).toFixed(2);
+      } else {
+        // Non-Land: use manual selling price
+        const sp = data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) : parseFloat(oldProp.sellingPrice || "0");
+        sellingPriceNum = sp.toFixed(2);
+        realEstateFeeNum = (sp * 0.03).toFixed(2);
+        // Clear land pricing fields for non-Land
+        newPricePerDecimal = null;
+        newLandSizeDecimal = null;
+        newNegotiatedPrice = null;
+        newDiscountAmount = null;
+        finalSellingPriceNum = null;
+      }
+
+      // Update data with computed values
+      data.sellingPrice = sellingPriceNum;
+      data.realEstateFee = realEstateFeeNum;
+      data.pricePerDecimal = newPricePerDecimal;
+      data.landSizeDecimal = newLandSizeDecimal;
+      data.negotiatedPrice = newNegotiatedPrice;
+      data.discountAmount = newDiscountAmount;
+      data.finalSellingPrice = finalSellingPriceNum;
+      data.thramNumber = isLandType ? (data.thramNumber || null) : null;
+      data.plotNumber = isLandType ? (data.plotNumber || null) : null;
+      if (isPriceOverride) {
+        data.priceOverrideBy = userId.toString();
+        data.priceOverrideAt = new Date().toISOString();
+      }
+
+      // Validate numeric fields
       if (data.sellingPrice !== undefined) {
         const sp = parseFloat(data.sellingPrice);
         if (isNaN(sp) || sp <= 0) {
@@ -418,14 +698,10 @@ export const propertyRouter = createRouter({
       // Ownership check BEFORE any side effects
       let staffProp: { listedById: number; approvalStatus: string } | null = null;
       if (ctx.unifiedUser!.role === "staff") {
-        const prop = await db.select({ listedById: properties.listedById, approvalStatus: properties.approvalStatus })
-          .from(properties)
-          .where(eq(properties.id, id))
-          .limit(1);
-        if (prop.length === 0 || prop[0].listedById !== ctx.unifiedUser!.id) {
+        if (oldProp.listedById !== ctx.unifiedUser!.id) {
           throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this property" });
         }
-        staffProp = prop[0];
+        staffProp = { listedById: oldProp.listedById, approvalStatus: oldProp.approvalStatus };
       }
 
       return await db.transaction(async (tx) => {
@@ -476,6 +752,50 @@ export const propertyRouter = createRouter({
         if (rejectionComments !== undefined) adminUpdateData.rejectionComments = rejectionComments;
 
         await tx.update(properties).set(adminUpdateData).where(eq(properties.id, id));
+
+        // Log price history for changed fields
+        const historyEntries = [];
+        const fieldsToCheck: Array<{ key: string; oldVal: string | null; newVal: string | null }> = [
+          { key: "pricePerDecimal", oldVal: oldProp.pricePerDecimal, newVal: newPricePerDecimal },
+          { key: "landSizeDecimal", oldVal: oldProp.landSizeDecimal, newVal: newLandSizeDecimal },
+          { key: "negotiatedPrice", oldVal: oldProp.negotiatedPrice, newVal: newNegotiatedPrice },
+          { key: "discountAmount", oldVal: oldProp.discountAmount, newVal: newDiscountAmount },
+          { key: "sellingPrice", oldVal: oldProp.sellingPrice, newVal: sellingPriceNum },
+          { key: "finalSellingPrice", oldVal: oldProp.finalSellingPrice, newVal: finalSellingPriceNum },
+        ];
+        for (const field of fieldsToCheck) {
+          if (field.newVal !== null && field.oldVal !== field.newVal) {
+            historyEntries.push({
+              propertyId: id,
+              fieldName: field.key,
+              oldValue: field.oldVal,
+              newValue: field.newVal,
+              changedBy: userId,
+              changedByName: userName,
+              reason: isPriceOverride ? data.priceOverrideReason : "Auto-recalculated on update",
+            });
+          }
+        }
+        if (historyEntries.length > 0) {
+          await tx.insert(propertyPriceHistory).values(historyEntries);
+        }
+
+        // Activity log for price changes
+        if (historyEntries.length > 0) {
+          await tx.insert(activityLogs).values({
+            userId,
+            userName,
+            action: "PRICE_CHANGED",
+            entityType: "property",
+            entityId: id,
+            metadata: {
+              sellingPrice: sellingPriceNum,
+              finalSellingPrice: finalSellingPriceNum,
+              fieldsChanged: historyEntries.map(h => h.fieldName),
+            },
+          });
+        }
+
         return { success: true };
       });
     }),
@@ -1056,6 +1376,16 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          pricePerDecimal: properties.pricePerDecimal,
+          landSizeDecimal: properties.landSizeDecimal,
+          negotiatedPrice: properties.negotiatedPrice,
+          discountAmount: properties.discountAmount,
+          finalSellingPrice: properties.finalSellingPrice,
+          priceOverrideBy: properties.priceOverrideBy,
+          priceOverrideAt: properties.priceOverrideAt,
+          priceOverrideReason: properties.priceOverrideReason,
+          thramNumber: properties.thramNumber,
+          plotNumber: properties.plotNumber,
           currentStep: properties.currentStep,
           approvalStatus: properties.approvalStatus,
           workflowStatus: properties.workflowStatus,
@@ -1107,6 +1437,11 @@ export const propertyRouter = createRouter({
         .where(eq(approvalHistory.propertyId, input.id))
         .orderBy(approvalHistory.createdAt);
 
+      const priceHistory = await db.select()
+        .from(propertyPriceHistory)
+        .where(eq(propertyPriceHistory.propertyId, input.id))
+        .orderBy(desc(propertyPriceHistory.createdAt));
+
       return {
         property: property[0],
         agreement: agreement[0] || null,
@@ -1115,6 +1450,7 @@ export const propertyRouter = createRouter({
         finalLagthram: finalLagthram[0] || null,
         images,
         history,
+        priceHistory,
       };
     }),
 
@@ -1448,6 +1784,7 @@ export const propertyRouter = createRouter({
       .select({ total: sql<string>`COALESCE(CAST(SUM(${properties.realEstateFee}) AS DECIMAL), 0)` })
       .from(properties)
       .where(eq(properties.workflowStatus, "completed"));
+    // Note: realEstateFee is already calculated as 3% of finalSellingPrice, so revenue is correct
 
     return {
       totalProperties: totalProperties[0]?.count || 0,
@@ -1498,6 +1835,7 @@ export const propertyRouter = createRouter({
           ownerCID: properties.ownerCID,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          finalSellingPrice: properties.finalSellingPrice,
           listedById: properties.listedById,
           completedAt: properties.completedAt,
           workflowStatus: properties.workflowStatus,
@@ -1536,6 +1874,7 @@ export const propertyRouter = createRouter({
         ownerName: property.ownerName,
         ownerCID: property.ownerCID,
         sellingPrice: property.sellingPrice,
+        finalSellingPrice: property.finalSellingPrice,
         realEstateFee: property.realEstateFee,
         listedByName: listedBy[0]?.fullName || "Unknown",
         completedAt: property.completedAt || new Date(),
@@ -1600,6 +1939,9 @@ export const propertyRouter = createRouter({
           buyerName: properties.buyerName,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          finalSellingPrice: properties.finalSellingPrice,
+          negotiatedPrice: properties.negotiatedPrice,
+          discountAmount: properties.discountAmount,
           currentStep: properties.currentStep,
           approvalStatus: properties.approvalStatus,
           workflowStatus: properties.workflowStatus,
@@ -1627,15 +1969,16 @@ export const propertyRouter = createRouter({
         .offset(offset);
 
       // Financial totals across all matching records (not just current page)
+      // Use finalSellingPrice when available, otherwise fall back to sellingPrice
       const totalsResult = await db.select({
-        totalSellingPrice: sql<string>`COALESCE(CAST(SUM(${properties.sellingPrice}) AS DECIMAL), 0)`,
+        totalSellingPrice: sql<string>`COALESCE(CAST(SUM(COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice})) AS DECIMAL), 0)`,
         totalCommission: sql<string>`COALESCE(SUM(COALESCE(CAST(${propertyAgreements.commissionAmount} AS DECIMAL), CAST(${properties.realEstateFee} AS DECIMAL), 0)), 0)`,
         totalPaymentAmount: sql<string>`COALESCE(SUM(
           CASE
             WHEN ${properties.currentStep} >= 3 THEN
               CASE
                 WHEN ${propertyAgreements.paymentAmount} IS NOT NULL THEN ${propertyAgreements.paymentAmount}
-                ELSE COALESCE(${properties.sellingPrice}, 0) / 2
+                ELSE COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0) / 2
               END
             ELSE 0
           END
@@ -1647,13 +1990,13 @@ export const propertyRouter = createRouter({
         ), 0)`,
         totalRemainingDue: sql<string>`COALESCE(SUM(
           GREATEST(
-            COALESCE(${properties.sellingPrice}, 0)
+            COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0)
             -
             CASE
               WHEN ${properties.currentStep} >= 3 THEN
                 CASE
                   WHEN ${propertyAgreements.paymentAmount} IS NOT NULL THEN ${propertyAgreements.paymentAmount}
-                  ELSE COALESCE(${properties.sellingPrice}, 0) / 2
+                  ELSE COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0) / 2
                 END
               ELSE 0
             END
@@ -1740,11 +2083,12 @@ export const propertyRouter = createRouter({
         .orderBy(desc(properties.createdAt));
 
       const formattedData = results.map((item) => {
-        const sellingPrice = parseFloat(item.sellingPrice ?? "0");
+        // Use finalSellingPrice when available, otherwise fall back to sellingPrice
+        const basePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
         const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
-        const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : sellingPrice / 2;
+        const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : basePrice / 2;
         const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
-        const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, sellingPrice - initialPayment);
+        const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, basePrice - initialPayment);
         const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
 
         const isStep2Approved = item.currentStep >= 3;
@@ -1753,8 +2097,8 @@ export const propertyRouter = createRouter({
         const initialReceived = isStep2Approved ? initialPayment : 0;
         const remainingReceived = isStep3Approved ? remainingPayment : 0;
         const totalReceived = initialReceived + remainingReceived;
-        const balanceDue = Math.max(0, sellingPrice - totalReceived);
-        const netToSeller = Math.max(0, sellingPrice - commission);
+        const balanceDue = Math.max(0, basePrice - totalReceived);
+        const netToSeller = Math.max(0, basePrice - commission);
 
         return {
           id: item.id,
@@ -1766,13 +2110,14 @@ export const propertyRouter = createRouter({
           listedBy: item.listedByName || "",
           status: item.workflowStatus,
           sellingPrice: fmtPlain(item.sellingPrice),
+          finalSellingPrice: fmtPlain(item.finalSellingPrice),
           initialPayment: fmtPlain(String(initialPayment)),
           remainingPayment: fmtPlain(String(remainingPayment)),
           totalReceived: fmtPlain(String(totalReceived)),
           balanceDue: fmtPlain(String(balanceDue)),
           commission: fmtPlain(String(commission)),
           netToSeller: fmtPlain(String(netToSeller)),
-          percentPaid: sellingPrice > 0 ? Math.round((totalReceived / sellingPrice) * 100) : 0,
+          percentPaid: basePrice > 0 ? Math.round((totalReceived / basePrice) * 100) : 0,
           createdAt: item.createdAt ? format(item.createdAt, "yyyy-MM-dd") : "",
           completedAt: item.completedAt ? format(item.completedAt, "yyyy-MM-dd") : "",
         };

@@ -18,6 +18,7 @@ interface Property {
   ownerPhone: string;
   ownerCID?: string;
   sellingPrice: string;
+  finalSellingPrice?: string | null;
   realEstateFee?: string;
   currentStep: number;
   approvalStatus: ApprovalStatus;
@@ -68,8 +69,17 @@ export function PropertyCard({ property, onView, className }: PropertyCardProps)
 
         <div className="flex items-center justify-between pt-2 border-t">
           <div>
-            <p className="text-xs text-muted-foreground">Selling Price</p>
-            <p className="font-semibold text-lg">{formatCurrency(property.sellingPrice)}</p>
+            <p className="text-xs text-muted-foreground">
+              {property.propertyTypeName === "Land" && property.finalSellingPrice ? "Final Selling Price" : "Selling Price"}
+            </p>
+            <p className="font-semibold text-lg">
+              {formatCurrency(property.propertyTypeName === "Land" ? (property.finalSellingPrice || property.sellingPrice) : property.sellingPrice)}
+            </p>
+            {property.propertyTypeName === "Land" && property.finalSellingPrice && property.finalSellingPrice !== property.sellingPrice && (
+              <p className="text-[10px] text-muted-foreground line-through">
+                {formatCurrency(property.sellingPrice)}
+              </p>
+            )}
           </div>
           {property.realEstateFee && (
             <div className="text-right">

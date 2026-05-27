@@ -5,14 +5,19 @@ import mysql from "mysql2/promise";
 import bcrypt from "bcryptjs";
 import * as schema from "./schema";
 import * as relations from "./relations";
+import { resolveDatabaseUrl } from "./connection-url";
+import { DEFAULT_SITE_TAGLINE } from "../contracts/constants";
 
 const fullSchema = { ...schema, ...relations };
 
-const DATABASE_URL = process.env.DATABASE_URL || "mysql://root@localhost:3306/phojaa95";
+async function propertiesEmpty(db: ReturnType<typeof drizzle>): Promise<boolean> {
+  const rows = await db.select({ count: sql<number>`count(*)` }).from(schema.properties);
+  return Number(rows[0]?.count ?? 0) === 0;
+}
 
 async function seed() {
   const pool = mysql.createPool({
-    uri: DATABASE_URL,
+    uri: resolveDatabaseUrl(),
     connectionLimit: 10,
   });
 
@@ -38,8 +43,8 @@ async function seed() {
   console.log("Property types seeded.");
 
   // ─── 2. LOCAL USERS (Admin + Staff) ──────────────────────────────
-  const adminPassword = await bcrypt.hash("Admin123", 12);
-  const staffPassword = await bcrypt.hash("Staff123", 12);
+  const adminPassword = await bcrypt.hash("Admin@123!", 12);
+  const staffPassword = await bcrypt.hash("Staff@123!", 12);
 
   await db.insert(schema.localUsers).values([
     {
@@ -83,11 +88,36 @@ async function seed() {
       loginAttempts: 0,
     },
   ]).onDuplicateKeyUpdate({
-    set: { email: sql`values(email)`, password: sql`values(password)`, status: sql`values(status)`, loginAttempts: sql`values(loginAttempts)` },
+    set: {
+      email: sql`values(email)`,
+      password: sql`values(password)`,
+      status: sql`values(status)`,
+      loginAttempts: sql`values(login_attempts)`,
+    },
   });
-  console.log("Users seeded.");
+  console.log("Users seeded (admin@phojaa95.com / Admin@123!, staff / Staff@123!).");
 
-  // ─── 3. SAMPLE PROPERTIES ────────────────────────────────────────
+  // ─── 3. SYSTEM SETTINGS (branding + app config) ─────────────────
+  await db.insert(schema.systemSettings).values([
+    { key: "site_name", value: "PHOJAA95", description: "Public site / company name" },
+    { key: "site_tagline", value: DEFAULT_SITE_TAGLINE, description: "Login page footer" },
+    { key: "site_logo", value: "", description: "Site logo URL" },
+    { key: "company_name", value: "Phojaa95 Real Estate", description: "Company name displayed in the system" },
+    { key: "commission_rate", value: "3", description: "Default commission rate percentage" },
+    { key: "currency", value: "BTN", description: "Default currency code" },
+  ]).onDuplicateKeyUpdate({
+    set: { value: sql`values(value)` },
+  });
+  console.log("System settings seeded.");
+
+  if (!(await propertiesEmpty(db))) {
+    console.log("Sample properties already exist — skipping demo properties, attendance, payroll, and history.");
+    await pool.end();
+    console.log("Seed completed (core data only).");
+    return;
+  }
+
+  // ─── 4. SAMPLE PROPERTIES ────────────────────────────────────────
   const sampleProperties = [
     {
       propertyName: "Sunset Valley Residence",
@@ -102,8 +132,8 @@ async function seed() {
       sellingPrice: "8500000.00",
       realEstateFee: "255000.00",
       currentStep: 5,
-      approvalStatus: "completed",
-      workflowStatus: "completed",
+      approvalStatus: "completed" as const,
+      workflowStatus: "completed" as const,
       listedById: 2,
     },
     {
@@ -119,8 +149,8 @@ async function seed() {
       sellingPrice: "15000000.00",
       realEstateFee: "450000.00",
       currentStep: 3,
-      approvalStatus: "pending_review",
-      workflowStatus: "processing",
+      approvalStatus: "pending_review" as const,
+      workflowStatus: "processing" as const,
       listedById: 3,
     },
     {
@@ -136,8 +166,8 @@ async function seed() {
       sellingPrice: "3200000.00",
       realEstateFee: "96000.00",
       currentStep: 2,
-      approvalStatus: "pending_review",
-      workflowStatus: "processing",
+      approvalStatus: "pending_review" as const,
+      workflowStatus: "processing" as const,
       listedById: 4,
     },
     {
@@ -153,8 +183,8 @@ async function seed() {
       sellingPrice: "5600000.00",
       realEstateFee: "168000.00",
       currentStep: 1,
-      approvalStatus: "submitted",
-      workflowStatus: "pending",
+      approvalStatus: "submitted" as const,
+      workflowStatus: "pending" as const,
       listedById: 2,
     },
     {
@@ -170,8 +200,8 @@ async function seed() {
       sellingPrice: "12000000.00",
       realEstateFee: "360000.00",
       currentStep: 4,
-      approvalStatus: "approved",
-      workflowStatus: "processing",
+      approvalStatus: "approved" as const,
+      workflowStatus: "processing" as const,
       listedById: 3,
     },
     {
@@ -187,8 +217,8 @@ async function seed() {
       sellingPrice: "4300000.00",
       realEstateFee: "129000.00",
       currentStep: 2,
-      approvalStatus: "approved",
-      workflowStatus: "processing",
+      approvalStatus: "approved" as const,
+      workflowStatus: "processing" as const,
       listedById: 4,
     },
     {
@@ -204,8 +234,8 @@ async function seed() {
       sellingPrice: "9800000.00",
       realEstateFee: "294000.00",
       currentStep: 5,
-      approvalStatus: "completed",
-      workflowStatus: "completed",
+      approvalStatus: "completed" as const,
+      workflowStatus: "completed" as const,
       listedById: 2,
     },
     {
@@ -221,19 +251,19 @@ async function seed() {
       sellingPrice: "25000000.00",
       realEstateFee: "750000.00",
       currentStep: 3,
-      approvalStatus: "rejected",
-      workflowStatus: "processing",
+      approvalStatus: "rejected" as const,
+      workflowStatus: "processing" as const,
       listedById: 3,
       rejectionComments: "Occupancy certificate is expired. Please provide updated document.",
     },
   ];
 
   for (const prop of sampleProperties) {
-    await db.insert(schema.properties).values(prop as any);
+    await db.insert(schema.properties).values(prop);
   }
   console.log("Properties seeded.");
 
-  // ─── 4. ATTENDANCE ───────────────────────────────────────────────
+  // ─── 5. ATTENDANCE ───────────────────────────────────────────────
   const today = new Date();
   const attendanceData = [];
 
@@ -246,11 +276,13 @@ async function seed() {
       const statuses = ["present", "present", "present", "late", "absent", "half_day"];
       const status = statuses[Math.floor(Math.random() * statuses.length)];
 
+      const checkInDate = new Date(dateStr);
+      const checkOutDate = new Date(dateStr);
       attendanceData.push({
         userId,
         date: dateStr,
-        checkIn: status !== "absent" ? new Date(date.setHours(8 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60))) : null,
-        checkOut: status !== "absent" ? new Date(date.setHours(17, Math.floor(Math.random() * 60))) : null,
+        checkIn: status !== "absent" ? new Date(checkInDate.setHours(8 + Math.floor(Math.random() * 3), Math.floor(Math.random() * 60))) : null,
+        checkOut: status !== "absent" ? new Date(checkOutDate.setHours(17, Math.floor(Math.random() * 60))) : null,
         status: status as "present" | "absent" | "late" | "half_day",
       });
     }
@@ -260,11 +292,11 @@ async function seed() {
     await db.insert(schema.attendance).values({
       ...att,
       date: new Date(att.date),
-    } as any);
+    });
   }
   console.log("Attendance seeded.");
 
-  // ─── 5. PAYROLL ──────────────────────────────────────────────────
+  // ─── 6. PAYROLL ──────────────────────────────────────────────────
   const payrollData = [];
   const months = ["2026-01", "2026-02", "2026-03", "2026-04"];
 
@@ -282,7 +314,7 @@ async function seed() {
         bonus: bonus.toFixed(2),
         deduction: deduction.toFixed(2),
         netSalary: netSalary.toFixed(2),
-        paymentStatus: month === "2026-04" ? "pending" : "paid",
+        paymentStatus: (month === "2026-04" ? "pending" : "paid") as "pending" | "paid",
         paidAt: month !== "2026-04" ? new Date(`${month}-28`) : null,
         notes: `Monthly salary for ${month}`,
       });
@@ -290,30 +322,30 @@ async function seed() {
   }
 
   for (const pay of payrollData) {
-    await db.insert(schema.payroll).values(pay as any);
+    await db.insert(schema.payroll).values(pay);
   }
   console.log("Payroll seeded.");
 
-  // ─── 6. APPROVAL HISTORY ─────────────────────────────────────────
+  // ─── 7. APPROVAL HISTORY ─────────────────────────────────────────
   const historyData = [
-    { propertyId: 1, step: 1, action: "submitted", adminId: 2, comments: "Property information submitted" },
-    { propertyId: 1, step: 1, action: "approved", adminId: 1, comments: "All details verified" },
-    { propertyId: 1, step: 2, action: "submitted", adminId: 2, comments: "Agreement and payment uploaded" },
-    { propertyId: 1, step: 2, action: "approved", adminId: 1, comments: "Documents verified" },
-    { propertyId: 1, step: 3, action: "submitted", adminId: 2, comments: "Property documents uploaded" },
-    { propertyId: 1, step: 3, action: "approved", adminId: 1, comments: "All building documents verified" },
-    { propertyId: 1, step: 4, action: "submitted", adminId: 2, comments: "Verification in progress" },
-    { propertyId: 1, step: 4, action: "approved", adminId: 1, comments: "Both processes completed" },
-    { propertyId: 1, step: 5, action: "submitted", adminId: 2, comments: "Final documents uploaded" },
-    { propertyId: 1, step: 5, action: "completed", adminId: 1, comments: "Property sale completed" },
+    { propertyId: 1, step: 1, action: "submitted" as const, adminId: 2, comments: "Property information submitted" },
+    { propertyId: 1, step: 1, action: "approved" as const, adminId: 1, comments: "All details verified" },
+    { propertyId: 1, step: 2, action: "submitted" as const, adminId: 2, comments: "Agreement and payment uploaded" },
+    { propertyId: 1, step: 2, action: "approved" as const, adminId: 1, comments: "Documents verified" },
+    { propertyId: 1, step: 3, action: "submitted" as const, adminId: 2, comments: "Property documents uploaded" },
+    { propertyId: 1, step: 3, action: "approved" as const, adminId: 1, comments: "All building documents verified" },
+    { propertyId: 1, step: 4, action: "submitted" as const, adminId: 2, comments: "Verification in progress" },
+    { propertyId: 1, step: 4, action: "approved" as const, adminId: 1, comments: "Both processes completed" },
+    { propertyId: 1, step: 5, action: "submitted" as const, adminId: 2, comments: "Final documents uploaded" },
+    { propertyId: 1, step: 5, action: "completed" as const, adminId: 1, comments: "Property sale completed" },
   ];
 
   for (const hist of historyData) {
-    await db.insert(schema.approvalHistory).values(hist as any);
+    await db.insert(schema.approvalHistory).values(hist);
   }
   console.log("Approval history seeded.");
 
-  // ─── 7. ACTIVITY LOGS ────────────────────────────────────────────
+  // ─── 8. ACTIVITY LOGS ────────────────────────────────────────────
   const activityData = [
     { userId: 1, userName: "Admin User", action: "LOGIN", entityType: "system", metadata: { ip: "192.168.1.1" } },
     { userId: 2, userName: "Karma Dorji", action: "PROPERTY_CREATED", entityType: "property", entityId: 1, metadata: { propertyName: "Sunset Valley Residence" } },
@@ -327,18 +359,8 @@ async function seed() {
   }
   console.log("Activity logs seeded.");
 
-  // ─── 8. SYSTEM SETTINGS ──────────────────────────────────────────
-  await db.insert(schema.systemSettings).values([
-    { key: "company_name", value: "Phojaa95 Real Estate", description: "Company name displayed in the system" },
-    { key: "commission_rate", value: "3", description: "Default commission rate percentage" },
-    { key: "currency", value: "BTN", description: "Default currency code" },
-  ]).onDuplicateKeyUpdate({
-    set: { key: sql`values(\`key\`)` },
-  });
-  console.log("System settings seeded.");
-
-  console.log("Seed completed successfully!");
   await pool.end();
+  console.log("Seed completed successfully!");
 }
 
 seed().catch((error) => {

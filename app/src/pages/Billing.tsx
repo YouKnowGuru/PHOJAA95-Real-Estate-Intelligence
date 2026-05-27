@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -15,6 +14,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AppleCard,
+  AppleCardContent,
+} from "@/components/ui/apple-card";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Receipt,
   Search,
@@ -37,6 +41,7 @@ import {
   FileSpreadsheet,
   FileJson,
   FileType,
+  ArrowUpRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router";
@@ -61,31 +66,33 @@ const fmtPlain = (val: string | number | null | undefined) => {
 };
 
 function StatusBadge({ status }: { status: string }) {
-  const configs: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
-    pending: { label: "Pending", variant: "outline", icon: <CircleDashed className="h-3 w-3" /> },
-    processing: { label: "Processing", variant: "secondary", icon: <TrendingUp className="h-3 w-3" /> },
-    completed: { label: "Completed", variant: "default", icon: <CircleCheck className="h-3 w-3" /> },
-    rejected: { label: "Rejected", variant: "destructive", icon: <AlertCircle className="h-3 w-3" /> },
-    cancelled: { label: "Cancelled", variant: "outline", icon: <AlertCircle className="h-3 w-3" /> },
-    approved: { label: "Approved", variant: "default", icon: <CircleCheck className="h-3 w-3" /> },
+  const configs: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
+    pending: { label: "Pending", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800", icon: <CircleDashed className="h-3 w-3" /> },
+    processing: { label: "Processing", className: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800", icon: <TrendingUp className="h-3 w-3" /> },
+    completed: { label: "Completed", className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800", icon: <CircleCheck className="h-3 w-3" /> },
+    rejected: { label: "Rejected", className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800", icon: <AlertCircle className="h-3 w-3" /> },
+    cancelled: { label: "Cancelled", className: "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-900/20 dark:text-slate-300 dark:border-slate-800", icon: <AlertCircle className="h-3 w-3" /> },
+    approved: { label: "Approved", className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800", icon: <CircleCheck className="h-3 w-3" /> },
   };
-  const conf = configs[status] ?? { label: status, variant: "outline" as const, icon: null };
+  const conf = configs[status] ?? { label: status, className: "bg-muted text-muted-foreground border-border", icon: null };
   return (
-    <Badge variant={conf.variant} className="gap-1 capitalize">
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${conf.className}`}>
       {conf.icon}
       {conf.label}
-    </Badge>
+    </span>
   );
 }
 
 // ─── Print / Download helpers ─────────────────────────────────────────────
 
 function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteLogo?: string }) {
-  const sellingPrice = parseFloat(item.sellingPrice ?? "0");
+  // Use finalSellingPrice when available (for land with negotiated price), otherwise fall back to sellingPrice
+  const effectivePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
+  const originalPrice = parseFloat(item.sellingPrice ?? "0");
   const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
-  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : sellingPrice / 2;
+  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : effectivePrice / 2;
   const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
-  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, sellingPrice - initialPayment);
+  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, effectivePrice - initialPayment);
   const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
 
   const isStep2Approved = item.currentStep >= 3;
@@ -94,8 +101,8 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
   const initialReceived = isStep2Approved ? initialPayment : 0;
   const remainingReceived = isStep3Approved ? remainingPayment : 0;
   const totalReceived = initialReceived + remainingReceived;
-  const balanceDue = Math.max(0, sellingPrice - totalReceived);
-  const percentPaid = sellingPrice > 0 ? Math.round((totalReceived / sellingPrice) * 100) : 0;
+  const balanceDue = Math.max(0, effectivePrice - totalReceived);
+  const percentPaid = effectivePrice > 0 ? Math.round((totalReceived / effectivePrice) * 100) : 0;
   const isFullyPaid = percentPaid === 100;
 
   const invoiceNo = `INV-${String(item.id).padStart(5, "0")}`;
@@ -104,6 +111,10 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
   const statusColor = isFullyPaid ? "#10b981" : percentPaid >= 50 ? "#f59e0b" : "#6366f1";
   const statusBg = isFullyPaid ? "#ecfdf5" : percentPaid >= 50 ? "#fffbeb" : "#eef2ff";
   const statusText = isFullyPaid ? "Fully Paid" : percentPaid >= 50 ? "Partially Paid" : "Payment Pending";
+
+  const hasPriceAdjustment = item.finalSellingPrice && parseFloat(item.finalSellingPrice) !== originalPrice;
+  const negotiatedVal = parseFloat(item.negotiatedPrice || "0");
+  const discountVal = parseFloat(item.discountAmount || "0");
 
   const logoHtml = branding.siteLogo
     ? `<img src="${branding.siteLogo}" alt="${branding.siteName}" style="width:40px;height:40px;object-fit:contain;border-radius:8px;" onerror="this.style.display='none'"/>`
@@ -248,8 +259,8 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
       <tbody>
         <tr>
           <td>01</td>
-          <td><strong>Total Selling Price</strong></td>
-          <td class="amount"><strong>${fmtPlain(item.sellingPrice)}</strong></td>
+          <td><strong>Total Selling Price</strong>${hasPriceAdjustment ? `<br/><span style="font-size:9px;color:#64748b">(Original: ${fmtPlain(originalPrice)})</span>` : ""}</td>
+          <td class="amount"><strong>${fmtPlain(effectivePrice)}</strong></td>
         </tr>
         <tr>
           <td>02</td>
@@ -303,7 +314,7 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
       </div>
       <div class="total-row net">
         <span>Net to Seller</span>
-        <span style="color:#4f46e5">${fmtPlain(String(Math.max(0, sellingPrice - commission)))}</span>
+        <span style="color:#4f46e5">${fmtPlain(String(Math.max(0, effectivePrice - commission)))}</span>
       </div>
       <div class="total-bar">
         <div class="total-bar-fill"></div>
@@ -354,6 +365,9 @@ interface BillingItem {
   buyerName: string | null;
   sellingPrice: string;
   realEstateFee: string;
+  finalSellingPrice: string | null;
+  negotiatedPrice: string | null;
+  discountAmount: string | null;
   currentStep: number;
   approvalStatus: string;
   workflowStatus: string;
@@ -412,14 +426,14 @@ function PaymentSteps({ currentStep }: { currentStep: number }) {
   );
 }
 
-// ─── Invoice Card ─────────────────────────────────────────────────────────
+// ─── Featured Hero Card (App Store Style) ─────────────────────────────────
 
-function InvoiceCard({ item, branding }: { item: BillingItem; branding: { siteName: string; siteLogo?: string } }) {
-  const sellingPrice = parseFloat(item.sellingPrice ?? "0");
+function FeaturedInvoiceCard({ item, branding }: { item: BillingItem; branding: { siteName: string; siteLogo?: string } }) {
+  const effectivePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
   const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
-  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : sellingPrice / 2;
+  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : effectivePrice / 2;
   const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
-  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, sellingPrice - initialPayment);
+  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, effectivePrice - initialPayment);
   const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
 
   const isStep2Approved = item.currentStep >= 3;
@@ -428,8 +442,181 @@ function InvoiceCard({ item, branding }: { item: BillingItem; branding: { siteNa
   const initialReceived = isStep2Approved ? initialPayment : 0;
   const remainingReceived = isStep3Approved ? remainingPayment : 0;
   const totalReceived = initialReceived + remainingReceived;
-  const balanceDue = Math.max(0, sellingPrice - totalReceived);
-  const percentPaid = sellingPrice > 0 ? Math.round((totalReceived / sellingPrice) * 100) : 0;
+  const balanceDue = Math.max(0, effectivePrice - totalReceived);
+  const percentPaid = effectivePrice > 0 ? Math.round((totalReceived / effectivePrice) * 100) : 0;
+
+  const invoiceNo = `INV-${String(item.id).padStart(5, "0")}`;
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 24 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+      className="group relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-card via-card to-muted/30 backdrop-blur-xl shadow-apple-md hover:shadow-apple-lg transition-all duration-500"
+    >
+      {/* Top gradient bar */}
+      <div className={`h-1.5 w-full ${percentPaid === 100 ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : percentPaid >= 50 ? "bg-gradient-to-r from-amber-400 to-amber-600" : "bg-gradient-to-r from-primary to-primary/70"}`} />
+
+      <div className="p-6">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 mb-5">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="relative">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center shrink-0 shadow-sm">
+                <Receipt className="h-7 w-7 text-primary" />
+              </div>
+              <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
+                <Star className="h-3 w-3 text-white fill-white" />
+              </div>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-primary tracking-widest uppercase">{invoiceNo}</p>
+              <p className="text-lg font-bold text-foreground truncate max-w-[220px] sm:max-w-[320px]">{item.propertyName}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <StatusBadge status={item.workflowStatus} />
+                <span className="text-xs text-muted-foreground">{item.propertyTypeName || "Property"}</span>
+              </div>
+            </div>
+          </div>
+          <Link to={`/properties/${item.id}`}>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0">
+              <ArrowUpRight className="h-5 w-5" />
+            </Button>
+          </Link>
+        </div>
+
+        {/* Payment Progress */}
+        <div className="mb-5">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Progress</span>
+            <span className={`text-sm font-bold ${percentPaid === 100 ? "text-emerald-600" : "text-foreground"}`}>{percentPaid}%</span>
+          </div>
+          <Progress value={percentPaid} className="h-2.5 bg-muted/60 rounded-full" />
+          <div className="flex items-center justify-between mt-3">
+            <PaymentSteps currentStep={item.currentStep} />
+            <span className="text-xs font-medium text-muted-foreground">{isStep3Approved ? "Fully Paid" : isStep2Approved ? "Partially Paid" : "Awaiting Payment"}</span>
+          </div>
+        </div>
+
+        {/* Parties */}
+        <div className="grid grid-cols-2 gap-4 mb-5 p-4 rounded-2xl bg-muted/40 dark:bg-muted/20 border border-border/30">
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1.5">Owner / Seller</p>
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-foreground truncate">{item.ownerName}</p>
+            </div>
+          </div>
+          <div className="min-w-0">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1.5">Buyer</p>
+            <div className="flex items-center gap-2">
+              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <p className="text-sm font-semibold text-foreground truncate">{item.buyerName || <span className="text-muted-foreground italic font-normal">Not assigned</span>}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Billing Breakdown */}
+        <div className="space-y-3 mb-5">
+          <BillingRow
+            label="Total Selling Price"
+            value={fmt(String(effectivePrice))}
+            accent="text-foreground font-bold text-base"
+            icon={<DollarSign className="h-5 w-5 text-primary" />}
+            highlight
+          />
+
+          <div className="rounded-2xl bg-muted/30 dark:bg-muted/15 border border-border/30 p-4 space-y-3">
+            <BillingRow
+              label={`Initial Payment ${isStep2Approved ? "✓" : ""}`}
+              sublabel={isStep2Approved ? "Received" : `Pending${hasExactPayment ? "" : " • est. 50%"}`}
+              value={fmt(String(initialPayment))}
+              accent={isStep2Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}
+              icon={<TrendingUp className={`h-4 w-4 ${isStep2Approved ? "text-emerald-500" : "text-muted-foreground/50"}`} />}
+            />
+            <BillingRow
+              label={`Remaining Payment ${isStep3Approved ? "✓" : ""}`}
+              sublabel={isStep3Approved ? "Received" : `Pending${hasExactRemaining ? "" : " • est. 50%"}`}
+              value={fmt(String(remainingPayment))}
+              accent={isStep3Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}
+              icon={<TrendingUp className={`h-4 w-4 ${isStep3Approved ? "text-emerald-500" : "text-amber-500/60"}`} />}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">Total Paid</p>
+              <p className="text-base font-bold text-emerald-700 dark:text-emerald-300">{fmt(String(totalReceived))}</p>
+            </div>
+            <div className={`rounded-xl border px-4 py-3 ${balanceDue > 0 ? "bg-amber-50/80 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40" : "bg-emerald-50/80 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${balanceDue > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>Balance Due</p>
+              <p className={`text-base font-bold ${balanceDue > 0 ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{fmt(String(balanceDue))}</p>
+            </div>
+          </div>
+
+          <Separator className="opacity-30" />
+
+          <BillingRow
+            label="Agent Commission (3%)"
+            sublabel="Paid by seller to agent"
+            value={`-${fmt(commission)}`}
+            accent="text-red-500 font-semibold"
+            icon={<Building2 className="h-4 w-4 text-red-400" />}
+          />
+
+          <div className="rounded-xl bg-gradient-to-r from-emerald-50/80 via-emerald-50/50 to-emerald-50/30 dark:from-emerald-950/30 dark:via-emerald-950/15 dark:to-emerald-950/5 border border-emerald-200/70 dark:border-emerald-800/50 px-5 py-3.5 flex items-center justify-between">
+            <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Net to Seller</span>
+            <span className="text-lg font-black text-emerald-700 dark:text-emerald-300">{fmt(String(Math.max(0, effectivePrice - commission)))}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 gap-2 text-xs h-10 rounded-xl hover:bg-muted transition-colors border-border/50"
+            onClick={() => printInvoice(item, branding)}
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 gap-2 text-xs h-10 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-sm"
+            onClick={() => downloadInvoice(item, branding)}
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Compact Invoice Card (App Store Grid Style) ──────────────────────────
+
+function CompactInvoiceCard({ item, branding }: { item: BillingItem; branding: { siteName: string; siteLogo?: string } }) {
+  const effectivePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
+  const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
+  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : effectivePrice / 2;
+  const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
+  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, effectivePrice - initialPayment);
+
+  const isStep2Approved = item.currentStep >= 3;
+  const isStep3Approved = item.currentStep >= 4;
+
+  const initialReceived = isStep2Approved ? initialPayment : 0;
+  const remainingReceived = isStep3Approved ? remainingPayment : 0;
+  const totalReceived = initialReceived + remainingReceived;
+  const percentPaid = effectivePrice > 0 ? Math.round((totalReceived / effectivePrice) * 100) : 0;
 
   const invoiceNo = `INV-${String(item.id).padStart(5, "0")}`;
 
@@ -439,137 +626,86 @@ function InvoiceCard({ item, branding }: { item: BillingItem; branding: { siteNa
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.3 }}
-      className="group relative overflow-hidden rounded-2xl border border-border/50 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm shadow-sm hover:shadow-lg hover:shadow-primary/5 transition-all duration-300"
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      className="group relative overflow-hidden rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm shadow-apple-sm hover:shadow-apple-md hover:-translate-y-1 transition-all duration-300"
     >
-      {/* Top accent bar */}
+      {/* Top accent */}
       <div className={`h-1 w-full ${percentPaid === 100 ? "bg-emerald-500" : percentPaid >= 50 ? "bg-amber-500" : "bg-primary"}`} />
 
-      {/* Invoice Header */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0">
-            <Receipt className="h-5 w-5 text-primary" />
+      <div className="p-5">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center shrink-0">
+              <Receipt className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold text-primary tracking-widest uppercase">{invoiceNo}</p>
+              <p className="text-sm font-bold text-foreground truncate max-w-[160px]">{item.propertyName}</p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-primary tracking-wide">{invoiceNo}</p>
-            <p className="text-sm font-bold text-foreground truncate max-w-[200px]">{item.propertyName}</p>
+          <StatusBadge status={item.workflowStatus} />
+        </div>
+
+        {/* Progress */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{percentPaid}% Paid</span>
+            <PaymentSteps currentStep={item.currentStep} />
+          </div>
+          <Progress value={percentPaid} className="h-1.5 bg-muted/60 rounded-full" />
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="rounded-lg bg-muted/40 px-3 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Selling Price</p>
+            <p className="text-sm font-bold text-foreground">{fmt(item.sellingPrice)}</p>
+          </div>
+          <div className="rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-800/30 px-3 py-2">
+            <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-0.5">Received</p>
+            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{fmt(String(totalReceived))}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <StatusBadge status={item.workflowStatus} />
+
+        {/* Parties */}
+        <div className="flex items-center gap-2 mb-4 text-xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <User className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground truncate">{item.ownerName}</span>
+          </div>
+          <span className="text-border">|</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <User className="h-3 w-3 text-muted-foreground shrink-0" />
+            <span className="text-muted-foreground truncate">{item.buyerName || "No buyer"}</span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 gap-1.5 text-[11px] h-8 rounded-lg hover:bg-muted transition-colors"
+            onClick={() => printInvoice(item, branding)}
+          >
+            <Printer className="h-3.5 w-3.5" />
+            Print
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 gap-1.5 text-[11px] h-8 rounded-lg bg-primary hover:bg-primary/90 text-white"
+            onClick={() => downloadInvoice(item, branding)}
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </Button>
           <Link to={`/properties/${item.id}`}>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
+            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary">
               <FileText className="h-4 w-4" />
             </Button>
           </Link>
         </div>
-      </div>
-
-      {/* Payment Progress */}
-      <div className="px-5 pb-3">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Payment Progress</span>
-          <span className={`text-xs font-bold ${percentPaid === 100 ? "text-emerald-600" : "text-foreground"}`}>{percentPaid}%</span>
-        </div>
-        <Progress value={percentPaid} className="h-2 bg-muted/60" />
-        <div className="flex items-center justify-between mt-2">
-          <PaymentSteps currentStep={item.currentStep} />
-          <span className="text-[10px] text-muted-foreground">{isStep3Approved ? "Fully Paid" : isStep2Approved ? "Partially Paid" : "Awaiting Payment"}</span>
-        </div>
-      </div>
-
-      {/* Parties */}
-      <div className="grid grid-cols-2 gap-3 px-5 py-3 bg-slate-50/60 dark:bg-slate-900/30 border-y border-border/30">
-        <div className="min-w-0">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Owner / Seller</p>
-          <div className="flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <p className="text-sm font-medium text-foreground truncate">{item.ownerName}</p>
-          </div>
-        </div>
-        <div className="min-w-0">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold mb-1">Buyer</p>
-          <div className="flex items-center gap-1.5">
-            <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <p className="text-sm font-medium text-foreground truncate">{item.buyerName || <span className="text-muted-foreground italic">Not assigned</span>}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Billing Breakdown */}
-      <div className="px-5 py-4 space-y-3">
-        <BillingRow
-          label="Total Selling Price"
-          value={fmt(item.sellingPrice)}
-          accent="text-foreground font-bold"
-          icon={<DollarSign className="h-4 w-4 text-primary" />}
-          highlight
-        />
-
-        <div className="rounded-xl bg-muted/40 dark:bg-muted/20 border border-border/40 p-3 space-y-2">
-          <BillingRow
-            label={`Initial Payment ${isStep2Approved ? "✓" : ""}`}
-            sublabel={isStep2Approved ? "Received" : `Pending${hasExactPayment ? "" : " • est. 50%"}`}
-            value={fmt(String(initialPayment))}
-            accent={isStep2Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}
-            icon={<TrendingUp className={`h-3.5 w-3.5 ${isStep2Approved ? "text-emerald-500" : "text-muted-foreground/50"}`} />}
-          />
-          <BillingRow
-            label={`Remaining Payment ${isStep3Approved ? "✓" : ""}`}
-            sublabel={isStep3Approved ? "Received" : `Pending${hasExactRemaining ? "" : " • est. 50%"}`}
-            value={fmt(String(remainingPayment))}
-            accent={isStep3Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}
-            icon={<TrendingUp className={`h-3.5 w-3.5 ${isStep3Approved ? "text-emerald-500" : "text-amber-500/60"}`} />}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-3 py-2.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-0.5">Total Paid</p>
-            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">{fmt(String(totalReceived))}</p>
-          </div>
-          <div className={`rounded-lg border px-3 py-2.5 ${balanceDue > 0 ? "bg-amber-50/60 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40" : "bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"}`}>
-            <p className={`text-[10px] font-semibold uppercase tracking-wider mb-0.5 ${balanceDue > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>Balance Due</p>
-            <p className={`text-sm font-bold ${balanceDue > 0 ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{fmt(String(balanceDue))}</p>
-          </div>
-        </div>
-
-        <Separator className="opacity-40" />
-
-        <BillingRow
-          label="Agent Commission (3%)"
-          sublabel="Paid by seller to agent"
-          value={`-${fmt(commission)}`}
-          accent="text-red-500 font-semibold"
-          icon={<Building2 className="h-3.5 w-3.5 text-red-400" />}
-        />
-
-        <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-50/50 dark:from-emerald-950/30 dark:to-emerald-950/10 border border-emerald-200/70 dark:border-emerald-800/50 px-4 py-3 flex items-center justify-between">
-          <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Net to Seller</span>
-          <span className="text-base font-black text-emerald-700 dark:text-emerald-300">{fmt(String(Math.max(0, sellingPrice - commission)))}</span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 px-5 pb-5 pt-1">
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-1 gap-1.5 text-xs hover:bg-muted transition-colors"
-          onClick={() => printInvoice(item, branding)}
-        >
-          <Printer className="h-3.5 w-3.5" />
-          Print
-        </Button>
-        <Button
-          size="sm"
-          className="flex-1 gap-1.5 text-xs bg-primary hover:bg-primary/90 text-white shadow-sm"
-          onClick={() => downloadInvoice(item, branding)}
-        >
-          <Download className="h-3.5 w-3.5" />
-          Download
-        </Button>
       </div>
     </motion.div>
   );
@@ -592,7 +728,7 @@ function BillingRow({
 }) {
   return (
     <div className={`flex items-center justify-between gap-2 ${highlight ? "py-0.5" : ""}`}>
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2.5 min-w-0">
         {icon}
         <div className="min-w-0">
           <p className={`text-sm ${highlight ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{label}</p>
@@ -604,9 +740,9 @@ function BillingRow({
   );
 }
 
-// ─── Summary Cards ────────────────────────────────────────────────────────
+// ─── KPI Card (App Store Style) ───────────────────────────────────────────
 
-function SummaryCard({
+function BillingKPICard({
   title,
   value,
   sub,
@@ -621,33 +757,27 @@ function SummaryCard({
   icon: React.ElementType;
   delay?: number;
 }) {
+  const bgColor = color.replace("bg-", "bg-").replace("500", "50");
+  const darkBgColor = color.replace("bg-", "").replace("500", "950/20");
+  const textColor = color.replace("bg-", "text-");
+  const borderColor = color.replace("bg-", "").replace("500", "200/60");
+  const darkBorderColor = color.replace("bg-", "").replace("500", "800/40");
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-    >
-      <motion.div
-        whileHover={{ y: -4, transition: { duration: 0.2 } }}
-        className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10"
-      >
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1 sm:space-y-2 min-w-0">
-                <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground truncate">{title}</p>
-                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-foreground truncate">{value}</h3>
-                {sub && <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{sub}</p>}
-              </div>
-              <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
-                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
+    <AppleCard hover delay={delay} className="overflow-hidden">
+      <AppleCardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-2.5 min-w-0 flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{title}</p>
+            <h3 className="text-xl sm:text-2xl font-black tracking-tight text-foreground">{value}</h3>
+            {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+          </div>
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${color} bg-opacity-10 dark:bg-opacity-20`}>
+            <Icon className={`h-5 w-5 ${textColor}`} />
+          </div>
+        </div>
+      </AppleCardContent>
+    </AppleCard>
   );
 }
 
@@ -657,7 +787,7 @@ function SummarySkeleton() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-28 rounded-xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        <div key={i} className="h-28 rounded-2xl bg-muted/60 animate-pulse" />
       ))}
     </div>
   );
@@ -667,7 +797,7 @@ function InvoiceSkeleton() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-[520px] rounded-2xl bg-slate-100 dark:bg-slate-800 animate-pulse" />
+        <div key={i} className="h-[420px] rounded-2xl bg-muted/60 animate-pulse" />
       ))}
     </div>
   );
@@ -768,31 +898,23 @@ export default function Billing() {
     }
   };
 
+    const regularItems = items;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Page Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between gap-4 flex-wrap"
-      >
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Receipt className="h-7 w-7 text-primary" />
-            Billing &amp; Invoices
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Full financial breakdown for all {isAdmin ? "" : "your "}property transactions
-          </p>
-        </div>
-      </motion.div>
+      <PageHeader
+        title="Billing & Invoices"
+        description={`Full financial breakdown for all ${isAdmin ? "" : "your "}property transactions`}
+        icon={<Receipt className="h-5 w-5" />}
+      />
 
       {/* Summary Cards */}
       {isLoading ? (
         <SummarySkeleton />
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <SummaryCard
+          <BillingKPICard
             title="Total Sales Value"
             value={formatK(totalSellingPrice)}
             sub={`Across ${data?.total ?? 0} propert${(data?.total ?? 0) !== 1 ? "ies" : "y"}`}
@@ -800,7 +922,7 @@ export default function Billing() {
             icon={Landmark}
             delay={0}
           />
-          <SummaryCard
+          <BillingKPICard
             title="Payments Received"
             value={formatK(totalPaymentAmount)}
             sub="Actual payments received"
@@ -808,7 +930,7 @@ export default function Billing() {
             icon={Wallet}
             delay={0.05}
           />
-          <SummaryCard
+          <BillingKPICard
             title="Outstanding Balance"
             value={formatK(totalRemaining)}
             sub="Remaining amount due"
@@ -816,7 +938,7 @@ export default function Billing() {
             icon={DollarSign}
             delay={0.1}
           />
-          <SummaryCard
+          <BillingKPICard
             title="Total Commission"
             value={formatK(totalCommission)}
             sub="Real estate fees"
@@ -831,10 +953,10 @@ export default function Billing() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
       >
-        <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
-          <CardContent className="pt-4 pb-4">
+        <AppleCard hover={false} className="overflow-hidden">
+          <AppleCardContent className="p-4">
             <div className="flex flex-wrap gap-3 items-center">
               <div className="relative flex-1 min-w-[140px] sm:min-w-[240px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -842,11 +964,11 @@ export default function Billing() {
                   placeholder="Search by property, owner or buyer..."
                   value={search}
                   onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                  className="pl-9 bg-background/50"
+                  className="pl-9 bg-background/50 rounded-xl border-border/40"
                 />
               </div>
               <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
-                <SelectTrigger className="w-[170px] bg-background/50">
+                <SelectTrigger className="w-[170px] bg-background/50 rounded-xl border-border/40">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -861,7 +983,7 @@ export default function Billing() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-xs"
+                  className="gap-1.5 text-xs rounded-xl border-border/40"
                   disabled={isLoading || !!exporting}
                   onClick={() => handleExport("csv")}
                 >
@@ -871,7 +993,7 @@ export default function Billing() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-xs"
+                  className="gap-1.5 text-xs rounded-xl border-border/40"
                   disabled={isLoading || !!exporting}
                   onClick={() => handleExport("json")}
                 >
@@ -881,7 +1003,7 @@ export default function Billing() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-xs"
+                  className="gap-1.5 text-xs rounded-xl border-border/40"
                   disabled={isLoading || !!exporting}
                   onClick={() => handleExport("pdf")}
                 >
@@ -890,14 +1012,14 @@ export default function Billing() {
                 </Button>
               </div>
               {debouncedSearch && (
-                <Badge variant="secondary" className="h-9 px-3 gap-1">
+                <Badge variant="secondary" className="h-9 px-3 gap-1 rounded-xl">
                   <Search className="h-3 w-3" />
                   {debouncedSearch}
                 </Badge>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </AppleCardContent>
+        </AppleCard>
       </motion.div>
 
       {/* Invoice Grid */}
@@ -909,8 +1031,8 @@ export default function Billing() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
-            <CardContent className="py-20 text-center">
+          <AppleCard hover={false} className="overflow-hidden">
+            <AppleCardContent className="py-20 text-center">
               <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
                 <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
               </div>
@@ -918,8 +1040,8 @@ export default function Billing() {
               <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
                 Properties with payment data will appear here. Try adjusting your filters or search terms.
               </p>
-            </CardContent>
-          </Card>
+            </AppleCardContent>
+          </AppleCard>
         </motion.div>
       ) : (
         <AnimatePresence mode="wait">
@@ -929,11 +1051,13 @@ export default function Billing() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+            className="space-y-6"
           >
-            {items.map((item) => (
-              <InvoiceCard key={item.id} item={item} branding={{ siteName, siteLogo }} />
-            ))}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+              {regularItems.map((item) => (
+                <CompactInvoiceCard key={item.id} item={item} branding={{ siteName, siteLogo }} />
+              ))}
+            </div>
           </motion.div>
         </AnimatePresence>
       )}
@@ -950,7 +1074,7 @@ export default function Billing() {
             size="sm"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
-            className="gap-1"
+            className="gap-1 rounded-xl border-border/40"
           >
             <ChevronLeft className="h-4 w-4" />
             Prev
@@ -967,7 +1091,7 @@ export default function Billing() {
                     variant={page === p ? "default" : "outline"}
                     size="sm"
                     onClick={() => setPage(p)}
-                    className="h-8 w-8 p-0 text-xs"
+                    className="h-8 w-8 p-0 text-xs rounded-xl"
                   >
                     {p}
                   </Button>
@@ -979,7 +1103,7 @@ export default function Billing() {
             size="sm"
             disabled={page >= (data?.totalPages ?? 1)}
             onClick={() => setPage((p) => p + 1)}
-            className="gap-1"
+            className="gap-1 rounded-xl border-border/40"
           >
             Next
             <ChevronRight className="h-4 w-4" />

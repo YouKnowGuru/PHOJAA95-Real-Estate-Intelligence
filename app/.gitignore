@@ -31,6 +31,9 @@ dist-ssr
 *.sqlite
 *.sqlite3
 db/migrations/*.sql
+!db/hostinger-install.sql
+!db/hostinger-seed.sql
+!db/hostinger-full-setup.sql
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs

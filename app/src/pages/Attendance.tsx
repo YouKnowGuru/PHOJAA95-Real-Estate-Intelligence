@@ -3,18 +3,23 @@ import type { ElementType } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-
 import { toast } from "sonner";
 import { LogIn, LogOut, Calendar, Users, Download, Search, Filter, Clock, Trash2, CheckCircle2, XCircle, Timer, PackageOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { AttendanceCalendar } from "@/components/AttendanceCalendar";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page-header";
+import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
+import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, AppleCardContent } from "@/components/ui/apple-card";
+import { KPICard } from "@/components/ui/kpi-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { DataTable } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 const statusColors: Record<string, string> = {
   present: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
@@ -22,29 +27,6 @@ const statusColors: Record<string, string> = {
   late: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
   half_day: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
 };
-
-function SummaryCard({ title, value, color, icon: Icon, delay = 0 }: { title: string; value: string | number; color: string; icon: ElementType; delay?: number }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay }}>
-      <motion.div whileHover={{ y: -4 }} className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
-              </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity-20`}>
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
 
 export default function AttendancePage() {
   const { isAdmin } = useAuth();
@@ -169,149 +151,134 @@ export default function AttendancePage() {
     return `${currentYear}-${String(m).padStart(2, "0")}`;
   });
 
+  const records = isAdmin ? adminList?.items : myAttendance?.records;
+  const isLoading = isAdmin ? adminListLoading : myAttendanceLoading;
+
   return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Users className="h-7 w-7 text-primary" />
-            Attendance
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Track and manage attendance records</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm p-2">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border border-border bg-white/50 px-3 py-2 text-sm dark:bg-slate-800"
-          >
-            {monthOptions.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          {isAdmin ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={exportToCSV}>
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-              <Dialog open={showMarkDialog} onOpenChange={setShowMarkDialog}>
-                <DialogTrigger asChild>
-                  <Button className="bg-primary text-white shadow-lg shadow-primary/20">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Mark Attendance
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Manual Attendance Marking</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label>Staff Member</Label>
-                      <Select value={markForm.userId} onValueChange={(val) => setMarkForm({ ...markForm, userId: val })}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select Staff" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {staffList?.items.map((s) => (
-                            <SelectItem key={s.id} value={s.id.toString()}>
-                              {s.fullName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
+    <AnimatedPage>
+      <PageHeader
+        title="Attendance"
+        description="Track and manage attendance records"
+        icon={<Users className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
+            >
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {isAdmin ? (
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={exportToCSV}>
+                  <Download className="h-4 w-4 mr-1.5" />
+                  Export
+                </Button>
+                <Dialog open={showMarkDialog} onOpenChange={setShowMarkDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                      <Clock className="h-4 w-4 mr-1.5" />
+                      Mark
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="rounded-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Manual Attendance Marking</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
                       <div className="space-y-2">
-                        <Label>Date</Label>
-                        <Input type="date" value={markForm.date} onChange={(e) => setMarkForm({ ...markForm, date: e.target.value })} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Status</Label>
-                        <Select value={markForm.status} onValueChange={(val) => setMarkForm({ ...markForm, status: val as "present" | "absent" | "late" | "half_day" })}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
+                        <Label>Staff Member</Label>
+                        <Select value={markForm.userId} onValueChange={(val) => setMarkForm({ ...markForm, userId: val })}>
+                          <SelectTrigger><SelectValue placeholder="Select Staff" /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="present">Present</SelectItem>
-                            <SelectItem value="absent">Absent</SelectItem>
-                            <SelectItem value="late">Late</SelectItem>
-                            <SelectItem value="half_day">Half Day</SelectItem>
+                            {staffList?.items.map((s) => (
+                              <SelectItem key={s.id} value={s.id.toString()}>{s.fullName}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>Date</Label>
+                          <Input type="date" value={markForm.date} onChange={(e) => setMarkForm({ ...markForm, date: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Status</Label>
+                          <Select value={markForm.status} onValueChange={(val) => setMarkForm({ ...markForm, status: val as any })}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="present">Present</SelectItem>
+                              <SelectItem value="absent">Absent</SelectItem>
+                              <SelectItem value="late">Late</SelectItem>
+                              <SelectItem value="half_day">Half Day</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Input placeholder="Reason or remarks..." value={markForm.notes} onChange={(e) => setMarkForm({ ...markForm, notes: e.target.value })} />
+                      </div>
+                      <Button
+                        className="w-full"
+                        disabled={!markForm.userId || markAttendanceMutation.isPending}
+                        onClick={() =>
+                          markAttendanceMutation.mutate({
+                            userId: parseInt(markForm.userId),
+                            date: markForm.date,
+                            status: markForm.status,
+                            notes: markForm.notes,
+                          })
+                        }
+                      >
+                        Save Attendance
+                      </Button>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Notes</Label>
-                      <Input placeholder="Reason or remarks..." value={markForm.notes} onChange={(e) => setMarkForm({ ...markForm, notes: e.target.value })} />
-                    </div>
-                    <Button
-                      className="w-full mt-2"
-                      disabled={!markForm.userId || markAttendanceMutation.isPending}
-                      onClick={() =>
-                        markAttendanceMutation.mutate({
-                          userId: parseInt(markForm.userId),
-                          date: markForm.date,
-                          status: markForm.status,
-                          notes: markForm.notes,
-                        })
-                      }
-                    >
-                      Save Attendance
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  onClick={() => checkInMutation.mutate({})}
-                  disabled={checkInMutation.isPending}
-                  className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20"
-                >
-                  <LogIn className="mr-2 h-4 w-4" />
+                  </DialogContent>
+                </Dialog>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Button onClick={() => checkInMutation.mutate({})} disabled={checkInMutation.isPending} className="bg-primary text-primary-foreground shadow-lg shadow-primary/20">
+                  <LogIn className="mr-1.5 h-4 w-4" />
                   Check In
                 </Button>
-              </motion.div>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Button onClick={() => checkOutMutation.mutate()} disabled={checkOutMutation.isPending} variant="outline">
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-1.5 h-4 w-4" />
                   Check Out
                 </Button>
-              </motion.div>
-            </div>
-          )}
-        </div>
-      </motion.div>
+              </div>
+            )}
+          </div>
+        }
+      />
 
       {/* Stats */}
       {(isAdmin ? aggregateStats : myAttendance?.stats) ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {isAdmin ? (
             <>
-              <SummaryCard title="Present" value={aggregateStats?.present || 0} color="bg-emerald-500" icon={CheckCircle2} delay={0} />
-              <SummaryCard title="Late" value={aggregateStats?.late || 0} color="bg-amber-500" icon={Clock} delay={0.1} />
-              <SummaryCard title="Absent" value={aggregateStats?.absent || 0} color="bg-red-500" icon={XCircle} delay={0.2} />
-              <SummaryCard title="Half Day" value={aggregateStats?.halfDay || 0} color="bg-blue-500" icon={Timer} delay={0.3} />
+              <KPICard title="Present" value={aggregateStats?.present || 0} icon={CheckCircle2} color="bg-emerald-500" delay={0} />
+              <KPICard title="Late" value={aggregateStats?.late || 0} icon={Clock} color="bg-amber-500" delay={0.1} />
+              <KPICard title="Absent" value={aggregateStats?.absent || 0} icon={XCircle} color="bg-red-500" delay={0.2} />
+              <KPICard title="Half Day" value={aggregateStats?.halfDay || 0} icon={Timer} color="bg-blue-500" delay={0.3} />
             </>
           ) : (
             <>
-              <SummaryCard title="Present" value={myAttendance?.stats?.present || 0} color="bg-emerald-500" icon={CheckCircle2} delay={0} />
-              <SummaryCard title="Late" value={myAttendance?.stats?.late || 0} color="bg-amber-500" icon={Clock} delay={0.1} />
-              <SummaryCard title="Absent" value={myAttendance?.stats?.absent || 0} color="bg-red-500" icon={XCircle} delay={0.2} />
-              <SummaryCard title="Half Day" value={myAttendance?.stats?.halfDay || 0} color="bg-blue-500" icon={Timer} delay={0.3} />
+              <KPICard title="Present" value={myAttendance?.stats?.present || 0} icon={CheckCircle2} color="bg-emerald-500" delay={0} />
+              <KPICard title="Late" value={myAttendance?.stats?.late || 0} icon={Clock} color="bg-amber-500" delay={0.1} />
+              <KPICard title="Absent" value={myAttendance?.stats?.absent || 0} icon={XCircle} color="bg-red-500" delay={0.2} />
+              <KPICard title="Half Day" value={myAttendance?.stats?.halfDay || 0} icon={Timer} color="bg-blue-500" delay={0.3} />
             </>
           )}
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-xl" />
+            <Skeleton key={i} className="h-28 rounded-2xl" />
           ))}
         </div>
       )}
@@ -329,11 +296,11 @@ export default function AttendancePage() {
               }))}
             />
           </div>
-          <Card className="border-border/50 h-full">
-            <CardHeader>
-              <CardTitle className="text-sm">Attendance Summary</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <AppleCard>
+            <AppleCardHeader>
+              <AppleCardTitle className="text-sm">Attendance Summary</AppleCardTitle>
+            </AppleCardHeader>
+            <AppleCardContent>
               <div className="space-y-4">
                 <p className="text-xs text-muted-foreground">
                   Your attendance for {selectedMonth}. Make sure to check in before 9:00 AM to be marked as present.
@@ -353,59 +320,55 @@ export default function AttendancePage() {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </AppleCardContent>
+          </AppleCard>
         </div>
       )}
 
       {/* Admin Live Overview */}
       {isAdmin && dailyStatus && (
-        <Card className="border-border/50 bg-indigo-50/50 dark:bg-indigo-900/10 border-indigo-200 dark:border-indigo-800/50 overflow-hidden relative">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
-          <CardHeader className="pb-2 pt-5">
-            <CardTitle className="text-sm flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
-              <Clock className="h-4 w-4" />
-              Today's Live Overview ({todayStr})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Checked In</p>
-                <p className="text-xl font-bold text-indigo-600">
-                  {dailyStatus.breakdown.reduce((acc, curr) => acc + (curr.status !== "absent" ? curr.count : 0), 0)} / {dailyStatus.totalStaff}
-                </p>
+        <AnimatedSection delay={0.3}>
+          <AppleCard className="border-indigo-200/50 dark:border-indigo-800/30 bg-indigo-50/30 dark:bg-indigo-900/10">
+            <AppleCardHeader>
+              <AppleCardTitle className="text-sm flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
+                <Clock className="h-4 w-4" />
+                Today's Live Overview ({todayStr})
+              </AppleCardTitle>
+            </AppleCardHeader>
+            <AppleCardContent>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Checked In</p>
+                  <p className="text-xl font-bold text-indigo-600">
+                    {dailyStatus.breakdown.reduce((acc, curr) => acc + (curr.status !== "absent" ? curr.count : 0), 0)} / {dailyStatus.totalStaff}
+                  </p>
+                </div>
+                {["present", "late", "absent", "half_day"].map((status) => {
+                  const count = dailyStatus.breakdown.find((b) => b.status === status)?.count || 0;
+                  return (
+                    <div key={status} className="space-y-1">
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">{status.replace("_", " ")}</p>
+                      <p className={`text-xl font-bold ${
+                        status === "present" ? "text-emerald-600" :
+                        status === "late" ? "text-amber-600" :
+                        status === "absent" ? "text-red-600" :
+                        "text-blue-600"
+                      }`}>
+                        {count}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
-              {["present", "late", "absent", "half_day"].map((status) => {
-                const count = dailyStatus.breakdown.find((b) => b.status === status)?.count || 0;
-                return (
-                  <div key={status} className="space-y-1">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">{status.replace("_", " ")}</p>
-                    <p
-                      className={`text-xl font-bold ${
-                        status === "present"
-                          ? "text-emerald-600"
-                          : status === "late"
-                          ? "text-amber-600"
-                          : status === "absent"
-                          ? "text-red-600"
-                          : "text-blue-600"
-                      }`}
-                    >
-                      {count}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
+            </AppleCardContent>
+          </AppleCard>
+        </AnimatedSection>
       )}
 
       {/* Records */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <CardTitle className="text-base">{isAdmin ? "Attendance Logs" : "My Attendance Records"}</CardTitle>
+      <AppleCard>
+        <AppleCardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <AppleCardTitle className="text-sm">{isAdmin ? "Attendance Logs" : "My Attendance Records"}</AppleCardTitle>
           {isAdmin && (
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -418,7 +381,7 @@ export default function AttendancePage() {
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-8 w-[100px] text-xs">
+                <SelectTrigger className="h-8 w-[110px] text-xs">
                   <Filter className="h-3 w-3 mr-1" />
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -432,9 +395,9 @@ export default function AttendancePage() {
               </Select>
             </div>
           )}
-        </CardHeader>
-        <CardContent>
-          {(isAdmin ? adminListLoading : myAttendanceLoading) ? (
+        </AppleCardHeader>
+        <AppleCardContent>
+          {isLoading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 rounded-xl" />
@@ -442,17 +405,17 @@ export default function AttendancePage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {(isAdmin ? adminList?.items : myAttendance?.records)?.map((record, index) => (
+              {records?.map((record, index) => (
                 <motion.div
                   key={record.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: index * 0.02 }}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border border-border/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 gap-2"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-border/30 hover:bg-muted/20 transition-colors gap-2"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-700">
-                      <Calendar className="h-4 w-4 text-slate-500" />
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
                       <p className="text-sm font-medium">
@@ -463,7 +426,7 @@ export default function AttendancePage() {
                       )}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="flex items-center gap-2 sm:gap-4 ml-11 sm:ml-0">
                     <div className="text-right">
                       {record.checkIn && (
                         <p className="text-xs text-muted-foreground">In: {new Date(record.checkIn).toLocaleTimeString()}</p>
@@ -472,7 +435,13 @@ export default function AttendancePage() {
                         <p className="text-xs text-muted-foreground">Out: {new Date(record.checkOut).toLocaleTimeString()}</p>
                       )}
                     </div>
-                    <Badge className={`${statusColors[record.status]} border-0 text-[10px]`}>{record.status}</Badge>
+                    <StatusBadge variant={
+                      record.status === "present" ? "success" :
+                      record.status === "late" ? "warning" :
+                      record.status === "absent" ? "error" : "info"
+                    }>
+                      {record.status}
+                    </StatusBadge>
                     {isAdmin && (
                       <Button
                         variant="ghost"
@@ -492,39 +461,31 @@ export default function AttendancePage() {
                   </div>
                 </motion.div>
               ))}
-              {(isAdmin ? adminList?.items : myAttendance?.records)?.length === 0 && (
-                <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
-                  <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
-                    <CardContent className="py-20 text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
-                        <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
-                      </div>
-                      <p className="text-lg font-bold text-foreground">No records found</p>
-                      <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-                        {isAdmin
-                          ? "No attendance records match your filters for this month."
-                          : "You have no attendance records for this month yet."}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </motion.div>
+              {records?.length === 0 && (
+                <EmptyState
+                  title="No records found"
+                  description={isAdmin
+                    ? "No attendance records match your filters for this month."
+                    : "You have no attendance records for this month yet."
+                  }
+                />
               )}
             </div>
           )}
-        </CardContent>
-      </Card>
+        </AppleCardContent>
+      </AppleCard>
 
       {/* Admin Summary */}
       {isAdmin && summary && summary.length > 0 && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Monthly Summary</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <AppleCard>
+          <AppleCardHeader>
+            <AppleCardTitle className="text-sm">Monthly Summary</AppleCardTitle>
+          </AppleCardHeader>
+          <AppleCardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border/50">
                     <th className="text-left py-2 px-3 font-medium text-muted-foreground">Staff</th>
                     <th className="text-center py-2 px-3 font-medium text-emerald-600">Present</th>
                     <th className="text-center py-2 px-3 font-medium text-amber-600">Late</th>
@@ -535,7 +496,7 @@ export default function AttendancePage() {
                 </thead>
                 <tbody>
                   {summary.map((s) => (
-                    <tr key={s.userId} className="border-b border-border/50">
+                    <tr key={s.userId} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                       <td className="py-2 px-3 font-medium">{s.userName}</td>
                       <td className="text-center py-2 px-3">{s.present || 0}</td>
                       <td className="text-center py-2 px-3">{s.late || 0}</td>
@@ -547,9 +508,9 @@ export default function AttendancePage() {
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
+          </AppleCardContent>
+        </AppleCard>
       )}
-    </div>
+    </AnimatedPage>
   );
 }

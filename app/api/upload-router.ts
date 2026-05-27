@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, staffQuery, adminQuery } from "./middleware";
+import { resolveDocumentMimeType } from "@contracts/upload";
 import { uploadFile, deleteFile, getSignedDownloadUrl, validateFileType, validateFileSize } from "./services/upload";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -35,7 +36,9 @@ export const uploadRouter = createRouter({
         }
       }
 
-      if (!validateFileType(mimeType)) {
+      const resolvedMimeType = resolveDocumentMimeType(fileName, mimeType);
+
+      if (!validateFileType(resolvedMimeType, fileName)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "File type not allowed" });
       }
 
@@ -53,7 +56,7 @@ export const uploadRouter = createRouter({
         folderPath = folder;
       }
 
-      const result = await uploadFile(buffer, fileName, mimeType, folderPath);
+      const result = await uploadFile(buffer, fileName, resolvedMimeType, folderPath);
 
       return {
         key: result.key,

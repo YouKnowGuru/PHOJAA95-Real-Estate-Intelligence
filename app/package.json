@@ -14,7 +14,10 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:seed": "npx tsx db/seed.ts",
+    "db:setup": "drizzle-kit push && npx tsx db/seed.ts",
+    "db:test": "node scripts/test-db-connection.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.965.0",

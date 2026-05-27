@@ -1,22 +1,18 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { nanoid } from "nanoid";
+import { isAllowedDocumentMimeType, resolveDocumentMimeType } from "@contracts/upload";
 import { UPLOAD_DIR } from "../lib/paths";
 import { logger } from "../lib/logger";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-];
-
 const MAGIC_BYTES: Record<string, number[]> = {
   "image/png": [0x89, 0x50, 0x4e, 0x47],
   "image/jpeg": [0xff, 0xd8, 0xff],
   "application/pdf": [0x25, 0x50, 0x44, 0x46],
+  "application/msword": [0xd0, 0xcf, 0x11, 0xe0],
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [0x50, 0x4b, 0x03, 0x04],
 };
 
 function sanitizePath(input: string): string {
@@ -51,12 +47,14 @@ export async function uploadFile(
     throw new Error(`File size exceeds maximum of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
-  if (!ALLOWED_TYPES.includes(mimeType)) {
-    throw new Error("File type not allowed. Allowed types: PDF, PNG, JPEG");
+  const resolvedMime = resolveDocumentMimeType(fileName, mimeType);
+
+  if (!isAllowedDocumentMimeType(resolvedMime)) {
+    throw new Error("File type not allowed. Allowed types: PDF, Word (.doc, .docx), PNG, JPEG");
   }
 
-  if (!validateMagicBytes(file, mimeType)) {
-    throw new Error("File content does not match claimed MIME type");
+  if (!validateMagicBytes(file, resolvedMime)) {
+    throw new Error("File content does not match claimed file type");
   }
 
   const safeFolder = sanitizePath(folder);
@@ -73,7 +71,7 @@ export async function uploadFile(
 
   const publicUrl = `/uploads/${key}`;
 
-  logger.info("File uploaded", { key, filePath, size: file.length, mimeType });
+  logger.info("File uploaded", { key, filePath, size: file.length, mimeType: resolvedMime });
 
   return {
     key,
@@ -81,7 +79,7 @@ export async function uploadFile(
     signedUrl: publicUrl,
     fileName: safeFileName,
     fileSize: file.length,
-    mimeType,
+    mimeType: resolvedMime,
   };
 }
 
@@ -135,8 +133,9 @@ export async function deleteFolder(prefix: string): Promise<void> {
   }
 }
 
-export function validateFileType(mimeType: string): boolean {
-  return ALLOWED_TYPES.includes(mimeType);
+export function validateFileType(mimeType: string, fileName?: string): boolean {
+  const resolved = fileName ? resolveDocumentMimeType(fileName, mimeType) : mimeType;
+  return isAllowedDocumentMimeType(resolved);
 }
 
 export function validateFileSize(size: number): boolean {

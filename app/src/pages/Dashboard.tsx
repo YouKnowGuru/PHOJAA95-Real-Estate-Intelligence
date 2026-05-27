@@ -3,6 +3,10 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { KPICard } from "@/components/ui/kpi-card";
+import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, AppleCardContent } from "@/components/ui/apple-card";
+import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
+import { PageHeader } from "@/components/ui/page-header";
 import {
   Building2,
   Clock,
@@ -32,78 +36,6 @@ import {
   Cell,
 } from "recharts";
 
-function KPICard({
-  title,
-  value,
-  icon: Icon,
-  trend,
-  trendUp,
-  subtitle,
-  color,
-  delay = 0,
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  trend?: string;
-  trendUp?: boolean;
-  subtitle: string;
-  color: string;
-  delay?: number;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay }}
-    >
-      <motion.div 
-        whileHover={{ y: -5, transition: { duration: 0.2 } }}
-        whileTap={{ scale: 0.98 }}
-        className="group relative overflow-hidden border-border/50 bg-white/70 backdrop-blur-sm transition-all duration-300 hover:shadow-lg hover:shadow-primary/10 dark:bg-slate-800/70 rounded-xl"
-      >
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-3">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {title}
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <h3 className="text-2xl font-bold tracking-tight text-foreground truncate max-w-[140px] sm:max-w-none">
-                    {value}
-                  </h3>
-                  {trend && (
-                    <span
-                      className={`flex items-center text-xs font-medium ${
-                        trendUp ? "text-emerald-600" : "text-red-500"
-                      }`}
-                    >
-                      {trendUp ? (
-                        <ArrowUpRight className="mr-0.5 h-3 w-3" />
-                      ) : (
-                        <ArrowDownRight className="mr-0.5 h-3 w-3" />
-                      )}
-                      {trend}
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">{subtitle}</p>
-              </div>
-              <div
-                className={`flex h-11 w-11 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity-20`}
-              >
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 const formatCurrency = (val: string | number) => {
   const n = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(n)) return "Nu. 0";
@@ -115,7 +47,6 @@ function AdminDashboard() {
   const { data: stats, isLoading: statsLoading } = trpc.property.dashboardStats.useQuery();
   const { data: typeStats } = trpc.dashboard.propertyTypeStats.useQuery();
   const { data: recentActivity } = trpc.dashboard.recentActivity.useQuery({ limit: 8 });
-
   const { data: realMonthlyData } = trpc.dashboard.monthlySales.useQuery({ year: new Date().getFullYear().toString() });
 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -136,25 +67,27 @@ function AdminDashboard() {
 
   if (statsLoading) {
     return (
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
-          <Skeleton key={i} className="h-32 rounded-xl" />
-        ))}
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
+          <Skeleton className="h-80 rounded-2xl" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Overview of your real estate operations
-          </p>
-        </div>
-      </div>
+    <AnimatedPage>
+      <PageHeader
+        title="Dashboard"
+        description="Overview of your real estate operations"
+        icon={<Building2 className="h-5 w-5" />}
+      />
 
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -179,7 +112,7 @@ function AdminDashboard() {
           value={stats?.completedSales || 0}
           icon={CheckCircle2}
           subtitle="Successfully closed"
-          color="bg-primary"
+          color="bg-emerald-500"
           delay={0.2}
         />
         <KPICard
@@ -195,38 +128,34 @@ function AdminDashboard() {
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-3">
         {/* Revenue Chart */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-2"
-        >
-          <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <AnimatedSection delay={0.3} className="lg:col-span-2">
+          <AppleCard>
+            <AppleCardHeader>
+              <AppleCardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-primary" />
                 Revenue Trends
-              </CardTitle>
-              <CardDescription>Monthly commission revenue</CardDescription>
-            </CardHeader>
-            <CardContent>
+              </AppleCardTitle>
+              <AppleCardDescription>Monthly commission revenue</AppleCardDescription>
+            </AppleCardHeader>
+            <AppleCardContent>
               <ResponsiveContainer width="100%" height={280}>
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.15} />
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.12} />
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                  <YAxis tick={{ fontSize: 12 }} stroke="#94a3b8" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
+                  <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
                   <Tooltip
                     contentStyle={{
-                      background: "rgba(255,255,255,0.95)",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
                       fontSize: "12px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                     }}
                     formatter={(value: number) => [`Nu. ${value.toLocaleString()}`, "Revenue"]}
                   />
@@ -239,25 +168,21 @@ function AdminDashboard() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </AppleCardContent>
+          </AppleCard>
+        </AnimatedSection>
 
         {/* Status Distribution */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <AnimatedSection delay={0.4}>
+          <AppleCard>
+            <AppleCardHeader>
+              <AppleCardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-4 w-4 text-violet-500" />
                 Status Distribution
-              </CardTitle>
-              <CardDescription>Property workflow status</CardDescription>
-            </CardHeader>
-            <CardContent>
+              </AppleCardTitle>
+              <AppleCardDescription>Property workflow status</AppleCardDescription>
+            </AppleCardHeader>
+            <AppleCardContent>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
                   <Pie
@@ -275,10 +200,11 @@ function AdminDashboard() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      background: "rgba(255,255,255,0.95)",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
                       fontSize: "12px",
+                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                     }}
                   />
                 </PieChart>
@@ -291,61 +217,53 @@ function AdminDashboard() {
                   </div>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </AppleCardContent>
+          </AppleCard>
+        </AnimatedSection>
       </div>
 
       {/* Bottom Row */}
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Property Types */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <AnimatedSection delay={0.5}>
+          <AppleCard>
+            <AppleCardHeader>
+              <AppleCardTitle className="flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-blue-500" />
                 Property Type Analytics
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              </AppleCardTitle>
+            </AppleCardHeader>
+            <AppleCardContent>
               <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={typeStats || []} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.5} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} stroke="#94a3b8" />
-                  <YAxis dataKey="typeName" type="category" tick={{ fontSize: 11 }} stroke="#94a3b8" width={80} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
+                  <YAxis dataKey="typeName" type="category" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" width={80} />
                   <Tooltip
                     contentStyle={{
-                      background: "rgba(255,255,255,0.95)",
-                      border: "1px solid #e2e8f0",
-                      borderRadius: "8px",
+                      background: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "12px",
                       fontSize: "12px",
                     }}
                   />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </motion.div>
+            </AppleCardContent>
+          </AppleCard>
+        </AnimatedSection>
 
         {/* Recent Activity */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+        <AnimatedSection delay={0.6}>
+          <AppleCard>
+            <AppleCardHeader>
+              <AppleCardTitle className="flex items-center gap-2">
                 <Activity className="h-4 w-4 text-amber-500" />
                 Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </AppleCardTitle>
+            </AppleCardHeader>
+            <AppleCardContent className="space-y-3">
               {(recentActivity?.length ?? 0) === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   No recent activity
@@ -353,7 +271,7 @@ function AdminDashboard() {
               ) : recentActivity?.slice(0, 6).map((activity) => (
                 <div
                   key={activity.id}
-                  className="flex items-start gap-3 rounded-lg border border-border/30 p-3 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  className="flex items-start gap-3 rounded-xl border border-border/30 p-3 transition-colors hover:bg-muted/30"
                 >
                   <div
                     className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -385,16 +303,16 @@ function AdminDashboard() {
                       </p>
                     )}
                   </div>
-                  <Badge variant="outline" className="text-[10px] shrink-0">
+                  <Badge variant="outline" className="text-[10px] shrink-0 rounded-full">
                     {activity.action}
                   </Badge>
                 </div>
               ))}
-            </CardContent>
-          </Card>
-        </motion.div>
+            </AppleCardContent>
+          </AppleCard>
+        </AnimatedSection>
       </div>
-    </div>
+    </AnimatedPage>
   );
 }
 
@@ -403,21 +321,18 @@ function StaffDashboard() {
   const { data: recentActivity } = trpc.dashboard.staffRecentActivity.useQuery({ limit: 5 });
 
   const progressData = [
-    { label: "Completed", value: stats?.completedSales || 0, color: "bg-primary", total: stats?.totalProperties || 1 },
+    { label: "Completed", value: stats?.completedSales || 0, color: "bg-emerald-500", total: stats?.totalProperties || 1 },
     { label: "Pending", value: stats?.pendingApprovals || 0, color: "bg-amber-500", total: stats?.totalProperties || 1 },
     { label: "Rejected", value: stats?.rejectedCount || 0, color: "bg-red-500", total: stats?.totalProperties || 1 },
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">My Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Track your property listings and approvals
-          </p>
-        </div>
-      </div>
+    <AnimatedPage>
+      <PageHeader
+        title="My Dashboard"
+        description="Track your property listings and approvals"
+        icon={<Building2 className="h-5 w-5" />}
+      />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
@@ -454,17 +369,13 @@ function StaffDashboard() {
         />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
-        <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Property Progress</CardTitle>
-            <CardDescription>Distribution of your property statuses</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
+      <AnimatedSection delay={0.4}>
+        <AppleCard>
+          <AppleCardHeader>
+            <AppleCardTitle>Property Progress</AppleCardTitle>
+            <AppleCardDescription>Distribution of your property statuses</AppleCardDescription>
+          </AppleCardHeader>
+          <AppleCardContent className="space-y-6">
             {progressData.map((item) => (
               <div key={item.label} className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
@@ -473,45 +384,40 @@ function StaffDashboard() {
                     {item.value} of {item.total}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                   <motion.div
                     className={`h-full rounded-full ${item.color}`}
                     initial={{ width: 0 }}
                     animate={{ width: `${(item.value / item.total) * 100}%` }}
-                    transition={{ duration: 0.8, delay: 0.5 }}
+                    transition={{ duration: 0.8, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
                   />
                 </div>
               </div>
             ))}
-          </CardContent>
-        </Card>
-      </motion.div>
+          </AppleCardContent>
+        </AppleCard>
+      </AnimatedSection>
 
-      {/* Staff Recent Activity */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card className="border-border/50 bg-white/70 backdrop-blur-sm dark:bg-slate-800/70">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+      <AnimatedSection delay={0.5}>
+        <AppleCard>
+          <AppleCardHeader>
+            <AppleCardTitle className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-primary" />
               Recent Properties
-            </CardTitle>
-            <CardDescription>Your latest property updates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
+            </AppleCardTitle>
+            <AppleCardDescription>Your latest property updates</AppleCardDescription>
+          </AppleCardHeader>
+          <AppleCardContent>
+            <div className="space-y-3">
               {(recentActivity?.length ?? 0) === 0 ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
                   No recent properties
                 </div>
               ) : recentActivity?.map((activity) => (
-                <div key={activity.id} className="flex flex-col gap-2 p-3 rounded-lg border border-border/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div key={activity.id} className="flex flex-col gap-2 p-4 rounded-xl border border-border/30 hover:bg-muted/20 transition-colors">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm">{activity.propertyName}</span>
-                    <Badge variant="outline" className="text-[10px]">
+                    <Badge variant="outline" className="text-[10px] rounded-full">
                       Step {activity.step}
                     </Badge>
                   </div>
@@ -519,17 +425,17 @@ function StaffDashboard() {
                     <span className="text-xs text-muted-foreground">
                       {activity.updatedAt ? new Date(activity.updatedAt).toLocaleDateString() : ""}
                     </span>
-                    <Badge className="text-[10px]" variant={activity.status === "rejected" ? "destructive" : activity.status === "completed" ? "default" : "secondary"}>
+                    <Badge className="text-[10px] rounded-full" variant={activity.status === "rejected" ? "destructive" : activity.status === "completed" ? "default" : "secondary"}>
                       {activity.status?.replace("_", " ")}
                     </Badge>
                   </div>
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </div>
+          </AppleCardContent>
+        </AppleCard>
+      </AnimatedSection>
+    </AnimatedPage>
   );
 }
 

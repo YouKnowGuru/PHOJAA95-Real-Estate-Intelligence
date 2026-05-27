@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -17,29 +16,10 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { motion } from "framer-motion";
 import { PayslipModal } from "@/components/PayrollTable";
-
-function SummaryCard({ title, value, color, icon: Icon, delay = 0 }: { title: string; value: string | number; color: string; icon: ElementType; delay?: number }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay }}>
-      <motion.div whileHover={{ y: -4 }} className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
-              </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity-20`}>
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
+import { PageHeader } from "@/components/ui/page-header";
+import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
+import { KPICard } from "@/components/ui/kpi-card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default function PayrollPage() {
   const { user, isAdmin } = useAuth();
@@ -136,7 +116,6 @@ export default function PayrollPage() {
     const siteName = branding?.site_name || "PHOJAA95";
     const siteLogo = branding?.site_logo;
 
-    // Color palette
     const primary = [16, 185, 129];
     const primaryDark = [5, 150, 105];
     const dark = [15, 23, 42];
@@ -144,15 +123,11 @@ export default function PayrollPage() {
     const lightGray = [241, 245, 249];
     const white = [255, 255, 255];
 
-    // Top accent bar
     doc.setFillColor(...primary);
     doc.rect(0, 0, pageWidth, 6, "F");
-
-    // Header background
     doc.setFillColor(...dark);
     doc.rect(0, 6, pageWidth, 42, "F");
 
-    // Logo
     let headerTextY = 20;
     if (siteLogo) {
       try {
@@ -166,24 +141,21 @@ export default function PayrollPage() {
         doc.addImage(img, "PNG", 14, 12, 28, 28, undefined, "FAST");
         headerTextY = 22;
       } catch {
-        // Fallback to text
+        // Fallback
       }
     }
 
-    // Company name
     doc.setFontSize(20);
     doc.setTextColor(...white);
     doc.setFont("helvetica", "bold");
     const logoOffset = siteLogo ? 44 : 14;
     doc.text(siteName.toUpperCase(), logoOffset, headerTextY);
 
-    // Subtitle
     doc.setFontSize(9);
     doc.setTextColor(...primary);
     doc.setFont("helvetica", "normal");
     doc.text("P A Y S L I P", logoOffset, headerTextY + 7);
 
-    // Month badge on right
     const monthText = (() => {
       const [y, m] = item.month.split("-");
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -198,12 +170,10 @@ export default function PayrollPage() {
     doc.roundedRect(monthX, 14, monthTextWidth, 14, 3, 3, "F");
     doc.text(monthText, monthX + monthTextWidth / 2, 23, { align: "center" });
 
-    // Divider line
     doc.setDrawColor(...primary);
     doc.setLineWidth(0.8);
     doc.line(14, 50, pageWidth - 14, 50);
 
-    // Employee info section
     let y = 60;
     doc.setFontSize(8);
     doc.setTextColor(...gray);
@@ -252,7 +222,6 @@ export default function PayrollPage() {
     doc.setFont("helvetica", "normal");
     doc.text(paidDate, 40, y);
 
-    // Earnings & Deductions table
     y += 12;
     doc.setFontSize(8);
     doc.setTextColor(...gray);
@@ -289,22 +258,17 @@ export default function PayrollPage() {
       ],
       theme: "grid",
       headStyles: { fillColor: [...dark], textColor: white, fontSize: 9, fontStyle: "bold" },
-      columnStyles: {
-        0: { cellWidth: 100 },
-        1: { halign: "right", cellWidth: 60 },
-      },
+      columnStyles: { 0: { cellWidth: 100 }, 1: { halign: "right", cellWidth: 60 } },
       styles: { fontSize: 9, cellPadding: 3, lineColor: lightGray, lineWidth: 0.2 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
     });
 
-    // Net Salary box
     const tableFinalY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY || y + 60;
     const netBoxY = tableFinalY + 8;
     const netBoxHeight = 22;
 
     doc.setFillColor(...dark);
     doc.roundedRect(14, netBoxY, pageWidth - 28, netBoxHeight, 3, 3, "F");
-
     doc.setFillColor(...primary);
     doc.roundedRect(14, netBoxY, 4, netBoxHeight, 3, 3, "F");
 
@@ -317,7 +281,6 @@ export default function PayrollPage() {
     doc.setTextColor(...primary);
     doc.text(`Nu. ${netSalary.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, pageWidth - 20, netBoxY + 10, { align: "right" });
 
-    // Footer
     const footerY = Math.min(netBoxY + netBoxHeight + 15, pageHeight - 25);
     doc.setDrawColor(...lightGray);
     doc.setLineWidth(0.3);
@@ -329,7 +292,6 @@ export default function PayrollPage() {
     doc.text(`This is a computer-generated payslip issued by ${siteName} and does not require a signature.`, pageWidth / 2, footerY + 5, { align: "center" });
     doc.text(`Generated on ${new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`, pageWidth / 2, footerY + 10, { align: "center" });
 
-    // Bottom accent bar
     doc.setFillColor(...primary);
     doc.rect(0, pageHeight - 4, pageWidth, 4, "F");
 
@@ -339,49 +301,46 @@ export default function PayrollPage() {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <Wallet className="h-7 w-7 text-primary" />
-            Payroll
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Salary management and payment tracking</p>
-        </div>
-        <div className="flex items-center gap-3 rounded-xl border border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm p-2">
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-lg border border-border bg-white/50 px-3 py-2 text-sm dark:bg-slate-800"
-          >
-            {monthOptions.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
-          {isAdmin && (
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button onClick={() => setShowAdd(true)} className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20">
+      {/* Page Header */}
+      <PageHeader
+        title="Payroll"
+        description="Salary management and payment tracking"
+        icon={<Wallet className="h-5 w-5" />}
+        actions={
+          <div className="flex items-center gap-3">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm"
+            >
+              {monthOptions.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {isAdmin && (
+              <Button onClick={() => setShowAdd(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-xl">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Payroll
               </Button>
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
+            )}
+          </div>
+        }
+      />
 
       {/* Summary Cards for Admin */}
       {isAdmin && (
         summary ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <SummaryCard title="Total Base" value={`Nu. ${parseFloat(summary.totalBase).toLocaleString()}`} color="bg-primary" icon={Wallet} delay={0} />
-            <SummaryCard title="Total PF" value={`Nu. ${parseFloat(summary.totalPF || "0").toLocaleString()}`} color="bg-amber-500" icon={PiggyBank} delay={0.1} />
-            <SummaryCard title="Total Net" value={`Nu. ${parseFloat(summary.totalNet).toLocaleString()}`} color="bg-emerald-500" icon={Banknote} delay={0.2} />
-            <SummaryCard title="Paid" value={summary.totalPaid} color="bg-blue-500" icon={CheckCircle2} delay={0.3} />
-            <SummaryCard title="Pending" value={summary.totalPending} color="bg-red-500" icon={AlertCircle} delay={0.4} />
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <KPICard title="Total Base" value={`Nu. ${parseFloat(summary.totalBase).toLocaleString()}`} icon={Wallet} color="bg-primary" delay={0} />
+            <KPICard title="Total PF" value={`Nu. ${parseFloat(summary.totalPF || "0").toLocaleString()}`} icon={PiggyBank} color="bg-amber-500" delay={0.05} />
+            <KPICard title="Total Net" value={`Nu. ${parseFloat(summary.totalNet).toLocaleString()}`} icon={Banknote} color="bg-emerald-500" delay={0.1} />
+            <KPICard title="Paid" value={summary.totalPaid} icon={CheckCircle2} color="bg-blue-500" delay={0.15} />
+            <KPICard title="Pending" value={summary.totalPending} icon={AlertCircle} color="bg-red-500" delay={0.2} />
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-xl" />
+              <Skeleton key={i} className="h-28 rounded-2xl" />
             ))}
           </div>
         )
@@ -391,142 +350,128 @@ export default function PayrollPage() {
       {(isAdmin ? payrollLoading : myPayrollLoading) ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16 rounded-xl" />
+            <Skeleton key={i} className="h-16 rounded-2xl" />
           ))}
         </div>
       ) : payrollItems && payrollItems.length > 0 ? (
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              {isAdmin ? "All Payroll Entries" : "My Payslips"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Staff</th>
-                    <th className="text-left py-2 px-3 font-medium text-muted-foreground">Month</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Base</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Bonus</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Ded.</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">PF Ded.</th>
-                    <th className="text-right py-2 px-3 font-medium text-muted-foreground">Net</th>
-                    <th className="text-center py-2 px-3 font-medium text-muted-foreground">Status</th>
-                    <th className="text-center py-2 px-3 font-medium text-muted-foreground">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payrollItems.map((item: any) => (
-                    <tr key={item.id} className="border-b border-border/50">
-                      <td className="py-2 px-3">
-                        <div className="font-medium">{item.userName || "You"}</div>
-                        <div className="flex gap-2 text-[10px] text-muted-foreground">
-                          {item.employeeId && <span>ID: {item.employeeId}</span>}
-                          {item.pfNumber && <span>PF: {item.pfNumber}</span>}
-                        </div>
-                      </td>
-                      <td className="py-2 px-3">{item.month}</td>
-                      <td className="py-2 px-3 text-right">{parseFloat(item.baseSalary).toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right text-primary">+{parseFloat(item.bonus).toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right text-red-500">-{parseFloat(item.deduction).toLocaleString()}</td>
-                      <td className="py-2 px-3 text-right text-amber-600">
-                        <div>-{parseFloat(item.pfDeduction || "0").toLocaleString()}</div>
-                        <div className="text-[10px] text-muted-foreground">({item.pfPercentage || "0"}%)</div>
-                      </td>
-                      <td className="py-2 px-3 text-right font-bold">{parseFloat(item.netSalary).toLocaleString()}</td>
-                      <td className="py-2 px-3 text-center">
-                        <Badge variant={item.paymentStatus === "paid" ? "default" : "secondary"} className="text-[10px]">
-                          {item.paymentStatus}
-                        </Badge>
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={() => setSelectedPayslip(item)}
-                            title="View Payslip"
-                          >
-                            <Eye className="h-4 w-4 text-emerald-500" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
-                            onClick={() => generatePayslipPDF(item)}
-                            title="Download PDF"
-                          >
-                            <FileText className="h-4 w-4 text-blue-500" />
-                          </Button>
+        <AppleCard hover={false} className="overflow-hidden">
+          <div className="px-5 pt-5 pb-3 border-b border-border/30">
+            <h3 className="text-sm font-semibold">{isAdmin ? "All Payroll Entries" : "My Payslips"}</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/30">
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Staff</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Month</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Base</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Bonus</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Ded.</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">PF Ded.</th>
+                  <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Net</th>
+                  <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                  <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payrollItems.map((item: any) => (
+                  <tr key={item.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
+                    <td className="py-3 px-4">
+                      <div className="font-medium">{item.userName || "You"}</div>
+                      <div className="flex gap-2 text-[10px] text-muted-foreground">
+                        {item.employeeId && <span>ID: {item.employeeId}</span>}
+                        {item.pfNumber && <span>PF: {item.pfNumber}</span>}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">{item.month}</td>
+                    <td className="py-3 px-4 text-right">{parseFloat(item.baseSalary).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-emerald-600">+{parseFloat(item.bonus).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-red-500">-{parseFloat(item.deduction).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-amber-600">
+                      <div>-{parseFloat(item.pfDeduction || "0").toLocaleString()}</div>
+                      <div className="text-[10px] text-muted-foreground">({item.pfPercentage || "0"}%)</div>
+                    </td>
+                    <td className="py-3 px-4 text-right font-bold">{parseFloat(item.netSalary).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-center">
+                      <Badge variant={item.paymentStatus === "paid" ? "default" : "secondary"} className="text-[10px] rounded-lg">
+                        {item.paymentStatus}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <div className="flex flex-wrap items-center justify-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 rounded-lg"
+                          onClick={() => setSelectedPayslip(item)}
+                          title="View Payslip"
+                        >
+                          <Eye className="h-4 w-4 text-emerald-500" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0 rounded-lg"
+                          onClick={() => generatePayslipPDF(item)}
+                          title="Download PDF"
+                        >
+                          <FileText className="h-4 w-4 text-blue-500" />
+                        </Button>
 
-                          {isAdmin && (
-                            <div className="flex items-center gap-2">
-                              {item.paymentStatus === "pending" ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8"
-                                  onClick={() => markPaidMutation.mutate({ id: item.id })}
-                                  disabled={markPaidMutation.isPending}
-                                >
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Pay
-                                </Button>
-                              ) : (
-                                <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                  {item.paidAt ? new Date(item.paidAt).toLocaleDateString() : ""}
-                                </span>
-                              )}
-
+                        {isAdmin && (
+                          <>
+                            {item.paymentStatus === "pending" ? (
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                onClick={() => {
-                                  if (window.confirm("Are you sure you want to delete this payroll entry?")) {
-                                    deleteMutation.mutate({ id: item.id });
-                                  }
-                                }}
-                                disabled={deleteMutation.isPending}
-                                title="Delete Entry"
+                                variant="outline"
+                                className="h-8 rounded-lg text-xs"
+                                onClick={() => markPaidMutation.mutate({ id: item.id })}
+                                disabled={markPaidMutation.isPending}
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Pay
                               </Button>
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                                {item.paidAt ? new Date(item.paidAt).toLocaleDateString() : ""}
+                              </span>
+                            )}
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg"
+                              onClick={() => {
+                                if (window.confirm("Are you sure you want to delete this payroll entry?")) {
+                                  deleteMutation.mutate({ id: item.id });
+                                }
+                              }}
+                              disabled={deleteMutation.isPending}
+                              title="Delete Entry"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </AppleCard>
       ) : (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
-          <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
-            <CardContent className="py-20 text-center">
-              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
-                <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-lg font-bold text-foreground">No records found</p>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-                {isAdmin
-                  ? "No payroll entries found for the selected month."
-                  : "You have no payslips for the selected month."}
-              </p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <EmptyState
+          icon={PackageOpen}
+          title="No records found"
+          description={isAdmin ? "No payroll entries found for the selected month." : "You have no payslips for the selected month."}
+        />
       )}
 
       {/* Add Payroll Dialog */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Add Payroll Entry</DialogTitle>
           </DialogHeader>
@@ -534,7 +479,7 @@ export default function PayrollPage() {
             <div className="space-y-2">
               <Label>Staff Member *</Label>
               <Select value={payrollForm.userId} onValueChange={(v) => setPayrollForm({ ...payrollForm, userId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectTrigger className="rounded-xl border-border/40 bg-background/50"><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
                   {staffList?.items.map((u: any) => (
                     <SelectItem key={u.id} value={u.id.toString()}>{u.fullName}</SelectItem>
@@ -544,16 +489,16 @@ export default function PayrollPage() {
             </div>
             <div className="space-y-2">
               <Label>Month *</Label>
-              <Input value={payrollForm.month} onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })} />
+              <Input value={payrollForm.month} onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
             </div>
             <div className="space-y-2">
               <Label>Base Salary (Nu.) *</Label>
-              <Input type="number" value={payrollForm.baseSalary} onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })} />
+              <Input type="number" value={payrollForm.baseSalary} onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Bonus</Label>
-                <Input type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })} />
+                <Input type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
               </div>
               <div className="space-y-2">
                 <Label>PF Percentage (%)</Label>
@@ -566,9 +511,9 @@ export default function PayrollPage() {
                       return staff?.pfPercentage || "0";
                     })()}
                     onChange={(e) => setPayrollForm({ ...payrollForm, pfPercentage: e.target.value })}
-                    className="flex-1"
+                    className="flex-1 rounded-xl border-border/40 bg-background/50"
                   />
-                  <div className="flex items-center justify-center px-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-border min-w-0">
+                  <div className="flex items-center justify-center px-3 rounded-xl bg-muted/40 border border-border/40 min-w-0">
                     <span className="text-[10px] font-bold text-amber-600">
                       {(() => {
                         const staff = staffList?.items.find((u: any) => u.id.toString() === payrollForm.userId);
@@ -586,7 +531,7 @@ export default function PayrollPage() {
             </div>
             <div className="space-y-2">
               <Label>Other Deduction</Label>
-              <Input type="number" value={payrollForm.deduction} onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })} />
+              <Input type="number" value={payrollForm.deduction} onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
             </div>
             <div className="space-y-2">
               <Label>Other Deduction Notes</Label>
@@ -595,12 +540,13 @@ export default function PayrollPage() {
                 onChange={(e) => setPayrollForm({ ...payrollForm, deductionNotes: e.target.value })}
                 placeholder="Reason for other deduction (e.g., advance, late fine)"
                 rows={2}
+                className="rounded-xl border-border/40 bg-background/50"
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowAdd(false)} className="rounded-xl">Cancel</Button>
               <Button
-                className="bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/20"
+                className="bg-primary hover:bg-primary/90 text-white shadow-sm rounded-xl"
                 onClick={() => {
                   if (!payrollForm.userId || !payrollForm.baseSalary) {
                     toast.error("Please fill required fields");

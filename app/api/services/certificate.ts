@@ -8,6 +8,7 @@ export interface CertificateData {
   ownerName: string;
   ownerCID: string;
   sellingPrice: string;
+  finalSellingPrice: string | null;
   realEstateFee: string;
   listedByName: string;
   completedAt: Date;
@@ -57,7 +58,13 @@ export function generateCompletionCertificate(data: CertificateData): Buffer {
   addField("Address", data.address);
   addField("Owner Name", data.ownerName);
   addField("Owner CID", data.ownerCID);
-  addField("Selling Price", `Nu. ${data.sellingPrice}`);
+  const displayPrice = data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice
+    ? data.finalSellingPrice
+    : data.sellingPrice;
+  addField("Selling Price", `Nu. ${displayPrice}`);
+  if (data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice) {
+    addField("Gross Price", `Nu. ${data.sellingPrice}`);
+  }
   addField("Commission Fee", `Nu. ${data.realEstateFee}`);
   addField("Listed By", data.listedByName);
   addField("Completion Date", format(data.completedAt, "MMMM dd, yyyy"));
@@ -131,7 +138,13 @@ export function generateCertificatePdfBase64(data: CertificateData): string {
   addField("Address", data.address);
   addField("Owner Name", data.ownerName);
   addField("Owner CID", data.ownerCID);
-  addField("Selling Price", `Nu. ${data.sellingPrice}`);
+  const displayPrice = data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice
+    ? data.finalSellingPrice
+    : data.sellingPrice;
+  addField("Selling Price", `Nu. ${displayPrice}`);
+  if (data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice) {
+    addField("Gross Price", `Nu. ${data.sellingPrice}`);
+  }
   addField("Commission Fee", `Nu. ${data.realEstateFee}`);
   addField("Listed By", data.listedByName);
   addField("Completion Date", format(data.completedAt, "MMMM dd, yyyy"));

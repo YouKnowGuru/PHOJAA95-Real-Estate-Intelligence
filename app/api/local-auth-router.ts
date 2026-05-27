@@ -107,13 +107,34 @@ export const localAuthRouter = createRouter({
     .input(
       z.object({
         email: z.string().email(),
-        password: passwordSchema,
+        password: z.string().min(1, "Password is required"),
         rememberMe: z.boolean().optional().default(false),
       })
     )
     .mutation(async ({ input, ctx }) => {
       const db = getDb();
-      const users = await db.select().from(localUsers).where(eq(localUsers.email, input.email)).limit(1);
+      let users;
+      try {
+        users = await db.select().from(localUsers).where(eq(localUsers.email, input.email)).limit(1);
+      } catch (err) {
+        const errMsg = String(err);
+        const errCode = (err as NodeJS.ErrnoException).code;
+        logger.error("Login database query failed", { error: errMsg, code: errCode });
+
+        if (errCode === "ECONNREFUSED" || errCode === "ETIMEDOUT" || errCode === "ENOTFOUND") {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              "Cannot connect to MySQL. On Hostinger use host localhost in DATABASE_URL. From your PC enable Remote MySQL in hPanel for srv1957.hstgr.io and your IP, then run npm run db:test.",
+          });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            "Database is not ready. Run app/db/hostinger-fix-login.sql in phpMyAdmin, or restart the app after importing hostinger-full-setup.sql.",
+        });
+      }
       if (users.length === 0) {
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password" });
       }

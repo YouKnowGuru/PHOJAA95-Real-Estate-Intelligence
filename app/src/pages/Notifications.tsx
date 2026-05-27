@@ -1,68 +1,35 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { 
-  Bell, 
-  Trash2, 
-  CheckCheck, 
-  Send, 
-  Info, 
-  CheckCircle, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  Bell,
+  Trash2,
+  CheckCheck,
+  Send,
+  Info,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
   Megaphone,
   History,
   Clock,
   PackageOpen,
-  Mail
+  Mail,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-function SummaryCard({
-  title,
-  value,
-  color,
-  icon: Icon,
-  delay = 0,
-}: {
-  title: string;
-  value: React.ReactNode;
-  color: string;
-  icon: React.ElementType;
-  delay?: number;
-}) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay }}>
-      <motion.div whileHover={{ y: -4 }} className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-start justify-between gap-2">
-              <div className="space-y-1 sm:space-y-2 min-w-0">
-                <p className="text-[10px] sm:text-xs font-medium uppercase tracking-wider text-muted-foreground truncate">{title}</p>
-                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-foreground truncate">{value}</h3>
-              </div>
-              <div className={`flex h-9 w-9 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-xl ${color} bg-opacity-10 dark:bg-opacity/20`}>
-                <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
+import { PageHeader } from "@/components/ui/page-header";
+import { AppleCard, AppleCardContent, AppleCardHeader, AppleCardTitle, AppleCardDescription } from "@/components/ui/apple-card";
+import { KPICard } from "@/components/ui/kpi-card";
 
 const notificationIcons = {
   info: Info,
@@ -85,7 +52,7 @@ export default function NotificationsPage() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
-  
+
   // Admin Broadcast State
   const [broadcastForm, setBroadcastForm] = useState({
     title: "",
@@ -138,52 +105,51 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-foreground flex items-center gap-2 truncate">
-            <Bell className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0" />
-            <span className="truncate">Notifications Center</span>
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Manage your alerts and stay updated</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => markAllReadMutation.mutate()}
-            disabled={markAllReadMutation.isPending || !data?.unreadCount}
-            className="h-9"
-          >
-            <CheckCheck className="h-4 w-4 mr-2" />
-            Mark all read
-          </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-red-500 hover:text-red-600 hover:bg-red-50 h-9"
-            onClick={() => {
-              if (window.confirm("Clear all read notifications?")) {
-                clearHistoryMutation.mutate();
-              }
-            }}
-            disabled={clearHistoryMutation.isPending}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Clear Read History
-          </Button>
-        </div>
-      </motion.div>
+      {/* Page Header */}
+      <PageHeader
+        title="Notifications Center"
+        description="Manage your alerts and stay updated"
+        icon={<Bell className="h-5 w-5" />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => markAllReadMutation.mutate()}
+              disabled={markAllReadMutation.isPending || !data?.unreadCount}
+              className="h-9 rounded-xl border-border/40"
+            >
+              <CheckCheck className="h-4 w-4 mr-2" />
+              Mark all read
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-red-500 hover:text-red-600 hover:bg-red-50 h-9 rounded-xl"
+              onClick={() => {
+                if (window.confirm("Clear all read notifications?")) {
+                  clearHistoryMutation.mutate();
+                }
+              }}
+              disabled={clearHistoryMutation.isPending}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Read History
+            </Button>
+          </div>
+        }
+      />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <KPICard
           title="Total Notifications"
           value={String(data?.items.length ?? 0)}
           color="bg-primary"
           icon={Bell}
           delay={0}
         />
-        <SummaryCard
+        <KPICard
           title="Unread Count"
           value={String(data?.unreadCount ?? 0)}
           color="bg-amber-500"
@@ -195,55 +161,54 @@ export default function NotificationsPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Notifications List */}
         <div className="lg:col-span-2 space-y-4">
-          <Card className="border-border/50">
-            <CardHeader className="pb-3 border-b border-border/50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg self-start">
-                  <button 
-                    onClick={() => setActiveTab("all")}
-                    className={cn(
-                      "px-3 sm:px-4 py-1.5 text-xs font-medium rounded-md transition-all",
-                      activeTab === "all" ? "bg-white dark:bg-slate-800 shadow-sm" : "text-muted-foreground"
-                    )}
-                  >
-                    All
-                  </button>
-                  <button 
-                    onClick={() => setActiveTab("unread")}
-                    className={cn(
-                      "px-3 sm:px-4 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-2",
-                      activeTab === "unread" ? "bg-white dark:bg-slate-800 shadow-sm" : "text-muted-foreground"
-                    )}
-                  >
-                    Unread
-                    {data?.unreadCount ? (
-                      <span className="h-4 w-4 rounded-full bg-primary text-[10px] text-white flex items-center justify-center">
-                        {data.unreadCount}
-                      </span>
-                    ) : null}
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
-                  <Clock className="h-3 w-3" />
-                  Showing last 50 alerts
-                </p>
+          <AppleCard hover={false} className="overflow-hidden">
+            {/* Tabs Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 pt-5 pb-3 border-b border-border/30">
+              <div className="flex bg-muted/60 p-1 rounded-xl self-start">
+                <button
+                  onClick={() => setActiveTab("all")}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-semibold rounded-lg transition-all",
+                    activeTab === "all" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setActiveTab("unread")}
+                  className={cn(
+                    "px-4 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-2",
+                    activeTab === "unread" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  Unread
+                  {data?.unreadCount ? (
+                    <span className="h-4 w-4 rounded-full bg-primary text-[10px] text-white flex items-center justify-center">
+                      {data.unreadCount}
+                    </span>
+                  ) : null}
+                </button>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
+              <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0">
+                <Clock className="h-3 w-3" />
+                Showing last 50 alerts
+              </p>
+            </div>
+
+            {/* List */}
+            <div className="p-0">
               <ScrollArea className="max-h-[70vh] sm:h-[600px]">
                 {(!data?.items || data.items.length === 0) && !isLoading ? (
                   <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="p-4">
-                    <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
-                      <CardContent className="py-20 text-center">
-                        <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
-                          <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
-                        </div>
-                        <p className="text-lg font-bold text-foreground">No notifications found</p>
-                        <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
-                          You're all caught up! New alerts will appear here when they arrive.
-                        </p>
-                      </CardContent>
-                    </Card>
+                    <div className="py-20 text-center">
+                      <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
+                        <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-lg font-bold text-foreground">No notifications found</p>
+                      <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                        You're all caught up! New alerts will appear here when they arrive.
+                      </p>
+                    </div>
                   </motion.div>
                 ) : (
                   <div className="divide-y divide-border/30">
@@ -258,15 +223,13 @@ export default function NotificationsPage() {
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ delay: idx * 0.03 }}
                             className={cn(
-                              "p-4 group hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors relative cursor-pointer border-l-2",
-                              !notif.isRead ? "border-l-primary bg-primary/5" : "border-l-transparent"
+                              "p-4 group hover:bg-muted/40 transition-colors relative cursor-pointer border-l-2",
+                              !notif.isRead ? "border-l-primary bg-primary/[0.03]" : "border-l-transparent"
                             )}
                             onClick={() => {
                               if (!notif.isRead) {
                                 markReadMutation.mutate({ id: notif.id });
                               }
-
-                              // Navigation logic
                               if (notif.entityType === "property" && notif.entityId) {
                                 navigate(`/properties/${notif.entityId}`);
                               } else if (notif.entityType === "payroll") {
@@ -306,11 +269,14 @@ export default function NotificationsPage() {
                                     {notif.type}
                                   </Badge>
                                   {!notif.isRead && (
-                                    <Button 
-                                      variant="link" 
-                                      size="sm" 
+                                    <Button
+                                      variant="link"
+                                      size="sm"
                                       className="h-auto p-0 text-[10px] font-bold uppercase tracking-wider"
-                                      onClick={() => markReadMutation.mutate({ id: notif.id })}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markReadMutation.mutate({ id: notif.id });
+                                      }}
                                     >
                                       Mark as read
                                     </Button>
@@ -325,44 +291,44 @@ export default function NotificationsPage() {
                   </div>
                 )}
               </ScrollArea>
-            </CardContent>
-          </Card>
+            </div>
+          </AppleCard>
         </div>
 
         {/* Sidebar Tools */}
         <div className="space-y-6">
           {/* Admin Broadcast Card */}
           {isAdmin && (
-            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-              <Card className="border-primary/20 shadow-lg shadow-primary/5 bg-gradient-to-br from-white to-primary/5 dark:from-slate-800 dark:to-primary/10 overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12">
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4, delay: 0.2 }}>
+              <AppleCard className="overflow-hidden relative">
+                <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 pointer-events-none">
                   <Megaphone className="h-20 w-20" />
                 </div>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
+                <AppleCardHeader>
+                  <AppleCardTitle className="flex items-center gap-2">
                     <Megaphone className="h-5 w-5 text-primary" />
                     System Broadcast
-                  </CardTitle>
-                  <CardDescription>Send an alert to all active staff members</CardDescription>
-                </CardHeader>
-                <CardContent>
+                  </AppleCardTitle>
+                  <AppleCardDescription>Send an alert to all active staff members</AppleCardDescription>
+                </AppleCardHeader>
+                <AppleCardContent>
                   <form onSubmit={handleBroadcast} className="space-y-4 relative">
                     <div className="space-y-2">
                       <Label className="text-xs uppercase font-bold tracking-wider">Title</Label>
-                      <Input 
-                        placeholder="Subject of the broadcast" 
+                      <Input
+                        placeholder="Subject of the broadcast"
                         value={broadcastForm.title}
                         onChange={(e) => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
-                        className="bg-white/50 dark:bg-slate-900/50"
+                        className="bg-background/50 rounded-xl border-border/40"
                       />
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs uppercase font-bold tracking-wider">Alert Type</Label>
-                      <Select 
-                        value={broadcastForm.type} 
+                      <Select
+                        value={broadcastForm.type}
                         onValueChange={(val) => setBroadcastForm({ ...broadcastForm, type: val as typeof broadcastForm.type })}
                       >
-                        <SelectTrigger className="bg-white/50 dark:bg-slate-900/50">
+                        <SelectTrigger className="bg-background/50 rounded-xl border-border/40">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -375,50 +341,50 @@ export default function NotificationsPage() {
                     </div>
                     <div className="space-y-2">
                       <Label className="text-xs uppercase font-bold tracking-wider">Message</Label>
-                      <textarea 
-                        className="w-full min-h-[100px] rounded-lg border border-border bg-white/50 dark:bg-slate-900/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      <textarea
+                        className="w-full min-h-[100px] rounded-xl border border-border/40 bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-y"
                         placeholder="Type your message here..."
                         value={broadcastForm.message}
                         onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
                       />
                     </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-primary text-white shadow-lg shadow-primary/20"
+                    <Button
+                      type="submit"
+                      className="w-full bg-primary hover:bg-primary/90 text-white shadow-sm rounded-xl"
                       disabled={broadcastMutation.isPending || !broadcastForm.title || !broadcastForm.message}
                     >
                       <Send className="h-4 w-4 mr-2" />
                       {broadcastMutation.isPending ? "Broadcasting..." : "Broadcast Message"}
                     </Button>
                   </form>
-                </CardContent>
-              </Card>
+                </AppleCardContent>
+              </AppleCard>
             </motion.div>
           )}
 
           {/* Tips Card */}
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
+          <AppleCard hover={false} className="overflow-hidden">
+            <AppleCardHeader>
+              <AppleCardTitle className="flex items-center gap-2 text-sm">
                 <History className="h-4 w-4 text-emerald-500" />
                 Notification Tips
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 space-y-2">
+              </AppleCardTitle>
+            </AppleCardHeader>
+            <AppleCardContent className="space-y-3">
+              <div className="p-3 rounded-xl bg-muted/40 space-y-2">
                 <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Real-time alerts</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   The system checks for new messages every 5 seconds. You'll hear a subtle sound whenever a new alert arrives.
                 </p>
               </div>
-              <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 space-y-2">
+              <div className="p-3 rounded-xl bg-muted/40 space-y-2">
                 <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Mark as Read</p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   Clicking on a notification in this list automatically marks it as read. Read messages are moved to your history.
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </AppleCardContent>
+          </AppleCard>
         </div>
       </div>
     </div>

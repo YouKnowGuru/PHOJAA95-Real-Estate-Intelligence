@@ -1,5 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useId } from "react";
 import { Upload, X, FileText, Image, Loader2 } from "lucide-react";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  DOCUMENT_UPLOAD_HINT,
+  resolveDocumentMimeType,
+} from "@contracts/upload";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 
@@ -15,7 +20,7 @@ interface FileUploaderProps {
 }
 
 export function FileUploader({
-  accept = "image/*,.pdf",
+  accept = DOCUMENT_UPLOAD_ACCEPT,
   maxSize = 15 * 1024 * 1024,
   value,
   onChange,
@@ -24,6 +29,7 @@ export function FileUploader({
   hint,
   folder = "documents",
 }: FileUploaderProps) {
+  const inputId = useId();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +68,7 @@ export function FileUploader({
             json: {
               file: fileData,
               fileName: file.name,
-              mimeType: file.type,
+              mimeType: resolveDocumentMimeType(file.name, file.type),
               folder,
             },
           }),
@@ -179,9 +185,9 @@ export function FileUploader({
           onChange={handleFileSelect}
           disabled={disabled || uploading}
           className="hidden"
-          id="file-upload"
+          id={inputId}
         />
-        <label htmlFor="file-upload" className="cursor-pointer">
+        <label htmlFor={inputId} className="cursor-pointer">
           {uploading ? (
             <div className="space-y-2">
               <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
@@ -193,7 +199,7 @@ export function FileUploader({
               <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
               <p className="text-sm font-medium">Click to upload</p>
               <p className="text-xs text-muted-foreground">
-                PDF, PNG, JPEG up to {maxSize / 1024 / 1024}MB
+                {DOCUMENT_UPLOAD_HINT} up to {maxSize / 1024 / 1024}MB
               </p>
             </div>
           )}

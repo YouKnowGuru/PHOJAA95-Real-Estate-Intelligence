@@ -597,6 +597,32 @@ export default function PropertyDetail() {
                 </div>
               </div>
 
+              {/* Land Document Details — Thram & Plot Number */}
+              {property.propertyTypeName === "Land" && (property.thramNumber || property.plotNumber) && (
+                <div className="mb-4 max-w-xl mx-auto">
+                  <div className="p-3 rounded-xl border border-[#FFD700]/60 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 flex flex-col items-center">
+                    <p className="text-[8px] font-black text-[#8B4513] uppercase tracking-[0.25em] mb-2">Land Registration Details</p>
+                    <div className="flex flex-wrap items-center justify-center gap-4">
+                      {property.thramNumber && (
+                        <div className="text-center">
+                          <p className="text-[9px] text-[#8B4513]/70 uppercase tracking-wider">Thram Number</p>
+                          <p className="text-base font-black text-[#4A1A00] tracking-wide">{property.thramNumber}</p>
+                        </div>
+                      )}
+                      {property.thramNumber && property.plotNumber && (
+                        <div className="h-8 w-px bg-[#FFD700]/60" />
+                      )}
+                      {property.plotNumber && (
+                        <div className="text-center">
+                          <p className="text-[9px] text-[#8B4513]/70 uppercase tracking-wider">Plot Number</p>
+                          <p className="text-base font-black text-[#4A1A00] tracking-wide">{property.plotNumber}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Date */}
               <div className="inline-flex flex-col items-center gap-0.5 mb-4 px-10 py-2 rounded-full border border-[#FFD700]/60 bg-[#FFF3DC]/50 mx-auto">
                 <p className="text-[9px] font-black uppercase tracking-widest text-[#8B4513]">Concluded On</p>
@@ -693,7 +719,7 @@ export default function PropertyDetail() {
                           {step.id === 1 && (
                             <div className="grid grid-cols-2 gap-2 text-xs">
                               <span className="text-muted-foreground">Type: {property.propertyTypeName}</span>
-                              <span className="text-muted-foreground">Price: Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString()}</span>
+                              <span className="text-muted-foreground">Price: Nu. {parseFloat(property.finalSellingPrice || property.sellingPrice || "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}</span>
                             </div>
                           )}
                           {step.id === 2 && (
@@ -769,24 +795,102 @@ export default function PropertyDetail() {
             <DetailItem icon={MapPin} label="Address" value={property.address} color="text-primary" />
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Selling Price</p>
-                <p className="text-sm font-bold">Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString()}</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
+                  {property.propertyTypeName === "Land" && property.finalSellingPrice ? "Final Selling Price" : "Selling Price"}
+                </p>
+                <p className="text-sm font-bold">
+                  Nu. {parseFloat(property.finalSellingPrice || property.sellingPrice || "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                </p>
+                {property.propertyTypeName === "Land" && property.finalSellingPrice && property.finalSellingPrice !== property.sellingPrice && (
+                  <p className="text-[10px] text-muted-foreground line-through mt-0.5">
+                    Gross: Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                  </p>
+                )}
               </div>
               <div className="p-3 rounded-xl bg-primary/5 dark:bg-primary/10 border border-primary/20">
                 <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Comm. (3%)</p>
-                <p className="text-sm font-bold text-primary dark:text-primary-foreground">Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString()}</p>
+                <p className="text-sm font-bold text-primary dark:text-primary-foreground">
+                  Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                </p>
               </div>
             </div>
-            {!!property.features && typeof property.features === 'object' && Object.keys(property.features as object).length > 0 && (
-              <div className="pt-4">
-                <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Property Features</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(property.features as Record<string, unknown>).map(([key, value], idx) => (
-                    <DetailItem key={idx} icon={Building2} label={key} value={String(value)} color="text-primary" />
-                  ))}
+            {/* Land Pricing Details — only show for Land type */}
+            {property.propertyTypeName === "Land" && (property.pricePerDecimal || property.landSizeDecimal) && (
+              <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
+                <p className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Land Pricing Details</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {property.landSizeDecimal && (
+                    <div>
+                      <span className="text-muted-foreground">Land Size:</span>
+                      <span className="ml-1 font-medium">{parseFloat(property.landSizeDecimal).toFixed(4)} decimal</span>
+                    </div>
+                  )}
+                  {property.pricePerDecimal && (
+                    <div>
+                      <span className="text-muted-foreground">Price/Decimal:</span>
+                      <span className="ml-1 font-medium">Nu. {parseFloat(property.pricePerDecimal).toLocaleString("en-BT", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {property.negotiatedPrice && (
+                    <div>
+                      <span className="text-muted-foreground">Negotiated:</span>
+                      <span className="ml-1 font-medium text-blue-600">Nu. {parseFloat(property.negotiatedPrice).toLocaleString("en-BT", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                  {property.discountAmount && (
+                    <div>
+                      <span className="text-muted-foreground">Discount:</span>
+                      <span className="ml-1 font-medium text-red-600">- Nu. {parseFloat(property.discountAmount).toLocaleString("en-BT", { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
                 </div>
+                {property.priceOverrideReason && (
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                    <span className="font-semibold">Override Reason:</span> {property.priceOverrideReason}
+                  </p>
+                )}
               </div>
             )}
+            {(() => {
+              // Parse features from various formats (object, string, double-encoded string)
+              let parsedFeatures: Record<string, unknown> = {};
+              let raw = property.features;
+
+              if (raw) {
+                // Handle double-encoded JSON (string containing JSON string)
+                if (typeof raw === "string") {
+                  try {
+                    const firstParse = JSON.parse(raw);
+                    if (typeof firstParse === "string") {
+                      // Double-encoded: parse again
+                      try {
+                        const secondParse = JSON.parse(firstParse);
+                        if (typeof secondParse === "object" && secondParse !== null && !Array.isArray(secondParse)) {
+                          parsedFeatures = secondParse;
+                        }
+                      } catch { /* ignore */ }
+                    } else if (typeof firstParse === "object" && firstParse !== null && !Array.isArray(firstParse)) {
+                      parsedFeatures = firstParse;
+                    }
+                  } catch { /* ignore */ }
+                } else if (typeof raw === "object" && !Array.isArray(raw)) {
+                  parsedFeatures = raw as Record<string, unknown>;
+                }
+              }
+
+              const validEntries = Object.entries(parsedFeatures).filter(([k]) => k && k.trim() !== "" && k !== "undefined" && k !== "null");
+              if (validEntries.length === 0) return null;
+              return (
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Property Features</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {validEntries.map(([key, value], idx) => (
+                      <DetailItem key={idx} icon={Building2} label={key} value={String(value ?? "")} color="text-primary" />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 
@@ -804,6 +908,26 @@ export default function PropertyDetail() {
               <DetailItem icon={Phone} label="Phone" value={property.ownerPhone} color="text-blue-500" />
               <DetailItem icon={MapPin} label="Owner Address" value={property.ownerAddress} color="text-blue-500" />
             </div>
+            {/* Land Document Fields — Thram & Plot Number */}
+            {property.propertyTypeName === "Land" && (property.thramNumber || property.plotNumber) && (
+              <div className="p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 space-y-2 mt-2">
+                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Land Documents</p>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  {property.thramNumber && (
+                    <div>
+                      <span className="text-muted-foreground">Thram Number:</span>
+                      <span className="ml-1 font-medium">{property.thramNumber}</span>
+                    </div>
+                  )}
+                  {property.plotNumber && (
+                    <div>
+                      <span className="text-muted-foreground">Plot Number:</span>
+                      <span className="ml-1 font-medium">{property.plotNumber}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {property.noObjectionLetter && (
               <div className="pt-2">
                 <a

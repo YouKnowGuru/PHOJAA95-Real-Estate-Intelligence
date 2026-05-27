@@ -3,7 +3,6 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -11,29 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Plus, Search, UserCircle, Lock, Unlock, Edit3, Trash2, PackageOpen, Users as UsersIcon, Shield } from "lucide-react";
 import { motion } from "framer-motion";
-
-function SummaryCard({ title, value, color, iconBg, icon: Icon, delay = 0 }: { title: string; value: string | number; color: string; iconBg: string; icon: any; delay?: number }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay }}>
-      <motion.div whileHover={{ y: -4 }} className="group relative overflow-hidden border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm rounded-xl transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
-        <Card className="border-0 bg-transparent shadow-none">
-          <div className={`absolute left-0 top-0 h-full w-1 ${color}`} />
-          <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{title}</p>
-                <h3 className="text-2xl font-black tracking-tight text-foreground">{value}</h3>
-              </div>
-              <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconBg}`}>
-                <Icon className={`h-5 w-5 ${color.replace("bg-", "text-")}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    </motion.div>
-  );
-}
+import { PageHeader } from "@/components/ui/page-header";
+import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
+import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
+import { KPICard } from "@/components/ui/kpi-card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
 
 export default function Users() {
   const utils = trpc.useUtils();
@@ -46,6 +28,7 @@ export default function Users() {
     const timer = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(timer);
   }, [search]);
+  
   const [showEdit, setShowEdit] = useState<NonNullable<typeof data>["items"][number] | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [editForm, setEditForm] = useState({
@@ -98,7 +81,6 @@ export default function Users() {
     onError: (err) => toast.error(err.message),
   });
 
-
   const resetPasswordMutation = trpc.user.resetPassword.useMutation({
     onSuccess: () => {
       toast.success("Password reset successfully");
@@ -143,87 +125,54 @@ export default function Users() {
   const totalLocked = data?.items?.filter((u) => u.status === "locked").length || 0;
 
   return (
-    <div className="space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-foreground flex items-center gap-2">
-            <UsersIcon className="h-7 w-7 text-primary" />
-            Staff Management
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage staff accounts and permissions</p>
-        </div>
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-          <Button onClick={() => setShowAdd(true)} className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Staff
-          </Button>
-        </motion.div>
-      </motion.div>
+    <AnimatedPage>
+      <PageHeader
+        title="Staff Management"
+        description="Manage staff accounts and permissions"
+        icon={<UsersIcon className="h-5 w-5" />}
+        actions={
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button onClick={() => setShowAdd(true)} className="bg-primary text-primary-foreground shadow-lg shadow-primary/20 hover:bg-primary/90 gap-1.5">
+              <Plus className="h-4 w-4" />
+              Add Staff
+            </Button>
+          </motion.div>
+        }
+      />
 
       {!isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <SummaryCard title="Total Staff" value={totalStaff} color="bg-primary" iconBg="bg-primary/10 dark:bg-primary/20" icon={UsersIcon} delay={0} />
-          <SummaryCard title="Admins" value={totalAdmins} color="bg-indigo-500" iconBg="bg-indigo-500/10 dark:bg-indigo-500/20" icon={Shield} delay={0.1} />
-          <SummaryCard title="Locked Accounts" value={totalLocked} color="bg-red-500" iconBg="bg-red-500/10 dark:bg-red-500/20" icon={Lock} delay={0.2} />
+          <KPICard title="Total Staff" value={totalStaff} icon={UsersIcon} color="bg-primary" delay={0} />
+          <KPICard title="Admins" value={totalAdmins} icon={Shield} color="bg-indigo-500" delay={0.1} />
+          <KPICard title="Locked" value={totalLocked} icon={Lock} color="bg-red-500" delay={0.2} />
         </div>
       )}
 
-      <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm">
-        <CardContent className="p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search staff by name or email..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 max-w-md"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Search */}
+      <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-sm p-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search staff by name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 h-10 bg-background/80"
+          />
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="space-y-3">
           {[...Array(4)].map((_, i) => (
-            <Card key={i} className="border-border/50 bg-white/70 dark:bg-slate-800/70 overflow-hidden">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <Skeleton className="h-10 w-10 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-16" />
-                      <Skeleton className="h-4 w-16" />
-                    </div>
-                    <Skeleton className="h-3 w-48" />
-                    <div className="flex gap-3">
-                      <Skeleton className="h-3 w-20" />
-                      <Skeleton className="h-3 w-20" />
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Skeleton className="h-8 w-20" />
-                    <Skeleton className="h-8 w-16" />
-                    <Skeleton className="h-8 w-20" />
-                    <Skeleton className="h-8 w-16" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Skeleton key={i} className="h-20 rounded-2xl" />
           ))}
         </div>
       ) : data?.items.length === 0 ? (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}>
-          <Card className="border-border/50 bg-white/70 dark:bg-slate-800/70">
-            <CardContent className="py-20 text-center">
-              <div className="h-16 w-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-5">
-                <PackageOpen className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-              <p className="text-lg font-bold text-foreground">No staff members found</p>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">Add your first staff member to get started with team management.</p>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <EmptyState
+          icon={PackageOpen}
+          title="No staff members found"
+          description="Add your first staff member to get started with team management."
+        />
       ) : (
         <div className="space-y-3">
           {data?.items.map((user, index) => {
@@ -240,36 +189,41 @@ export default function Users() {
                 key={user.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ y: -4, transition: { duration: 0.2 } }}
+                transition={{ delay: index * 0.03, duration: 0.3 }}
+                whileHover={{ y: -2 }}
               >
-                <Card className="relative border-border/50 bg-white/70 dark:bg-slate-800/70 overflow-hidden transition-shadow hover:shadow-lg hover:shadow-primary/5">
+                <AppleCard hover={false} className="overflow-hidden">
                   <div className={`absolute left-0 top-0 h-full w-1 ${accentColor}`} />
-                  <CardContent className="p-4">
+                  <AppleCardContent className="p-4">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
-                        <UserCircle className="h-5 w-5 text-slate-500" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                        <UserCircle className="h-5 w-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-sm font-bold text-foreground">{user.fullName}</h3>
-                          <Badge variant={user.role === "admin" ? "default" : "secondary"} className="text-[10px]">
+                          <StatusBadge variant={user.role === "admin" ? "primary" : "neutral"}>
                             {user.role}
-                          </Badge>
-                          <Badge
-                            variant={user.status === "active" ? "outline" : user.status === "locked" ? "destructive" : "secondary"}
-                            className="text-[10px]"
+                          </StatusBadge>
+                          <StatusBadge
+                            variant={
+                              user.status === "active"
+                                ? "success"
+                                : user.status === "locked"
+                                ? "error"
+                                : "warning"
+                            }
                           >
                             {user.status}
-                          </Badge>
+                          </StatusBadge>
                         </div>
                         <p className="text-xs text-muted-foreground">{user.email}</p>
                         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
-                          {user.phone && <p className="text-[10px] text-muted-foreground">📞 {user.phone}</p>}
-                          {user.pfNumber && <p className="text-[10px] text-primary font-medium">🆔 PF: {user.pfNumber}</p>}
-                          {user.employeeId && <p className="text-[10px] text-indigo-600 font-medium">👤 ID: {user.employeeId}</p>}
+                          {user.phone && <p className="text-[10px] text-muted-foreground">{user.phone}</p>}
+                          {user.pfNumber && <p className="text-[10px] text-primary font-medium">PF: {user.pfNumber}</p>}
+                          {user.employeeId && <p className="text-[10px] text-indigo-600 font-medium">ID: {user.employeeId}</p>}
                           {parseFloat(user.pfPercentage || "0") > 0 && (
-                            <p className="text-[10px] text-emerald-600 font-medium">💰 PF %: {user.pfPercentage}%</p>
+                            <p className="text-[10px] text-emerald-600 font-medium">PF %: {user.pfPercentage}%</p>
                           )}
                         </div>
                       </div>
@@ -285,21 +239,13 @@ export default function Users() {
                             Unlock
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowEdit(user)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setShowEdit(user)}>
                           <Edit3 className="h-3 w-3 mr-1" />
                           Edit
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowResetPassword(user.id)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setShowResetPassword(user.id)}>
                           <Lock className="h-3 w-3 mr-1" />
-                          Reset PW
+                          Reset
                         </Button>
                         <Button
                           size="sm"
@@ -317,8 +263,8 @@ export default function Users() {
                         </Button>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </AppleCardContent>
+                </AppleCard>
               </motion.div>
             );
           })}
@@ -332,7 +278,7 @@ export default function Users() {
           setFormData({ fullName: "", email: "", password: "", role: "staff", phone: "", address: "", pfNumber: "", pfPercentage: "0", employeeId: "" });
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Add Staff Member</DialogTitle>
             <DialogDescription>Create a new staff account</DialogDescription>
@@ -380,7 +326,7 @@ export default function Users() {
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/20" disabled={createMutation.isPending}>
+              <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create"}
               </Button>
             </div>
@@ -390,7 +336,7 @@ export default function Users() {
 
       {/* Edit User Dialog */}
       <Dialog open={!!showEdit} onOpenChange={() => setShowEdit(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Edit Staff Member</DialogTitle>
             <DialogDescription>Update staff account details</DialogDescription>
@@ -408,16 +354,16 @@ export default function Users() {
                 status: editForm.status,
               });
             }} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Full Name</Label>
-                    <Input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Phone</Label>
-                    <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input value={editForm.fullName} onChange={(e) => setEditForm({ ...editForm, fullName: e.target.value })} required />
                 </div>
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                </div>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Employee ID</Label>
@@ -453,7 +399,7 @@ export default function Users() {
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setShowEdit(null)}>Cancel</Button>
-                <Button type="submit" className="bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/20" disabled={updateMutation.isPending}>
+                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90" disabled={updateMutation.isPending}>
                   {updateMutation.isPending ? "Updating..." : "Save Changes"}
                 </Button>
               </div>
@@ -469,7 +415,7 @@ export default function Users() {
           setNewPassword("");
         }
       }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Reset Password</DialogTitle>
             <DialogDescription>Enter a new password for this user</DialogDescription>
@@ -481,25 +427,23 @@ export default function Users() {
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setShowResetPassword(null)}>Cancel</Button>
-              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button
-                  onClick={() => {
-                    if (!newPassword || newPassword.length < 6) {
-                      toast.error("Password must be at least 6 characters");
-                      return;
-                    }
-                    resetPasswordMutation.mutate({ id: showResetPassword!, newPassword });
-                  }}
-                  disabled={resetPasswordMutation.isPending}
-                  className="bg-primary hover:bg-primary/90 text-white shadow-sm shadow-primary/20"
-                >
-                  {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
-                </Button>
-              </motion.div>
+              <Button
+                onClick={() => {
+                  if (!newPassword || newPassword.length < 6) {
+                    toast.error("Password must be at least 6 characters");
+                    return;
+                  }
+                  resetPasswordMutation.mutate({ id: showResetPassword!, newPassword });
+                }}
+                disabled={resetPasswordMutation.isPending}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+              </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </AnimatedPage>
   );
 }

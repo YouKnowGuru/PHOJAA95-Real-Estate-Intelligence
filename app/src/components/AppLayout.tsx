@@ -25,6 +25,7 @@ import {
   Bell,
   Receipt,
   FolderOpen,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -34,13 +35,13 @@ const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Building2, label: "Properties", href: "/properties" },
   { icon: Building2, label: "Property Types", href: "/property-types" },
-  { icon: FolderOpen, label: "Document Library", href: "/documents" },
-  { icon: ClipboardList, label: "Approval Queue", href: "/approvals" },
+  { icon: FolderOpen, label: "Documents", href: "/documents" },
+  { icon: ClipboardList, label: "Approvals", href: "/approvals" },
   { icon: Receipt, label: "Billing", href: "/billing" },
-  { icon: Users, label: "Staff Management", href: "/users" },
+  { icon: Users, label: "Staff", href: "/users" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "Payroll", href: "/payroll" },
-  { icon: ScrollText, label: "Activity Logs", href: "/activity-logs" },
+  { icon: ScrollText, label: "Activity", href: "/activity-logs" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
@@ -50,7 +51,7 @@ const adminNavItems = [
 const staffNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
   { icon: Building2, label: "My Properties", href: "/properties" },
-  { icon: FolderOpen, label: "Document Library", href: "/documents" },
+  { icon: FolderOpen, label: "Documents", href: "/documents" },
   { icon: Receipt, label: "Billing", href: "/billing" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "My Payslips", href: "/payroll" },
@@ -85,7 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Session expiration warning for local auth users
+  // Session expiration warning
   useEffect(() => {
     if (!sessionExpiresAt) return;
 
@@ -93,7 +94,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const now = Math.floor(Date.now() / 1000);
       const remaining = sessionExpiresAt - now;
 
-      // Warn when 5 minutes or less remain
       if (remaining <= 300 && remaining > 0 && !sessionWarnedRef.current) {
         sessionWarnedRef.current = true;
         const minutes = Math.floor(remaining / 60);
@@ -118,13 +118,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         });
       }
 
-      // Auto-refresh if session was refreshed (reset the flag)
       if (remaining > 300) {
         sessionWarnedRef.current = false;
       }
     };
 
-    // Check immediately and then every 30 seconds
     checkSession();
     const interval = setInterval(checkSession, 30000);
     return () => clearInterval(interval);
@@ -133,7 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const navItems = isAdmin ? adminNavItems : staffNavItems;
 
   const { data: branding } = trpc.settings.getPublicSettings.useQuery(undefined, {
-    staleTime: Infinity, // Settings don't change often
+    staleTime: Infinity,
   });
 
   const siteName = branding?.site_name || "PHOJAA95";
@@ -149,7 +147,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const rejectedCount = !isAdmin ? staffStats?.rejectedCount : 0;
 
   return (
-    <div className="flex h-screen w-full bg-gradient-to-br from-slate-50 via-white to-primary/5 dark:from-slate-950 dark:via-slate-900 dark:to-primary/10 overflow-hidden">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Mobile Overlay */}
       <AnimatePresence>
         {sidebarOpen && isMobile && (
@@ -157,13 +155,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar - Fixed on mobile, relative on desktop */}
+      {/* Sidebar */}
       <motion.aside
         initial={false}
         animate={{
@@ -172,74 +171,83 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
         className={`
           fixed lg:relative z-50 h-full w-[280px] shrink-0
-          border-r border-border/50 bg-white/95 backdrop-blur-xl 
-          dark:bg-slate-900/95 dark:border-border/30
+          border-r border-border/40 glass-strong
           flex flex-col
           ${isMobile ? "left-0 top-0" : ""}
         `}
       >
         {/* Logo */}
-        <div className="border-b border-border/50 px-4 py-5">
+        <div className="border-b border-border/30 px-5 py-5">
           <Link to="/" className="flex items-center gap-3">
             {isValidLogo ? (
-              <img src={siteLogo} alt={siteName} className="h-10 w-10 object-contain rounded-lg shadow-sm" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+              <img 
+                src={siteLogo} 
+                alt={siteName} 
+                className="h-10 w-10 object-contain rounded-xl shadow-sm" 
+                onError={(e) => { e.currentTarget.style.display = "none"; }} 
+              />
             ) : (
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20">
                 <Building2 className="h-5 w-5 text-white" />
               </div>
             )}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <span className="text-sm font-bold tracking-tight text-foreground truncate max-w-[150px]">
                 {siteName}
               </span>
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Management
+                Real Estate
               </span>
             </div>
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <div className="space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
+          <div className="space-y-0.5">
             {navItems.map((item, index) => {
               const isActive = location.pathname === item.href;
               return (
                 <motion.div
                   key={item.href}
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.03 }}
+                  transition={{ delay: index * 0.02, duration: 0.3 }}
                 >
                   <Link
                     to={item.href}
                     className={`
-                      flex items-center gap-3 px-3 py-2.5 rounded-lg
+                      flex items-center gap-3 px-3 py-2.5 rounded-xl
                       text-sm font-medium transition-all duration-200
+                      group relative
                       ${isActive
-                        ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
-                        : "text-muted-foreground hover:bg-primary/5 hover:text-primary dark:hover:bg-primary/10 dark:hover:text-primary-foreground"
+                        ? "bg-primary/10 text-primary dark:bg-primary/15"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
                       }
                     `}
                   >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="h-[18px] w-[18px] shrink-0" />
-                      <span className="truncate">{item.label}</span>
-                    </div>
+                    <item.icon className={cn(
+                      "h-[18px] w-[18px] shrink-0 transition-colors",
+                      isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span className="truncate">{item.label}</span>
                     {item.label === "Notifications" && unreadCount > 0 && (
-                      <Badge variant="destructive" className="ml-auto h-5 min-w-5 justify-center px-1 text-[10px]">
+                      <Badge variant="destructive" className="ml-auto h-5 min-w-5 justify-center px-1 text-[10px] rounded-full">
                         {unreadCount}
                       </Badge>
                     )}
-                    {item.label === "Approval Queue" && (pendingApprovalsCount || 0) > 0 && (
-                      <Badge className="ml-auto bg-amber-500 hover:bg-amber-600 text-white h-5 min-w-5 justify-center px-1 text-[10px] border-0">
+                    {item.label === "Approvals" && (pendingApprovalsCount || 0) > 0 && (
+                      <Badge className="ml-auto bg-amber-500 hover:bg-amber-600 text-white h-5 min-w-5 justify-center px-1 text-[10px] border-0 rounded-full">
                         {pendingApprovalsCount}
                       </Badge>
                     )}
                     {item.label === "My Properties" && (rejectedCount || 0) > 0 && (
-                      <Badge variant="destructive" className="ml-auto h-5 min-w-5 justify-center px-1 text-[10px]">
+                      <Badge variant="destructive" className="ml-auto h-5 min-w-5 justify-center px-1 text-[10px] rounded-full">
                         {rejectedCount}
                       </Badge>
+                    )}
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-primary rounded-r-full" />
                     )}
                   </Link>
                 </motion.div>
@@ -249,9 +257,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {/* User Section */}
-        <div className="border-t border-border/50 p-4">
+        <div className="border-t border-border/30 p-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 overflow-hidden">
               {!imgError && (user?.avatar || user?.profileImage) ? (
                 <img
                   src={user.avatar || user.profileImage || ""}
@@ -286,43 +294,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border/50 bg-white/80 px-4 backdrop-blur-xl dark:bg-slate-900/80 lg:px-6">
-          <div className="flex items-center gap-2 lg:gap-4">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-border/30 glass px-4 lg:px-6">
+          <div className="flex items-center gap-3">
             {/* Mobile Menu Toggle */}
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="lg:hidden h-9 w-9 rounded-lg"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
 
-            {/* Desktop Breadcrumb */}
+            {/* Breadcrumb */}
             <div className="hidden items-center gap-2 text-sm text-muted-foreground lg:flex">
               <Home className="h-3.5 w-3.5" />
-              <span>/</span>
+              <ChevronRight className="h-3 w-3" />
               <span className="font-medium text-foreground">
                 {navItems.find((n) => n.href === location.pathname)?.label || "Page"}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 lg:gap-3">
+          <div className="flex items-center gap-2">
             <NotificationBell />
             <ThemeToggle />
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto p-4 lg:p-6">
+        <main className="flex-1 overflow-auto p-4 lg:p-6 scrollbar-thin">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
               className="mx-auto max-w-[1440px]"
             >
               {children}
@@ -335,4 +343,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ChatbotFAB />
     </div>
   );
+}
+
+function cn(...classes: (string | undefined | false)[]) {
+  return classes.filter(Boolean).join(" ");
 }

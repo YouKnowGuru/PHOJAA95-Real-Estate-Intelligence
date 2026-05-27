@@ -4,6 +4,10 @@ import { eq, desc, like, or, and } from "drizzle-orm";
 import { createRouter, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { libraryDocuments, localUsers } from "@db/schema";
+import {
+  isAllowedDocumentMimeType,
+  resolveDocumentMimeType,
+} from "@contracts/upload";
 import { deleteFile } from "./services/upload";
 import {
   ensureLibraryDocumentsTable,
@@ -103,6 +107,14 @@ export const documentLibraryRouter = createRouter({
         const db = getDb();
         const uploadedBy = await resolveUploaderLocalId(ctx);
 
+        const mimeType = resolveDocumentMimeType(input.fileName, input.mimeType);
+        if (!isAllowedDocumentMimeType(mimeType)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "File type not allowed. Use PDF, Word (.doc, .docx), PNG, or JPEG.",
+          });
+        }
+
         const result = await db.insert(libraryDocuments).values({
           title: input.title,
           description: input.description ?? null,
@@ -110,7 +122,7 @@ export const documentLibraryRouter = createRouter({
           storageKey: input.storageKey,
           fileUrl: input.fileUrl,
           fileName: input.fileName,
-          mimeType: input.mimeType,
+          mimeType,
           fileSize: input.fileSize,
           uploadedBy,
         });
@@ -118,6 +130,7 @@ export const documentLibraryRouter = createRouter({
         return {
           id: Number(result[0].insertId),
           ...input,
+          mimeType,
           uploadedBy,
         };
       } catch (err) {
