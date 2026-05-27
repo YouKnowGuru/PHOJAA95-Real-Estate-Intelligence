@@ -17,17 +17,24 @@ import { ensureSchemaPatches } from "./lib/ensure-schema";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-// Apply DB patches once at startup (missing columns, default admin)
-try {
-  await ensureSchemaPatches();
-} catch (err) {
-  logger.error("Schema patches failed at startup — login may fail until DB is fixed", {
-    error: String(err),
-  });
+let patchesApplied = false;
+
+// Apply DB patches lazily on first request (avoids top-level await for Passenger compatibility)
+async function applySchemaPatches() {
+  if (patchesApplied) return;
+  patchesApplied = true;
+  try {
+    await ensureSchemaPatches();
+  } catch (err) {
+    logger.error("Schema patches failed at startup — login may fail until DB is fixed", {
+      error: String(err),
+    });
+  }
 }
 
 // ─── Request logging ─────────────────────────────────────────────────
 app.use("*", async (c, next) => {
+  await applySchemaPatches();
   const start = Date.now();
   const method = c.req.method;
   const path = c.req.path;
