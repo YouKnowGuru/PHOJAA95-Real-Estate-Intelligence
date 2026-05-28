@@ -1409,6 +1409,7 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          loanAmount: properties.loanAmount,
           pricePerDecimal: properties.pricePerDecimal,
           landSizeDecimal: properties.landSizeDecimal,
           negotiatedPrice: properties.negotiatedPrice,
