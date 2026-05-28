@@ -599,11 +599,11 @@ export default function PropertyDetail() {
                 </div>
               </div>
 
-              {/* Land Document Details — Thram & Plot Number */}
-              {property.propertyTypeName === "Land" && (property.thramNumber || property.plotNumber) && (
+              {/* Property Document Details — Thram & Plot Number */}
+              {(property.thramNumber || property.plotNumber) && (
                 <div className="mb-4 max-w-xl mx-auto">
                   <div className="p-3 rounded-xl border border-[#FFD700]/60 bg-gradient-to-r from-amber-50 via-yellow-50 to-amber-50 flex flex-col items-center">
-                    <p className="text-[8px] font-black text-[#8B4513] uppercase tracking-[0.25em] mb-2">Land Registration Details</p>
+                    <p className="text-[8px] font-black text-[#8B4513] uppercase tracking-[0.25em] mb-2">Property Registration Details</p>
                     <div className="flex flex-wrap items-center justify-center gap-4">
                       {property.thramNumber && (
                         <div className="text-center">
@@ -928,10 +928,10 @@ export default function PropertyDetail() {
               <DetailItem icon={Phone} label="Phone" value={property.ownerPhone} color="text-blue-500" />
               <DetailItem icon={MapPin} label="Owner Address" value={property.ownerAddress} color="text-blue-500" />
             </div>
-            {/* Land Document Fields — Thram & Plot Number */}
-            {property.propertyTypeName === "Land" && (property.thramNumber || property.plotNumber) && (
+            {/* Thram & Plot Number — All property types */}
+            {(property.thramNumber || property.plotNumber) && (
               <div className="p-3 rounded-xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-800/40 space-y-2 mt-2">
-                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Land Documents</p>
+                <p className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Property Documents</p>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   {property.thramNumber && (
                     <div>

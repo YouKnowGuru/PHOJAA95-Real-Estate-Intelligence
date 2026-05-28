@@ -387,8 +387,8 @@ export default function PropertyWizard() {
       discountAmount: isLand ? (step1Data.discountAmount || undefined) : undefined,
       finalSellingPrice: isLand ? pricing.finalSellingPrice : undefined,
       priceOverrideReason: isPriceOverride ? step1Data.priceOverrideReason : undefined,
-      thramNumber: isLand ? (step1Data.thramNumber || undefined) : undefined,
-      plotNumber: isLand ? (step1Data.plotNumber || undefined) : undefined,
+      thramNumber: step1Data.thramNumber || undefined,
+      plotNumber: step1Data.plotNumber || undefined,
       noObjectionLetter: step1Data.noObjectionLetter || undefined,
       images: step1Data.images,
     };
@@ -988,29 +988,29 @@ export default function PropertyWizard() {
                     required
                   />
                 </div>
-                {/* ── LAND DOCUMENT FIELDS (Thram & Plot Number) ─────────── */}
-                {(isLandType || isEditingLand) && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Thram Number *</Label>
-                      <Input
-                        value={step1Data.thramNumber}
-                        onChange={(e) => setStep1Data({ ...step1Data, thramNumber: e.target.value })}
-                        placeholder="e.g. TH-2024-001"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Plot Number *</Label>
-                      <Input
-                        value={step1Data.plotNumber}
-                        onChange={(e) => setStep1Data({ ...step1Data, plotNumber: e.target.value })}
-                        placeholder="e.g. P-45-A"
-                        required
-                      />
-                    </div>
-                  </>
-                )}
+                {/* ── THRAM & PLOT NUMBER (All property types) ───────────── */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span>Thram Number</span>
+                    <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
+                  <Input
+                    value={step1Data.thramNumber}
+                    onChange={(e) => setStep1Data({ ...step1Data, thramNumber: e.target.value })}
+                    placeholder="e.g. TH-2024-001"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <span>Plot Number</span>
+                    <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                  </Label>
+                  <Input
+                    value={step1Data.plotNumber}
+                    onChange={(e) => setStep1Data({ ...step1Data, plotNumber: e.target.value })}
+                    placeholder="e.g. P-45-A"
+                  />
+                </div>
               </div>
             </div>
 

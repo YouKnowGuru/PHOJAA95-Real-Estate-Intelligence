@@ -213,8 +213,8 @@ export const propertyRouter = createRouter({
           priceOverrideBy: isPriceOverride ? userId : null,
           priceOverrideAt: isPriceOverride ? new Date() : null,
           priceOverrideReason: isPriceOverride ? input.priceOverrideReason : null,
-          thramNumber: isLandType ? (input.thramNumber || null) : null,
-          plotNumber: isLandType ? (input.plotNumber || null) : null,
+          thramNumber: input.thramNumber || null,
+          plotNumber: input.plotNumber || null,
           noObjectionLetter: input.noObjectionLetter || null,
           currentStep: isAdmin ? 2 : 1,
           approvalStatus: isAdmin ? "approved" : "submitted",
@@ -705,8 +705,8 @@ export const propertyRouter = createRouter({
       data.negotiatedPrice = newNegotiatedPrice;
       data.discountAmount = newDiscountAmount;
       data.finalSellingPrice = finalSellingPriceNum;
-      data.thramNumber = isLandType ? (data.thramNumber || null) : null;
-      data.plotNumber = isLandType ? (data.plotNumber || null) : null;
+      data.thramNumber = data.thramNumber !== undefined ? (data.thramNumber || null) : undefined;
+      data.plotNumber = data.plotNumber !== undefined ? (data.plotNumber || null) : undefined;
       if (isPriceOverride) {
         data.priceOverrideBy = userId.toString();
         data.priceOverrideAt = new Date().toISOString();
