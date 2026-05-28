@@ -40,7 +40,7 @@ export function PropertyCard({ property, onView, className }: PropertyCardProps)
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <h3 className="font-semibold text-lg line-clamp-1">{property.propertyName}</h3>
+            <h3 className="font-semibold text-base sm:text-lg line-clamp-1">{property.propertyName}</h3>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Building2 className="h-4 w-4" />
               {property.propertyTypeName || "Property"}
@@ -56,23 +56,23 @@ export function PropertyCard({ property, onView, className }: PropertyCardProps)
           <span className="line-clamp-2 text-muted-foreground">{property.address}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-muted-foreground" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+          <div className="flex items-center gap-2 min-w-0">
+            <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="truncate">{property.ownerName}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-2 min-w-0">
+            <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <span className="truncate">{property.ownerPhone}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t">
-          <div>
+        <div className="flex items-center justify-between pt-2 border-t gap-2 min-w-0">
+          <div className="min-w-0">
             <p className="text-xs text-muted-foreground">
               {property.propertyTypeName === "Land" && property.finalSellingPrice ? "Final Selling Price" : "Selling Price"}
             </p>
-            <p className="font-semibold text-lg">
+            <p className="font-semibold text-base sm:text-lg truncate">
               {formatCurrency(property.propertyTypeName === "Land" ? (property.finalSellingPrice || property.sellingPrice) : property.sellingPrice)}
             </p>
             {property.propertyTypeName === "Land" && property.finalSellingPrice && property.finalSellingPrice !== property.sellingPrice && (
@@ -82,18 +82,20 @@ export function PropertyCard({ property, onView, className }: PropertyCardProps)
             )}
           </div>
           {property.realEstateFee && (
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               <p className="text-xs text-muted-foreground">Commission</p>
-              <p className="font-medium text-primary">{formatCurrency(property.realEstateFee)}</p>
+              <p className="font-medium text-primary text-sm sm:text-base">{formatCurrency(property.realEstateFee)}</p>
             </div>
           )}
         </div>
       </CardContent>
 
       <CardFooter className="pt-3 border-t bg-muted/30">
-        <div className="flex items-center justify-between w-full">
-          <StepBadge step={property.currentStep} currentStep={property.currentStep} isCompleted={false} />
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between w-full gap-2 min-w-0">
+          <div className="min-w-0">
+            <StepBadge step={property.currentStep} currentStep={property.currentStep} isCompleted={false} />
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
             {onView && (
               <Button variant="outline" size="sm" onClick={onView}>
                 View

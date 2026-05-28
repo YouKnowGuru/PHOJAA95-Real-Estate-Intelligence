@@ -132,7 +132,7 @@ export default function Properties() {
   const filterContent = (
     <>
       <Select value={status} onValueChange={(v) => { setStatus(v as typeof status); setPage(1); }}>
-        <SelectTrigger className="h-9 w-[140px] text-xs">
+        <SelectTrigger className="h-9 w-full sm:w-[140px] text-xs">
           <Filter className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Status" />
         </SelectTrigger>
@@ -147,7 +147,7 @@ export default function Properties() {
         </SelectContent>
       </Select>
       <Select value={step} onValueChange={(v) => { setStep(v); setPage(1); }}>
-        <SelectTrigger className="h-9 w-[130px] text-xs">
+        <SelectTrigger className="h-9 w-full sm:w-[130px] text-xs">
           <Layers className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Step" />
         </SelectTrigger>
@@ -161,7 +161,7 @@ export default function Properties() {
         </SelectContent>
       </Select>
       <Select value={propertyTypeId} onValueChange={(v) => { setPropertyTypeId(v); setPage(1); }}>
-        <SelectTrigger className="h-9 w-[140px] text-xs">
+        <SelectTrigger className="h-9 w-full sm:w-[140px] text-xs">
           <Tag className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Type" />
         </SelectTrigger>
@@ -213,7 +213,7 @@ export default function Properties() {
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Search by name, owner, CID, phone, address, thram/plot..."
+              placeholder="Search properties..."
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 h-9 bg-background/80"
@@ -264,7 +264,7 @@ export default function Properties() {
               : "You haven't listed any properties yet. Start your journey by adding your first listing."
           }
           action={
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button variant="outline" onClick={clearFilters}>
                 Clear Filters
               </Button>
@@ -293,7 +293,7 @@ export default function Properties() {
 
           {/* Delete Confirmation Dialog */}
           <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-            <AlertDialogContent className="rounded-2xl">
+            <AlertDialogContent className="rounded-2xl max-w-[calc(100%-2rem)] sm:max-w-[425px]">
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete Property</AlertDialogTitle>
                 <AlertDialogDescription>
@@ -316,7 +316,7 @@ export default function Properties() {
           {/* Pagination */}
           {data && data.totalPages > 1 && (
             <Pagination className="mt-6">
-              <PaginationContent className="flex-wrap justify-center">
+              <PaginationContent className="flex-wrap justify-center gap-y-2">
                 <PaginationItem>
                   <PaginationPrevious
                     onClick={() => setPage(Math.max(1, page - 1))}
