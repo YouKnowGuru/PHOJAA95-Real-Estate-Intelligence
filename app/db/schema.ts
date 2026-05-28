@@ -100,6 +100,8 @@ export const properties = mysqlTable("properties", {
   // ── Land Document Fields ───────────────────────────────────────────
   thramNumber: varchar("thram_number", { length: 100 }),
   plotNumber: varchar("plot_number", { length: 100 }),
+  // ── Property Details ───────────────────────────────────────────────
+  yearOfConstruction: int("year_of_construction"),
   // ────────────────────────────────────────────────────────────────────
   currentStep: int("current_step").default(1).notNull(),
   approvalStatus: mysqlEnum("approval_status", [

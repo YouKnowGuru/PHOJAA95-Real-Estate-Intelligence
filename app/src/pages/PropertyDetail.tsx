@@ -232,6 +232,11 @@ export default function PropertyDetail() {
               <Badge variant="outline" className="text-[10px]">
                 Step {property.currentStep} of 5
               </Badge>
+              {property.yearOfConstruction && (
+                <Badge variant="outline" className="text-[10px] bg-violet-50 text-violet-700 border-violet-200">
+                  Built {property.yearOfConstruction}
+                </Badge>
+              )}
               {property.isSold && (
                 <Badge className="bg-red-600 text-white border-0 shadow-sm animate-pulse">
                   SOLD
@@ -795,6 +800,12 @@ export default function PropertyDetail() {
           <CardContent className="space-y-4">
             <DetailItem icon={Building2} label="Property Type" value={property.propertyTypeName || "N/A"} color="text-primary" />
             <DetailItem icon={MapPin} label="Address" value={property.address} color="text-primary" />
+            {property.yearOfConstruction && (
+              <div className="p-3 rounded-xl bg-violet-50/50 dark:bg-violet-950/20 border border-violet-100 dark:border-violet-800/40">
+                <p className="text-[10px] font-bold text-violet-700 dark:text-violet-400 uppercase tracking-wider mb-1">Year of Construction</p>
+                <p className="text-sm font-bold text-violet-700 dark:text-violet-400">{property.yearOfConstruction}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">

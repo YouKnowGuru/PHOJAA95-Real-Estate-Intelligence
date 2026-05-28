@@ -88,6 +88,7 @@ export default function PropertyWizard() {
     priceOverrideReason: "",
     thramNumber: "",
     plotNumber: "",
+    yearOfConstruction: "",
     noObjectionLetter: "",
     images: [] as { url: string; publicId?: string }[],
     features: {} as Record<string, string>,
@@ -167,6 +168,7 @@ export default function PropertyWizard() {
         priceOverrideReason: p.priceOverrideReason || "",
         thramNumber: p.thramNumber || "",
         plotNumber: p.plotNumber || "",
+        yearOfConstruction: p.yearOfConstruction?.toString() || "",
         noObjectionLetter: p.noObjectionLetter || "",
         images: existingProperty.images?.map(img => ({
           url: img.url,
@@ -389,6 +391,7 @@ export default function PropertyWizard() {
       priceOverrideReason: isPriceOverride ? step1Data.priceOverrideReason : undefined,
       thramNumber: step1Data.thramNumber || undefined,
       plotNumber: step1Data.plotNumber || undefined,
+      yearOfConstruction: step1Data.yearOfConstruction || undefined,
       noObjectionLetter: step1Data.noObjectionLetter || undefined,
       images: step1Data.images,
     };
@@ -562,6 +565,20 @@ export default function PropertyWizard() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span>Year of Construction</span>
+                  <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                </Label>
+                <Input
+                  type="number"
+                  min="1900"
+                  max={new Date().getFullYear()}
+                  value={step1Data.yearOfConstruction}
+                  onChange={(e) => setStep1Data({ ...step1Data, yearOfConstruction: e.target.value })}
+                  placeholder="e.g. 2015"
+                />
               </div>
               {/* ── LAND PRICING SECTION (Only for Land type) ───────────── */}
               {(isLandType || isEditingLand) && (

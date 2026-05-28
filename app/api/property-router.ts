@@ -67,6 +67,7 @@ export const propertyRouter = createRouter({
         priceOverrideReason: z.string().optional(),
         thramNumber: z.string().min(1, "⚠️ Thram Number is required. Please enter the thram number."),
         plotNumber: z.string().min(1, "⚠️ Plot Number is required. Please enter the plot number."),
+        yearOfConstruction: z.string().optional(),
         noObjectionLetter: z.string().optional(),
         images: z.array(z.object({
           url: z.string(),
@@ -221,6 +222,7 @@ export const propertyRouter = createRouter({
           priceOverrideReason: isPriceOverride ? input.priceOverrideReason : null,
           thramNumber: input.thramNumber || null,
           plotNumber: input.plotNumber || null,
+          yearOfConstruction: input.yearOfConstruction ? parseInt(input.yearOfConstruction) : null,
           noObjectionLetter: input.noObjectionLetter || null,
           currentStep: isAdmin ? 2 : 1,
           approvalStatus: isAdmin ? "approved" : "submitted",
@@ -452,6 +454,7 @@ export const propertyRouter = createRouter({
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
           loanAmount: properties.loanAmount,
+          yearOfConstruction: properties.yearOfConstruction,
           pricePerDecimal: properties.pricePerDecimal,
           landSizeDecimal: properties.landSizeDecimal,
           negotiatedPrice: properties.negotiatedPrice,
@@ -522,6 +525,7 @@ export const propertyRouter = createRouter({
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
           loanAmount: properties.loanAmount,
+          yearOfConstruction: properties.yearOfConstruction,
           pricePerDecimal: properties.pricePerDecimal,
           landSizeDecimal: properties.landSizeDecimal,
           negotiatedPrice: properties.negotiatedPrice,
@@ -598,6 +602,7 @@ export const propertyRouter = createRouter({
         rejectionComments: z.string().optional(),
         thramNumber: z.string().optional(),
         plotNumber: z.string().optional(),
+        yearOfConstruction: z.string().optional(),
         images: z.array(z.object({
           url: z.string(),
           publicId: z.string().optional()
@@ -713,6 +718,9 @@ export const propertyRouter = createRouter({
       data.finalSellingPrice = finalSellingPriceNum;
       data.thramNumber = data.thramNumber !== undefined ? (data.thramNumber || null) : undefined;
       data.plotNumber = data.plotNumber !== undefined ? (data.plotNumber || null) : undefined;
+      data.yearOfConstruction = data.yearOfConstruction !== undefined 
+        ? (data.yearOfConstruction ? parseInt(data.yearOfConstruction) : null) 
+        : undefined;
       if (isPriceOverride) {
         data.priceOverrideBy = userId.toString();
         data.priceOverrideAt = new Date().toISOString();
