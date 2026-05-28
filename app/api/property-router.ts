@@ -131,9 +131,11 @@ export const propertyRouter = createRouter({
       let discountAmount: string | null = null;
       let finalSellingPriceNum: string | null = null;
 
+      // Parse landSizeDecimal for ALL property types (not just Land)
+      landSizeDecimal = parseDecimal(input.landSizeDecimal, 4);
+
       if (isLandType) {
         pricePerDecimal = parseDecimal(input.pricePerDecimal, 4);
-        landSizeDecimal = parseDecimal(input.landSizeDecimal, 4);
         negotiatedPrice = parseDecimal(input.negotiatedPrice, 2);
         discountAmount = parseDecimal(input.discountAmount, 2);
 
@@ -645,10 +647,12 @@ export const propertyRouter = createRouter({
       let newDiscountAmount: string | null = oldProp.discountAmount;
       let finalSellingPriceNum: string | null = oldProp.finalSellingPrice;
 
+      // Parse landSizeDecimal for ALL property types
+      newLandSizeDecimal = data.landSizeDecimal !== undefined ? parseDecimalUpd(data.landSizeDecimal, 4) : oldProp.landSizeDecimal;
+
       if (isLandType) {
         // Parse new pricing values for Land
         newPricePerDecimal = data.pricePerDecimal !== undefined ? parseDecimalUpd(data.pricePerDecimal, 4) : oldProp.pricePerDecimal;
-        newLandSizeDecimal = data.landSizeDecimal !== undefined ? parseDecimalUpd(data.landSizeDecimal, 4) : oldProp.landSizeDecimal;
         newNegotiatedPrice = data.negotiatedPrice !== undefined ? parseDecimalUpd(data.negotiatedPrice, 2) : oldProp.negotiatedPrice;
         newDiscountAmount = data.discountAmount !== undefined ? parseDecimalUpd(data.discountAmount, 2) : oldProp.discountAmount;
 
@@ -675,9 +679,8 @@ export const propertyRouter = createRouter({
         const sp = data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) : parseFloat(oldProp.sellingPrice || "0");
         sellingPriceNum = sp.toFixed(2);
         realEstateFeeNum = (sp * 0.03).toFixed(2);
-        // Clear land pricing fields for non-Land
+        // Clear land-specific pricing fields for non-Land
         newPricePerDecimal = null;
-        newLandSizeDecimal = null;
         newNegotiatedPrice = null;
         newDiscountAmount = null;
         finalSellingPriceNum = null;

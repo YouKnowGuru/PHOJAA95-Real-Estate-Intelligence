@@ -379,7 +379,7 @@ export default function PropertyWizard() {
       sellingPrice: isPriceOverride ? step1Data.sellingPrice : (isLand ? pricing.sellingPrice : step1Data.sellingPrice),
       realEstateFee: isLand ? pricing.realEstateFee : (parseFloat(step1Data.sellingPrice || "0") * 0.03).toFixed(2),
       pricePerDecimal: isLand ? (step1Data.pricePerDecimal || undefined) : undefined,
-      landSizeDecimal: isLand ? (step1Data.landSizeDecimal || undefined) : undefined,
+      landSizeDecimal: step1Data.landSizeDecimal || undefined,
       negotiatedPrice: isLand ? (step1Data.negotiatedPrice || undefined) : undefined,
       discountAmount: isLand ? (step1Data.discountAmount || undefined) : undefined,
       finalSellingPrice: isLand ? pricing.finalSellingPrice : undefined,
@@ -774,6 +774,21 @@ export default function PropertyWizard() {
                       value={step1Data.realEstateFee}
                       readOnly
                       className="bg-slate-50 dark:bg-slate-800"
+                    />
+                  </div>
+                  {/* Land Size for non-Land properties */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <span>Land Size (Decimal)</span>
+                      <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={step1Data.landSizeDecimal}
+                      onChange={(e) => setStep1Data({ ...step1Data, landSizeDecimal: e.target.value })}
+                      placeholder="e.g. 5.5"
                     />
                   </div>
                 </>

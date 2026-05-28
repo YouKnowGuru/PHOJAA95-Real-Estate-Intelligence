@@ -816,6 +816,14 @@ export default function PropertyDetail() {
                 </p>
               </div>
             </div>
+            {/* Land Size — show for ALL property types when available */}
+            {property.landSizeDecimal && property.propertyTypeName !== "Land" && (
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Land Size</p>
+                <p className="text-sm font-medium">{parseFloat(property.landSizeDecimal).toFixed(4)} decimal</p>
+              </div>
+            )}
+
             {/* Land Pricing Details — only show for Land type */}
             {property.propertyTypeName === "Land" && (property.pricePerDecimal || property.landSizeDecimal) && (
               <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-800/40 space-y-2">
