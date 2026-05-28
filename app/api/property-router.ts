@@ -58,7 +58,7 @@ export const propertyRouter = createRouter({
         buyerAddress: z.string().optional(),
         sellingPrice: z.string().min(1, "⚠️ Selling Price is required. Please enter the property selling price."),
         realEstateFee: z.string().min(1, "⚠️ Commission amount is required. Please try again."),
-        loanAmount: z.string().min(1, "⚠️ Loan Amount is required. Please enter the loan amount."),
+        loanAmount: z.string().optional(),
         pricePerDecimal: z.string().optional(),
         landSizeDecimal: z.string().optional(),
         negotiatedPrice: z.string().optional(),
@@ -108,8 +108,8 @@ export const propertyRouter = createRouter({
       if (!input.realEstateFee || isNaN(parseFloat(input.realEstateFee))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Commission amount could not be calculated. Please try again." });
       }
-      if (!input.loanAmount || isNaN(parseFloat(input.loanAmount)) || parseFloat(input.loanAmount) < 0) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Loan Amount is required and must be a valid non-negative number." });
+      if (input.loanAmount !== undefined && input.loanAmount !== "" && (isNaN(parseFloat(input.loanAmount)) || parseFloat(input.loanAmount) < 0)) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Loan Amount must be a valid non-negative number." });
       }
 
       // Fetch property type to determine if Land
@@ -204,7 +204,7 @@ export const propertyRouter = createRouter({
           buyerAddress: input.buyerAddress || null,
           sellingPrice: sellingPriceNum,
           realEstateFee: realEstateFeeNum,
-          loanAmount: parseFloat(input.loanAmount).toFixed(2),
+          loanAmount: input.loanAmount ? parseFloat(input.loanAmount).toFixed(2) : null,
           pricePerDecimal,
           landSizeDecimal,
           negotiatedPrice,

@@ -663,15 +663,17 @@ export default function PropertyWizard() {
 
                   {/* Loan Amount for Land properties */}
                   <div className="space-y-2">
-                    <Label>Loan Amount (Nu.) *</Label>
+                    <Label className="flex items-center gap-2">
+                      <span>Loan Amount (Nu.)</span>
+                      <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                    </Label>
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
                       value={step1Data.loanAmount}
                       onChange={(e) => setStep1Data({ ...step1Data, loanAmount: e.target.value })}
-                      placeholder="Enter loan amount"
-                      required
+                      placeholder="Enter loan amount if applicable"
                     />
                   </div>
 
@@ -810,15 +812,17 @@ export default function PropertyWizard() {
                   </div>
                   {/* Loan Amount for non-Land properties */}
                   <div className="space-y-2">
-                    <Label>Loan Amount (Nu.) *</Label>
+                    <Label className="flex items-center gap-2">
+                      <span>Loan Amount (Nu.)</span>
+                      <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
+                    </Label>
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
                       value={step1Data.loanAmount}
                       onChange={(e) => setStep1Data({ ...step1Data, loanAmount: e.target.value })}
-                      placeholder="Enter loan amount"
-                      required
+                      placeholder="Enter loan amount if applicable"
                     />
                   </div>
                 </>
