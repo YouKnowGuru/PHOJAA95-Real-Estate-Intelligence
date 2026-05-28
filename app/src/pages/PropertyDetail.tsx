@@ -816,6 +816,16 @@ export default function PropertyDetail() {
                 </p>
               </div>
             </div>
+            {/* Loan Amount — show for ALL property types */}
+            {property.loanAmount && (
+              <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-800/40">
+                <p className="text-[10px] font-bold text-blue-700 dark:text-blue-400 uppercase tracking-wider mb-1">Loan Amount</p>
+                <p className="text-sm font-bold text-blue-700 dark:text-blue-400">
+                  Nu. {parseFloat(property.loanAmount).toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+
             {/* Land Size — show for ALL property types when available */}
             {property.landSizeDecimal && property.propertyTypeName !== "Land" && (
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">

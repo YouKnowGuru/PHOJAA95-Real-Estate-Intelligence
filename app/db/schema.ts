@@ -93,6 +93,7 @@ export const properties = mysqlTable("properties", {
   negotiatedPrice: decimal("negotiated_price", { precision: 15, scale: 2 }),
   discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }),
   finalSellingPrice: decimal("final_selling_price", { precision: 15, scale: 2 }),
+  loanAmount: decimal("loan_amount", { precision: 15, scale: 2 }).notNull(),
   priceOverrideBy: bigint("price_override_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
   priceOverrideAt: timestamp("price_override_at"),
   priceOverrideReason: text("price_override_reason"),

@@ -79,6 +79,7 @@ export default function PropertyWizard() {
     ownerAddress: "",
     sellingPrice: "",
     realEstateFee: "",
+    loanAmount: "",
     pricePerDecimal: "",
     landSizeDecimal: "",
     negotiatedPrice: "",
@@ -157,6 +158,7 @@ export default function PropertyWizard() {
         ownerAddress: p.ownerAddress || "",
         sellingPrice: p.sellingPrice?.toString() || "",
         realEstateFee: p.realEstateFee?.toString() || "",
+        loanAmount: p.loanAmount?.toString() || "",
         pricePerDecimal: p.pricePerDecimal?.toString() || "",
         landSizeDecimal: p.landSizeDecimal?.toString() || "",
         negotiatedPrice: p.negotiatedPrice?.toString() || "",
@@ -378,6 +380,7 @@ export default function PropertyWizard() {
       ownerAddress: step1Data.ownerAddress,
       sellingPrice: isPriceOverride ? step1Data.sellingPrice : (isLand ? pricing.sellingPrice : step1Data.sellingPrice),
       realEstateFee: isLand ? pricing.realEstateFee : (parseFloat(step1Data.sellingPrice || "0") * 0.03).toFixed(2),
+      loanAmount: step1Data.loanAmount || undefined,
       pricePerDecimal: isLand ? (step1Data.pricePerDecimal || undefined) : undefined,
       landSizeDecimal: step1Data.landSizeDecimal || undefined,
       negotiatedPrice: isLand ? (step1Data.negotiatedPrice || undefined) : undefined,
@@ -658,6 +661,20 @@ export default function PropertyWizard() {
                     />
                   </div>
 
+                  {/* Loan Amount for Land properties */}
+                  <div className="space-y-2">
+                    <Label>Loan Amount (Nu.) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={step1Data.loanAmount}
+                      onChange={(e) => setStep1Data({ ...step1Data, loanAmount: e.target.value })}
+                      placeholder="Enter loan amount"
+                      required
+                    />
+                  </div>
+
                   {/* ── ADMIN OVERRIDE ───────────────────────────────────── */}
                   {isAdmin && (
                     <div className="space-y-3 sm:col-span-2 p-4 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/10">
@@ -789,6 +806,19 @@ export default function PropertyWizard() {
                       value={step1Data.landSizeDecimal}
                       onChange={(e) => setStep1Data({ ...step1Data, landSizeDecimal: e.target.value })}
                       placeholder="e.g. 5.5"
+                    />
+                  </div>
+                  {/* Loan Amount for non-Land properties */}
+                  <div className="space-y-2">
+                    <Label>Loan Amount (Nu.) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={step1Data.loanAmount}
+                      onChange={(e) => setStep1Data({ ...step1Data, loanAmount: e.target.value })}
+                      placeholder="Enter loan amount"
+                      required
                     />
                   </div>
                 </>

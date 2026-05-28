@@ -58,6 +58,7 @@ export const propertyRouter = createRouter({
         buyerAddress: z.string().optional(),
         sellingPrice: z.string().min(1, "⚠️ Selling Price is required. Please enter the property selling price."),
         realEstateFee: z.string().min(1, "⚠️ Commission amount is required. Please try again."),
+        loanAmount: z.string().min(1, "⚠️ Loan Amount is required. Please enter the loan amount."),
         pricePerDecimal: z.string().optional(),
         landSizeDecimal: z.string().optional(),
         negotiatedPrice: z.string().optional(),
@@ -106,6 +107,9 @@ export const propertyRouter = createRouter({
       }
       if (!input.realEstateFee || isNaN(parseFloat(input.realEstateFee))) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Commission amount could not be calculated. Please try again." });
+      }
+      if (!input.loanAmount || isNaN(parseFloat(input.loanAmount)) || parseFloat(input.loanAmount) < 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Loan Amount is required and must be a valid non-negative number." });
       }
 
       // Fetch property type to determine if Land
@@ -200,6 +204,7 @@ export const propertyRouter = createRouter({
           buyerAddress: input.buyerAddress || null,
           sellingPrice: sellingPriceNum,
           realEstateFee: realEstateFeeNum,
+          loanAmount: parseFloat(input.loanAmount).toFixed(2),
           pricePerDecimal,
           landSizeDecimal,
           negotiatedPrice,
@@ -440,6 +445,7 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          loanAmount: properties.loanAmount,
           pricePerDecimal: properties.pricePerDecimal,
           landSizeDecimal: properties.landSizeDecimal,
           negotiatedPrice: properties.negotiatedPrice,
@@ -509,6 +515,7 @@ export const propertyRouter = createRouter({
           buyerAddress: properties.buyerAddress,
           sellingPrice: properties.sellingPrice,
           realEstateFee: properties.realEstateFee,
+          loanAmount: properties.loanAmount,
           pricePerDecimal: properties.pricePerDecimal,
           landSizeDecimal: properties.landSizeDecimal,
           negotiatedPrice: properties.negotiatedPrice,
@@ -573,6 +580,7 @@ export const propertyRouter = createRouter({
         buyerAddress: z.string().optional(),
         sellingPrice: z.string().optional(),
         realEstateFee: z.string().optional(),
+        loanAmount: z.string().optional(),
         pricePerDecimal: z.string().optional(),
         landSizeDecimal: z.string().optional(),
         negotiatedPrice: z.string().optional(),
@@ -689,6 +697,9 @@ export const propertyRouter = createRouter({
       // Update data with computed values
       data.sellingPrice = sellingPriceNum;
       data.realEstateFee = realEstateFeeNum;
+      data.loanAmount = data.loanAmount !== undefined 
+        ? parseFloat(data.loanAmount).toFixed(2) 
+        : undefined;
       data.pricePerDecimal = newPricePerDecimal;
       data.landSizeDecimal = newLandSizeDecimal;
       data.negotiatedPrice = newNegotiatedPrice;
