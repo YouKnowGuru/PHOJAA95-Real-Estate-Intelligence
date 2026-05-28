@@ -65,8 +65,8 @@ export const propertyRouter = createRouter({
         discountAmount: z.string().optional(),
         finalSellingPrice: z.string().optional(),
         priceOverrideReason: z.string().optional(),
-        thramNumber: z.string().optional(),
-        plotNumber: z.string().optional(),
+        thramNumber: z.string().min(1, "⚠️ Thram Number is required. Please enter the thram number."),
+        plotNumber: z.string().min(1, "⚠️ Plot Number is required. Please enter the plot number."),
         noObjectionLetter: z.string().optional(),
         images: z.array(z.object({
           url: z.string(),
@@ -110,6 +110,12 @@ export const propertyRouter = createRouter({
       }
       if (input.loanAmount !== undefined && input.loanAmount !== "" && (isNaN(parseFloat(input.loanAmount)) || parseFloat(input.loanAmount) < 0)) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Loan Amount must be a valid non-negative number." });
+      }
+      if (!input.thramNumber || input.thramNumber.trim().length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Thram Number is required. Please enter the thram number." });
+      }
+      if (!input.plotNumber || input.plotNumber.trim().length === 0) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Plot Number is required. Please enter the plot number." });
       }
 
       // Fetch property type to determine if Land

@@ -990,25 +990,21 @@ export default function PropertyWizard() {
                 </div>
                 {/* ── THRAM & PLOT NUMBER (All property types) ───────────── */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span>Thram Number</span>
-                    <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                  </Label>
+                  <Label>Thram Number *</Label>
                   <Input
                     value={step1Data.thramNumber}
                     onChange={(e) => setStep1Data({ ...step1Data, thramNumber: e.target.value })}
                     placeholder="e.g. TH-2024-001"
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <span>Plot Number</span>
-                    <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                  </Label>
+                  <Label>Plot Number *</Label>
                   <Input
                     value={step1Data.plotNumber}
                     onChange={(e) => setStep1Data({ ...step1Data, plotNumber: e.target.value })}
                     placeholder="e.g. P-45-A"
+                    required
                   />
                 </div>
               </div>
