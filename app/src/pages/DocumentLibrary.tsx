@@ -240,7 +240,8 @@ export default function DocumentLibrary() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((doc, index) => {
             const isPdf = doc.mimeType === "application/pdf" || doc.fileName.endsWith(".pdf");
-            const FileIcon = isPdf ? FileText : ImageIcon;
+            const isWord = doc.mimeType === "application/msword" || doc.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || doc.fileName.endsWith(".doc") || doc.fileName.endsWith(".docx");
+            const FileIcon = isPdf ? FileText : isWord ? FileText : ImageIcon;
             return (
               <motion.div
                 key={doc.id}
@@ -334,13 +335,12 @@ export default function DocumentLibrary() {
             <div className="space-y-2">
               <Label>Document file *</Label>
               <FileUploader
-                accept=".pdf,image/*"
                 maxSize={10 * 1024 * 1024}
                 folder="library"
                 value={form.fileUrl}
                 onChange={handleUpload}
                 label="Choose file"
-                hint="PDF, PNG, or JPEG up to 10MB"
+                hint="PDF, Word, PNG, or JPEG up to 10MB"
               />
             </div>
             <div className="space-y-2">
