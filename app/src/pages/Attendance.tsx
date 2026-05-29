@@ -450,6 +450,9 @@ export default function AttendancePage() {
                       {isAdmin && "userName" in record && record.userName && (
                         <p className="text-xs text-muted-foreground">{String(record.userName)}</p>
                       )}
+                      {record.notes && (
+                        <p className="text-xs text-amber-600 italic">{String(record.notes)}</p>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 sm:gap-4 ml-11 sm:ml-0">
