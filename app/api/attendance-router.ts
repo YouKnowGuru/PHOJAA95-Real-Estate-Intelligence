@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -10,22 +10,6 @@ import { attendance, localUsers } from "@db/schema";
  */
 function getBhutanDateStr(date: Date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
-}
-
-/**
- * Get month boundaries in Bhutan timezone
- */
-function getMonthBoundaries(monthStr: string): { startDate: string; endDate: string } {
-  const [year, month] = monthStr.split("-");
-  // Use Bhutan timezone for month boundary calculation
-  const start = new Date(`${year}-${month}-01T00:00:00+06:00`);
-  const end = new Date(start.getTime());
-  end.setMonth(end.getMonth() + 1);
-  end.setDate(0); // Last day of month
-  return {
-    startDate: getBhutanDateStr(start),
-    endDate: getBhutanDateStr(end),
-  };
 }
 
 export const attendanceRouter = createRouter({
@@ -123,8 +107,7 @@ export const attendanceRouter = createRouter({
         .where(
           and(
             eq(attendance.userId, userId),
-            gte(attendance.date, startDate),
-            lte(attendance.date, endDate)
+            sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`
           )
         )
         .orderBy(desc(attendance.date))
@@ -141,8 +124,7 @@ export const attendanceRouter = createRouter({
         .where(
           and(
             eq(attendance.userId, userId),
-            gte(attendance.date, startDate),
-            lte(attendance.date, endDate)
+            sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`
           )
         );
 
@@ -168,9 +150,7 @@ export const attendanceRouter = createRouter({
       if (input.status) conditions.push(eq(attendance.status, input.status));
       if (input.userName) conditions.push(sql`${localUsers.fullName} LIKE ${`%${input.userName}%`}`);
       if (input.month) {
-        const { startDate, endDate } = getMonthBoundaries(input.month);
-        conditions.push(gte(attendance.date, startDate));
-        conditions.push(lte(attendance.date, endDate));
+        conditions.push(sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`);
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -262,10 +242,7 @@ export const attendanceRouter = createRouter({
         .from(attendance)
         .leftJoin(localUsers, eq(attendance.userId, localUsers.id))
         .where(
-          and(
-            gte(attendance.date, startDate),
-            lte(attendance.date, endDate)
-          )
+          sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`
         )
         .groupBy(attendance.userId, localUsers.fullName);
 
@@ -286,10 +263,7 @@ export const attendanceRouter = createRouter({
       })
         .from(attendance)
         .where(
-          and(
-            gte(attendance.date, startDate),
-            lte(attendance.date, endDate)
-          )
+          sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`
         );
 
       return statsResult[0] || { present: 0, late: 0, absent: 0, halfDay: 0 };
