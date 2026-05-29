@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import DOMPurify from "dompurify";
+
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,46 +43,165 @@ interface Conversation {
     updatedAt: string;
 }
 
-// ─── Simple Markdown Renderer ───────────────────────────────────────
+// ─── Safe Markdown Renderer (no dangerouslySetInnerHTML) ────────────
 
-function SimpleMarkdown({ content }: { content: string }) {
-    let processed = content
-        // Bold
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        // Italic
-        .replace(/\*(.+?)\*/g, "<em>$1</em>")
-        // Inline code
-        .replace(/`([^`]+)`/g, "<code class='bg-muted px-1 py-0.5 rounded text-sm font-mono'>$1</code>")
-        // Code blocks
-        .replace(/```(\w*)\n([\s\S]*?)```/g, (_, _lang, code) => {
-            return `<pre class='bg-muted p-3 rounded-lg my-2 overflow-x-auto text-sm font-mono'><code>${code.trim()}</code></pre>`;
-        })
-        // Headers
-        .replace(/^### (.+)$/gm, "<h3 class='text-base font-semibold mt-3 mb-1'>$1</h3>")
-        .replace(/^## (.+)$/gm, "<h2 class='text-lg font-semibold mt-3 mb-1'>$1</h2>")
-        .replace(/^# (.+)$/gm, "<h1 class='text-xl font-bold mt-3 mb-1'>$1</h1>")
-        // Unordered lists
-        .replace(/^- (.+)$/gm, "<li class='ml-4 list-disc'>$1</li>")
-        // Ordered lists
-        .replace(/^\d+\. (.+)$/gm, "<li class='ml-4 list-decimal'>$1</li>")
-        // Line breaks
-        .replace(/\n\n/g, "<br/><br/>")
-        .replace(/\n/g, "<br/>");
+function SafeMarkdown({ content }: { content: string }) {
+    // Split content by code blocks first
+    const segments: Array<{ type: "text" | "code"; content: string; lang?: string }> = [];
+    const codeBlockRegex = /```(\w*)\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
 
-    // Wrap consecutive <li> elements in <ul>
-    processed = processed.replace(/(<li[\s\S]*?<\/li>\s*)+/g, (match) => `<ul class="list-disc pl-4 my-1">${match}</ul>`);
-
-    const sanitizedHtml = DOMPurify.sanitize(processed, {
-        ALLOWED_TAGS: ["b", "i", "em", "strong", "code", "pre", "h1", "h2", "h3", "li", "ul", "ol", "br", "p", "div", "span"],
-        ALLOWED_ATTR: ["class"],
-    });
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+        if (match.index > lastIndex) {
+            segments.push({ type: "text", content: content.slice(lastIndex, match.index) });
+        }
+        segments.push({ type: "code", content: match[2].trim(), lang: match[1] || undefined });
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < content.length) {
+        segments.push({ type: "text", content: content.slice(lastIndex) });
+    }
 
     return (
-        <div
-            className="prose prose-sm dark:prose-invert max-w-none break-words [&_strong]:font-semibold [&_em]:italic [&_code]:break-all"
-            dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
+        <div className="prose prose-sm dark:prose-invert max-w-none break-words">
+            {segments.map((seg, i) =>
+                seg.type === "code" ? (
+                    <pre
+                        key={i}
+                        className="bg-muted p-3 rounded-lg my-2 overflow-x-auto text-sm font-mono"
+                    >
+                        <code>{seg.content}</code>
+                    </pre>
+                ) : (
+                    <MarkdownText key={i} content={seg.content} />
+                )
+            )}
+        </div>
     );
+}
+
+function MarkdownText({ content }: { content: string }) {
+    // Split by lines to handle block-level elements
+    const lines = content.split("\n");
+    const elements: React.ReactNode[] = [];
+    let listItems: string[] = [];
+    let listOrdered = false;
+
+    const flushList = () => {
+        if (listItems.length === 0) return;
+        const ListTag = listOrdered ? "ol" : "ul";
+        elements.push(
+            <ListTag key={`list-${elements.length}`} className={listOrdered ? "list-decimal pl-4 my-1" : "list-disc pl-4 my-1"}>
+                {listItems.map((item, i) => (
+                    <li key={i}>{renderInlineMarkdown(item)}</li>
+                ))}
+            </ListTag>
+        );
+        listItems = [];
+        listOrdered = false;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Headers
+        if (trimmed.startsWith("# ")) {
+            flushList();
+            elements.push(<h1 key={i} className="text-xl font-bold mt-3 mb-1">{renderInlineMarkdown(trimmed.slice(2))}</h1>);
+            continue;
+        }
+        if (trimmed.startsWith("## ")) {
+            flushList();
+            elements.push(<h2 key={i} className="text-lg font-semibold mt-3 mb-1">{renderInlineMarkdown(trimmed.slice(3))}</h2>);
+            continue;
+        }
+        if (trimmed.startsWith("### ")) {
+            flushList();
+            elements.push(<h3 key={i} className="text-base font-semibold mt-3 mb-1">{renderInlineMarkdown(trimmed.slice(4))}</h3>);
+            continue;
+        }
+
+        // Unordered list
+        if (trimmed.startsWith("- ")) {
+            listOrdered = false;
+            listItems.push(trimmed.slice(2));
+            continue;
+        }
+
+        // Ordered list
+        if (/^\d+\.\s/.test(trimmed)) {
+            listOrdered = true;
+            listItems.push(trimmed.replace(/^\d+\.\s/, ""));
+            continue;
+        }
+
+        // Empty line
+        if (trimmed === "") {
+            flushList();
+            continue;
+        }
+
+        // Regular paragraph
+        flushList();
+        elements.push(<p key={i} className="my-1">{renderInlineMarkdown(trimmed)}</p>);
+    }
+
+    flushList();
+    return <>{elements}</>;
+}
+
+function renderInlineMarkdown(text: string): React.ReactNode {
+    // Parse inline markdown: bold, italic, inline code
+    const parts: React.ReactNode[] = [];
+    let remaining = text;
+    let key = 0;
+
+    const patterns = [
+        { regex: /\*\*(.+?)\*\*/, type: "bold" as const },
+        { regex: /\*(.+?)\*/, type: "italic" as const },
+        { regex: /`([^`]+)`/, type: "code" as const },
+    ];
+
+    while (remaining.length > 0) {
+        let earliestMatch: { index: number; match: RegExpMatchArray; type: string } | null = null;
+
+        for (const p of patterns) {
+            const m = remaining.match(p.regex);
+            if (m && m.index !== undefined) {
+                if (!earliestMatch || m.index < earliestMatch.index) {
+                    earliestMatch = { index: m.index, match: m, type: p.type };
+                }
+            }
+        }
+
+        if (!earliestMatch) {
+            parts.push(<span key={key++}>{remaining}</span>);
+            break;
+        }
+
+        if (earliestMatch.index > 0) {
+            parts.push(<span key={key++}>{remaining.slice(0, earliestMatch.index)}</span>);
+        }
+
+        const innerText = earliestMatch.match[1];
+        if (earliestMatch.type === "bold") {
+            parts.push(<strong key={key++} className="font-semibold">{innerText}</strong>);
+        } else if (earliestMatch.type === "italic") {
+            parts.push(<em key={key++} className="italic">{innerText}</em>);
+        } else if (earliestMatch.type === "code") {
+            parts.push(
+                <code key={key++} className="bg-muted px-1 py-0.5 rounded text-sm font-mono break-all">
+                    {innerText}
+                </code>
+            );
+        }
+
+        remaining = remaining.slice(earliestMatch.index + earliestMatch.match[0].length);
+    }
+
+    return parts.length === 1 ? parts[0] : <>{parts}</>;
 }
 
 // ─── Message Bubble ─────────────────────────────────────────────────
@@ -126,7 +245,7 @@ function MessageBubble({ message, isStreaming }: { message: Message; isStreaming
                         <motion.span animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.45 }} className="hidden sm:inline-flex h-2 w-2 rounded-full bg-cyan-500" />
                     </div>
                 ) : (
-                    <SimpleMarkdown content={message.content} />
+                    <SafeMarkdown content={message.content} />
                 )}
             </div>
         </motion.div>

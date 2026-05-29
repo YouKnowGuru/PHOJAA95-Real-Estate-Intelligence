@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import { Button } from "./ui/button";
 
 interface Props {
   children: ReactNode;
@@ -11,7 +12,11 @@ interface State {
   error?: Error;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+/**
+ * Route-level Error Boundary for lazy-loaded components.
+ * Catches rendering errors and prevents the entire app from crashing.
+ */
+export class RouteErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false };
@@ -21,55 +26,49 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidMount() {
-    // Clear reload flag after successful mount to allow future reload attempts if needed
-    sessionStorage.removeItem("chunk-error-reload");
-  }
-
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-
-    // Check if it's a chunk loading/dynamic import error
-    const errorMessage = error?.message || "";
-    const isChunkLoadError =
-      errorMessage.includes("Failed to fetch dynamically imported module") ||
-      errorMessage.includes("Importing a module script failed") ||
-      errorMessage.includes("error loading dynamically imported module") ||
-      errorMessage.includes("chunk") ||
-      errorMessage.includes("dynamic import");
-
-    if (isChunkLoadError) {
-      console.warn("Chunk load error detected in ErrorBoundary, attempting to reload...");
-      const lastReload = sessionStorage.getItem("chunk-error-reload");
-      const now = Date.now();
-      // Only reload if we haven't reloaded in the last 10 seconds to prevent infinite reload loops
-      if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
-        sessionStorage.setItem("chunk-error-reload", now.toString());
-        window.location.reload();
-      }
-    }
+    // Log to console in development, send to error tracking in production
+    console.error("Route Error Boundary caught an error:", error, errorInfo);
   }
+
+  handleRetry = () => {
+    this.setState({ hasError: false, error: undefined });
+  };
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
+
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 text-center">
-          <h1 className="mb-2 text-3xl font-bold text-destructive">Something went wrong</h1>
-          <p className="mb-6 max-w-md text-muted-foreground">
-            An unexpected error occurred. Please try refreshing the page.
-          </p>
-          {this.state.error && (
-            <pre className="mb-6 max-w-lg overflow-auto rounded-md bg-muted p-4 text-left text-xs text-muted-foreground">
-              {this.state.error.message}
-            </pre>
-          )}
-          <Button onClick={() => window.location.reload()}>Refresh Page</Button>
+        <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 p-4">
+          <div className="max-w-md w-full text-center space-y-6">
+            <div className="flex justify-center">
+              <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
+                <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold text-foreground">Something went wrong</h2>
+              <p className="text-sm text-muted-foreground">
+                An error occurred while loading this page. Please try again.
+              </p>
+              {process.env.NODE_ENV === "development" && this.state.error && (
+                <pre className="text-left text-xs bg-muted p-3 rounded-lg overflow-auto max-h-40">
+                  {this.state.error.message}
+                </pre>
+              )}
+            </div>
+            <Button onClick={this.handleRetry} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Try Again
+            </Button>
+          </div>
         </div>
       );
     }
+
     return this.props.children;
   }
 }

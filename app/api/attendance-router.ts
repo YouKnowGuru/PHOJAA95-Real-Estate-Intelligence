@@ -30,7 +30,9 @@ export const attendanceRouter = createRouter({
       const status: "present" | "late" | "absent" | "half_day" = bhutanHour > 9 ? "late" : "present";
 
       return await db.transaction(async (tx) => {
-        // Use direct date string comparison instead of DATE() function to avoid timezone issues
+        // Security: Use SELECT FOR UPDATE to prevent race conditions (TOCTOU).
+        // This locks the rows for this user+date combination during the transaction,
+        // preventing duplicate check-ins from concurrent requests.
         const existing = await tx
           .select()
           .from(attendance)
@@ -40,6 +42,7 @@ export const attendanceRouter = createRouter({
               eq(attendance.date, localDateStr)
             )
           )
+          .for("update")
           .limit(1);
 
         if (existing.length > 0) {
@@ -67,7 +70,7 @@ export const attendanceRouter = createRouter({
     const localDateStr = getBhutanDateStr(now);
 
     return await db.transaction(async (tx) => {
-      // Use direct date string comparison
+      // Security: Use SELECT FOR UPDATE to prevent race conditions on checkout
       const existing = await tx
         .select()
         .from(attendance)
@@ -77,6 +80,7 @@ export const attendanceRouter = createRouter({
             eq(attendance.date, localDateStr)
           )
         )
+        .for("update")
         .limit(1);
 
       if (existing.length === 0) {

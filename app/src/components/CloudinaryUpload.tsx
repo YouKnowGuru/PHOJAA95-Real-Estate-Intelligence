@@ -41,8 +41,15 @@ export function CloudinaryUpload({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "demo"; // Fallback to demo for testing
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "phojaa95_preset";
+  // Security: Do NOT use fallback values for Cloudinary credentials in production.
+  // These must be set via environment variables. Using defaults exposes uploads
+  // to unauthorized access or demo accounts.
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+  if (!cloudName || !uploadPreset) {
+    console.error("Cloudinary configuration missing. Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET in your .env file.");
+  }
 
   const handleUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -63,7 +70,7 @@ export function CloudinaryUpload({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        
+
         const formData = new FormData();
         formData.append("file", file);
         formData.append("upload_preset", uploadPreset);
@@ -108,14 +115,14 @@ export function CloudinaryUpload({
   return (
     <div className="space-y-4">
       {label && <Label className="text-sm font-medium">{label}</Label>}
-      
+
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {/* Existing Images */}
         {value.map((img, index) => (
-          <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
-            <img 
-              src={fixCloudinaryUrl(img.url)} 
-              alt={`Property ${index}`} 
+          <div key={img.publicId || img.url} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
+            <img
+              src={fixCloudinaryUrl(img.url)}
+              alt={`Property ${index}`}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

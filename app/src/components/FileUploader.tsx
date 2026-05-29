@@ -8,6 +8,36 @@ import {
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 
+/** Validate URL is safe (http/https only) before rendering as link */
+function isSafeUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url, window.location.href);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function SafeFileLink({ url }: { url: string }) {
+  if (!isSafeUrl(url)) {
+    return (
+      <span className="text-sm font-medium text-destructive truncate block">
+        Invalid file URL
+      </span>
+    );
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-sm font-medium text-primary hover:underline truncate block"
+    >
+      View Uploaded File
+    </a>
+  );
+}
+
 interface FileUploaderProps {
   accept?: string;
   maxSize?: number;
@@ -76,8 +106,6 @@ export function FileUploader({
 
         const result = await response.json();
         
-        console.log("Upload response:", result);
-        
         // Handle batch response format
         let url: string | null = null;
         let uploadMeta: { key: string; fileName: string; mimeType: string; fileSize: number } | undefined;
@@ -103,7 +131,6 @@ export function FileUploader({
         
         if (Array.isArray(result)) {
           const firstResult = result[0];
-          console.log("First result:", firstResult);
           
           if (firstResult?.result?.data?.json) {
             const data = firstResult.result.data.json;
@@ -128,7 +155,6 @@ export function FileUploader({
           setProgress(100);
           onChange?.(url, uploadMeta);
         } else {
-          console.error("Upload full response:", JSON.stringify(result));
           throw new Error(errorMsg);
         }
       } catch (err) {
@@ -151,14 +177,7 @@ export function FileUploader({
             <FileText className="h-8 w-8 text-green-500" />
           )}
           <div className="flex-1 min-w-0">
-            <a
-              href={value}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-medium text-primary hover:underline truncate block"
-            >
-              View Uploaded File
-            </a>
+            <SafeFileLink url={value} />
             <p className="text-xs text-muted-foreground">Click to open in new tab</p>
           </div>
           <Button

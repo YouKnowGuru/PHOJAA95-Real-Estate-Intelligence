@@ -64,16 +64,16 @@ export const propertyRouter = createRouter({
         negotiatedPrice: z.string().optional(),
         discountAmount: z.string().optional(),
         finalSellingPrice: z.string().optional(),
-        priceOverrideReason: z.string().optional(),
+        priceOverrideReason: z.string().max(500).optional(),
         thramNumber: z.string().min(1, "⚠️ Thram Number is required. Please enter the thram number."),
         plotNumber: z.string().min(1, "⚠️ Plot Number is required. Please enter the plot number."),
         yearOfConstruction: z.string().optional(),
         noObjectionLetter: z.string().optional(),
         images: z.array(z.object({
-          url: z.string(),
+          url: z.string().url().refine((u) => u.startsWith("https://"), { message: "Image URL must use HTTPS" }),
           publicId: z.string().optional()
         })).optional(),
-        features: z.record(z.string(), z.any()).optional(),
+        features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -493,8 +493,19 @@ export const propertyRouter = createRouter({
         ? await db.select().from(propertyImages).where(inArray(propertyImages.propertyId, propertyIds))
         : [];
 
+      // Security: Mask sensitive PII fields for staff users in list view
+      const isAdmin = ctx.unifiedUser!.role === "admin";
       const resultsWithImages = results.map(p => ({
         ...p,
+        // Mask sensitive fields for non-admin staff
+        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
+        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
+        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
+        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
+        buyerAddress: isAdmin ? p.buyerAddress : null,
+        sellingPrice: isAdmin ? p.sellingPrice : null,
+        realEstateFee: isAdmin ? p.realEstateFee : null,
+        loanAmount: isAdmin ? p.loanAmount : null,
         images: allImages.filter(img => img.propertyId === p.id)
       }));
 
@@ -568,7 +579,22 @@ export const propertyRouter = createRouter({
         .from(propertyImages)
         .where(eq(propertyImages.propertyId, input.id));
 
-      return { ...property[0], images };
+      // Security: Mask sensitive PII fields for staff users in detail view
+      const isAdmin = ctx.unifiedUser!.role === "admin";
+      const p = property[0];
+      return {
+        ...p,
+        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
+        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
+        ownerAddress: isAdmin ? p.ownerAddress : null,
+        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
+        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
+        buyerAddress: isAdmin ? p.buyerAddress : null,
+        sellingPrice: isAdmin ? p.sellingPrice : null,
+        realEstateFee: isAdmin ? p.realEstateFee : null,
+        loanAmount: isAdmin ? p.loanAmount : null,
+        images,
+      };
     }),
 
   update: staffQuery
@@ -596,7 +622,7 @@ export const propertyRouter = createRouter({
         negotiatedPrice: z.string().optional(),
         discountAmount: z.string().optional(),
         finalSellingPrice: z.string().optional(),
-        priceOverrideReason: z.string().optional(),
+        priceOverrideReason: z.string().max(500).optional(),
         noObjectionLetter: z.string().optional(),
         adminNotes: z.string().optional(),
         rejectionComments: z.string().optional(),
@@ -604,10 +630,10 @@ export const propertyRouter = createRouter({
         plotNumber: z.string().optional(),
         yearOfConstruction: z.string().optional(),
         images: z.array(z.object({
-          url: z.string(),
+          url: z.string().url().refine((u) => u.startsWith("https://"), { message: "Image URL must use HTTPS" }),
           publicId: z.string().optional()
         })).optional(),
-        features: z.record(z.string(), z.any()).optional(),
+        features: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -762,7 +788,7 @@ export const propertyRouter = createRouter({
           const oldPublicIds = oldImages.map(i => i.publicId).filter(Boolean) as string[];
           if (oldPublicIds.length > 0) {
             const { deleteCloudinaryImages } = await import("./services/cloudinary");
-            deleteCloudinaryImages(oldPublicIds).catch((err: unknown) =>
+            await deleteCloudinaryImages(oldPublicIds).catch((err: unknown) =>
               logger.error("Cloudinary cleanup error", { error: String(err) })
             );
           }
@@ -1041,6 +1067,11 @@ export const propertyRouter = createRouter({
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
 
+        // Authorization: staff can only modify their own properties
+        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
+        }
+
         const propertyType = await tx.select({ requiresBuildingDocs: propertyTypes.requiresBuildingDocs })
           .from(propertyTypes)
           .where(eq(propertyTypes.id, prop[0].propertyTypeId))
@@ -1177,6 +1208,11 @@ export const propertyRouter = createRouter({
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
 
+        // Authorization: staff can only modify their own properties
+        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
+        }
+
         // Step 3 must be approved before staff can work on Step 4
         if (!isAdmin && prop[0].currentStep < 4) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Step 3 (Property Documents) must be approved by admin before proceeding to Step 4. Please wait for admin approval." });
@@ -1294,6 +1330,11 @@ export const propertyRouter = createRouter({
       return await db.transaction(async (tx) => {
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
+
+        // Authorization: staff can only modify their own properties
+        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
+        }
 
         if (!input.finalDocument) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Final Lagthram Document is required. Please upload the document." });
@@ -2074,6 +2115,9 @@ export const propertyRouter = createRouter({
         search: z.string().optional(),
         status: z.string().optional(),
         format: z.enum(["csv", "json", "pdf"]).default("csv"),
+        // Security: Add pagination to prevent memory exhaustion on large datasets
+        page: z.number().min(1).default(1),
+        limit: z.number().min(1).max(1000).default(500),
       }).optional()
     )
     .query(async ({ input, ctx }) => {
@@ -2104,6 +2148,11 @@ export const propertyRouter = createRouter({
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+      // Security: Limit max records to prevent memory exhaustion DoS
+      const page = input?.page || 1;
+      const limit = Math.min(input?.limit || 500, 1000); // Hard cap at 1000
+      const offset = (page - 1) * limit;
+
       const results = await db
         .select({
           id: properties.id,
@@ -2129,7 +2178,9 @@ export const propertyRouter = createRouter({
         .leftJoin(propertyAgreements, eq(propertyAgreements.propertyId, properties.id))
         .leftJoin(propertyDocuments, eq(propertyDocuments.propertyId, properties.id))
         .where(whereClause)
-        .orderBy(desc(properties.createdAt));
+        .orderBy(desc(properties.createdAt))
+        .limit(limit)
+        .offset(offset);
 
       const formattedData = results.map((item) => {
         // Use finalSellingPrice when available, otherwise fall back to sellingPrice

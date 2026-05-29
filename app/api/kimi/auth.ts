@@ -92,8 +92,27 @@ export function createOAuthCallbackHandler() {
       return c.json({ error: "code and state are required" }, 400);
     }
 
+    // Security: Validate the state parameter before using it.
+    // State should be a valid base64 string and the decoded redirect URI
+    // must match an allowed origin to prevent open redirect attacks.
+    let redirectUri: string;
     try {
-      const redirectUri = atob(state);
+      redirectUri = atob(state);
+    } catch {
+      return c.json({ error: "Invalid state parameter" }, 400);
+    }
+
+    // Validate redirect URI is from an allowed origin
+    const allowedOrigins = env.isProduction
+      ? [env.appUrl]
+      : ["http://localhost:5173", "http://localhost:3000", env.appUrl];
+    const isAllowedOrigin = allowedOrigins.some(origin => redirectUri.startsWith(origin));
+    if (!isAllowedOrigin) {
+      logger.warn("OAuth callback with disallowed redirect URI", { redirectUri });
+      return c.json({ error: "Invalid redirect URI" }, 400);
+    }
+
+    try {
       const tokenResp = await exchangeAuthCode(code, redirectUri);
       const { userId } = await verifyAccessToken(tokenResp.access_token);
       const userProfile = await kimiUsers.getProfile(tokenResp.access_token);

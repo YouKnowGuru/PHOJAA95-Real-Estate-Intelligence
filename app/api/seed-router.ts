@@ -45,10 +45,13 @@ export const seedRouter = createRouter({
       }
 
       // ─── 2. LOCAL USERS (Admin + Staff) ──────────────────────────────
-      const adminPass = "Admin123";
-      const staffPass = "Staff123";
-      console.log(`Admin password: ${adminPass}`);
-      console.log(`Staff password: ${staffPass}`);
+      // Generate cryptographically secure random passwords for seed data
+      const adminPass = crypto.randomBytes(12).toString("hex");
+      const staffPass = crypto.randomBytes(12).toString("hex");
+      // eslint-disable-next-line no-console
+      console.error(`SEED: Admin password: ${adminPass}`);
+      // eslint-disable-next-line no-console
+      console.error(`SEED: Staff password: ${staffPass}`);
 
       const adminPassword = await bcrypt.hash(adminPass, 12);
       const staffPassword = await bcrypt.hash(staffPass, 12);

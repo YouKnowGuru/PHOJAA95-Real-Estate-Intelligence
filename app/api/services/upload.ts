@@ -98,9 +98,36 @@ export async function deleteFile(key: string): Promise<void> {
   }
 }
 
-export async function getSignedDownloadUrl(key: string, _expiresIn = 3600): Promise<string> {
+export async function getSignedDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
   const safeKey = sanitizePath(key);
-  return `/uploads/${safeKey}`;
+  // Generate a time-limited signed URL with HMAC signature
+  const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+  const signature = await generateSignature(safeKey, expiresAt);
+  return `/api/file/${safeKey}?signature=${signature}&expires=${expiresAt}`;
+}
+
+/** Generate HMAC-SHA256 signature for file access. */
+async function generateSignature(key: string, expiresAt: number): Promise<string> {
+  const { env } = await import("../lib/env");
+  const crypto = await import("crypto");
+  const hmac = crypto.createHmac("sha256", env.appSecret || "fallback-secret");
+  hmac.update(`${key}:${expiresAt}`);
+  return hmac.digest("hex");
+}
+
+/** Verify HMAC-SHA256 signature for file access. */
+export async function verifySignature(key: string, expiresAt: number, signature: string): Promise<boolean> {
+  const expected = await generateSignature(key, expiresAt);
+  // Constant-time comparison to prevent timing attacks
+  try {
+    const { timingSafeEqual } = await import("crypto");
+    const sigBuf = Buffer.from(signature, "hex");
+    const expBuf = Buffer.from(expected, "hex");
+    if (sigBuf.length !== expBuf.length) return false;
+    return timingSafeEqual(sigBuf, expBuf);
+  } catch {
+    return false;
+  }
 }
 
 export async function listFiles(prefix: string): Promise<string[]> {

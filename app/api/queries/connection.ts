@@ -23,6 +23,9 @@ export function getDb() {
       waitForConnections: true,
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
+      // Security: Add query timeout to prevent resource exhaustion from slow queries
+      acquireTimeout: 60000, // 60 seconds to acquire connection from pool
+      timeout: 30000, // 30 seconds per query
     });
     instance = drizzle(pool, {
       mode: "planetscale",

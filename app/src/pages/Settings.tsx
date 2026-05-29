@@ -15,7 +15,7 @@ import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, Apple
 import { cn } from "@/lib/utils";
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -25,7 +25,6 @@ export default function Settings() {
   const [siteLogo, setSiteLogo] = useState("");
   const [siteTagline, setSiteTagline] = useState("");
 
-  const { isAdmin } = useAuth();
   const utils = trpc.useUtils();
 
   const { data: brandingData } = trpc.settings.getPublicSettings.useQuery();

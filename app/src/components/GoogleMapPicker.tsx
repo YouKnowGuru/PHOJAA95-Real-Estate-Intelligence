@@ -502,13 +502,14 @@ export function GoogleMapPicker({
       <Input type="hidden" value={value?.lat || ""} name="latitude" />
       <Input type="hidden" value={value?.lng || ""} name="longitude" />
 
-      <style dangerouslySetInnerHTML={{ __html: `
+      {/* Leaflet custom styles — injected safely via template literal (no user input) */}
+      <style>{`
         .leaflet-container { font-family: inherit; }
         .leaflet-bar { border: none !important; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important; }
         .leaflet-bar a { background-color: rgba(255, 255, 255, 0.9) !important; color: #64748b !important; border: 1px solid #e2e8f0 !important; }
         .leaflet-bar a:hover { background-color: #ffffff !important; color: hsl(var(--primary)) !important; }
         .custom-pin-icon { background: none !important; border: none !important; }
-      `}} />
+      `}</style>
     </div>
   );
 }

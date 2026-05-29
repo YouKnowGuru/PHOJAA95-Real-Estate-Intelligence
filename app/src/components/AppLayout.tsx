@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components";
 import { ChatbotFAB } from "@/components/Chatbot";
@@ -345,6 +346,4 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function cn(...classes: (string | undefined | false)[]) {
-  return classes.filter(Boolean).join(" ");
-}
+// Note: Uses the imported `cn` from @/lib/utils instead of a local redefinition

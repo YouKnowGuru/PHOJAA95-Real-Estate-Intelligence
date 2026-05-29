@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { ElementType } from "react";
 import { trpc } from "@/lib/trpc";
+import type { RouterOutputs } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,8 @@ export default function PayrollPage() {
   const currentYear = new Date().getFullYear();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [showAdd, setShowAdd] = useState(false);
-  const [selectedPayslip, setSelectedPayslip] = useState<any>(null);
+  type PayrollItem = RouterOutputs["payroll"]["list"]["items"][number];
+  const [selectedPayslip, setSelectedPayslip] = useState<PayrollItem | null>(null);
   const [payrollForm, setPayrollForm] = useState({
     userId: "",
     month: currentMonth,
@@ -108,7 +109,7 @@ export default function PayrollPage() {
     return `${currentYear}-${String(m).padStart(2, "0")}`;
   });
 
-  const generatePayslipPDF = async (item: any) => {
+  const generatePayslipPDF = async (item: PayrollItem) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -374,7 +375,7 @@ export default function PayrollPage() {
                 </tr>
               </thead>
               <tbody>
-                {payrollItems.map((item: any) => (
+                {payrollItems.map((item) => (
                   <tr key={item.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-medium">{item.userName || "You"}</div>
@@ -481,7 +482,7 @@ export default function PayrollPage() {
               <Select value={payrollForm.userId} onValueChange={(v) => setPayrollForm({ ...payrollForm, userId: v })}>
                 <SelectTrigger className="rounded-xl border-border/40 bg-background/50"><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
-                  {staffList?.items.map((u: any) => (
+                  {staffList?.items.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>{u.fullName}</SelectItem>
                   ))}
                 </SelectContent>
@@ -507,7 +508,7 @@ export default function PayrollPage() {
                     type="number"
                     step="0.01"
                     value={payrollForm.pfPercentage || (() => {
-                      const staff = staffList?.items.find((u: any) => u.id.toString() === payrollForm.userId);
+                      const staff = staffList?.items.find((u) => u.id.toString() === payrollForm.userId);
                       return staff?.pfPercentage || "0";
                     })()}
                     onChange={(e) => setPayrollForm({ ...payrollForm, pfPercentage: e.target.value })}
@@ -516,7 +517,7 @@ export default function PayrollPage() {
                   <div className="flex items-center justify-center px-3 rounded-xl bg-muted/40 border border-border/40 min-w-0">
                     <span className="text-[10px] font-bold text-amber-600">
                       {(() => {
-                        const staff = staffList?.items.find((u: any) => u.id.toString() === payrollForm.userId);
+                        const staff = staffList?.items.find((u) => u.id.toString() === payrollForm.userId);
                         const pfPercent = payrollForm.pfPercentage ? parseFloat(payrollForm.pfPercentage) : (staff ? parseFloat(staff.pfPercentage || "0") : 0);
                         const base = parseFloat(payrollForm.baseSalary || "0");
                         return `Nu. ${(base * pfPercent / 100).toLocaleString()}`;

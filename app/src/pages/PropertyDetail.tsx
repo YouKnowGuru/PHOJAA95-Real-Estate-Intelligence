@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { WORKFLOW_STEPS } from "@/constants/workflow";
+import { SecureFileLink, SecureDocLink } from "@/components/SecureFileLink";
 
 const statusConfig: Record<string, { color: string; bg: string; icon: React.ElementType }> = {
   draft: { color: "text-slate-600", bg: "bg-slate-100", icon: FileText },
@@ -349,7 +350,7 @@ export default function PropertyDetail() {
           </div>
           <div className="grid grid-cols-2 gap-3 md:h-full">
             {data.images.slice(1, 5).map((img, idx) => (
-              <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-slate-50 dark:bg-slate-900 group">
+              <div key={img.url} className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-slate-50 dark:bg-slate-900 group">
                 {!thumbError[idx] ? (
                   <img
                     src={fixCloudinaryUrl(img.url)}
@@ -395,7 +396,7 @@ export default function PropertyDetail() {
           <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-yellow-400/10 to-red-700/20 blur-3xl rounded-full print:hidden" />
 
           {/* Fail-safe A4 Print - Maximum Compatibility Version */}
-          <style dangerouslySetInnerHTML={{ __html: `
+          <style>{`
             @media print {
               @page {
                 size: A4;
@@ -519,7 +520,7 @@ export default function PropertyDetail() {
               .blur-3xl { display: none !important; }
               .print\\:hidden { display: none !important; }
             }
-          `}} />
+          `}</style>
 
           <div className="flex justify-end mb-4 print:hidden">
             <Button
@@ -697,19 +698,19 @@ export default function PropertyDetail() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
                     className={`relative flex items-start gap-4 p-4 rounded-xl transition-all ${isCurrent
-                        ? "bg-primary/5 border border-primary/20 dark:bg-primary/10 dark:border-primary/30"
-                        : isCompleted
-                          ? "bg-slate-50/30 dark:bg-slate-800/30"
-                          : "opacity-50"
+                      ? "bg-primary/5 border border-primary/20 dark:bg-primary/10 dark:border-primary/30"
+                      : isCompleted
+                        ? "bg-slate-50/30 dark:bg-slate-800/30"
+                        : "opacity-50"
                       }`}
                   >
                     {/* Step Indicator */}
                     <div
                       className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${isCompleted
-                          ? "bg-primary text-white shadow-sm shadow-primary/20"
-                          : isCurrent
-                            ? "bg-primary/10 text-primary border-2 border-primary/50 dark:bg-primary/20 dark:text-primary-foreground"
-                            : "bg-slate-200 text-slate-500 dark:bg-slate-700"
+                        ? "bg-primary text-white shadow-sm shadow-primary/20"
+                        : isCurrent
+                          ? "bg-primary/10 text-primary border-2 border-primary/50 dark:bg-primary/20 dark:text-primary-foreground"
+                          : "bg-slate-200 text-slate-500 dark:bg-slate-700"
                         }`}
                     >
                       {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : step.id}
@@ -925,7 +926,7 @@ export default function PropertyDetail() {
                   <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Property Features</h4>
                   <div className="grid grid-cols-2 gap-4">
                     {validEntries.map(([key, value], idx) => (
-                      <DetailItem key={idx} icon={Building2} label={key} value={String(value ?? "")} color="text-primary" />
+                      <DetailItem key={key} icon={Building2} label={key} value={String(value ?? "")} color="text-primary" />
                     ))}
                   </div>
                 </div>
@@ -970,15 +971,10 @@ export default function PropertyDetail() {
             )}
             {property.noObjectionLetter && (
               <div className="pt-2">
-                <a
-                  href={property.noObjectionLetter}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 underline"
-                >
+                <SecureDocLink url={property.noObjectionLetter}>
                   <FileText className="h-4 w-4" />
                   View No Objection Letter
-                </a>
+                </SecureDocLink>
               </div>
             )}
           </CardContent>
@@ -1018,14 +1014,7 @@ export default function PropertyDetail() {
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                     <p className="text-xs text-muted-foreground">Agreement File</p>
                     {agreement.agreementFile ? (
-                      <a
-                        href={agreement.agreementFile}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1"
-                      >
-                        <FileText className="h-4 w-4" /> View File
-                      </a>
+                      <SecureFileLink url={agreement.agreementFile} label="View File" />
                     ) : (
                       <p className="text-sm font-medium text-amber-600">Pending</p>
                     )}
@@ -1033,14 +1022,7 @@ export default function PropertyDetail() {
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                     <p className="text-xs text-muted-foreground">Initial Payment (50%)</p>
                     {agreement.paymentScreenshot ? (
-                      <a
-                        href={agreement.paymentScreenshot}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1"
-                      >
-                        <Image className="h-4 w-4" /> View Image
-                      </a>
+                      <SecureFileLink url={agreement.paymentScreenshot} label="View Image" icon="image" />
                     ) : (
                       <p className="text-sm font-medium text-amber-600">Pending</p>
                     )}
@@ -1052,7 +1034,7 @@ export default function PropertyDetail() {
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                     <p className="text-xs text-muted-foreground">Status</p>
                     <p className={`text-sm font-medium ${agreement.approvalStatus === "approved" ? "text-emerald-600" :
-                        agreement.approvalStatus === "rejected" ? "text-red-600" : "text-amber-600"
+                      agreement.approvalStatus === "rejected" ? "text-red-600" : "text-amber-600"
                       }`}>
                       {agreement.approvalStatus}
                     </p>
@@ -1081,9 +1063,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Gewog Endorse Document</p>
                   {documents.gewogCertification ? (
-                    <a href={documents.gewogCertification} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                      <FileText className="h-4 w-4" /> View
-                    </a>
+                    <SecureFileLink url={documents.gewogCertification} label="View" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
                   )}
@@ -1094,9 +1074,7 @@ export default function PropertyDetail() {
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">Internal Agreement</p>
                       {documents.internalAgreement ? (
-                        <a href={documents.internalAgreement} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                          <FileText className="h-4 w-4" /> View
-                        </a>
+                        <SecureFileLink url={documents.internalAgreement} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
                       )}
@@ -1104,9 +1082,7 @@ export default function PropertyDetail() {
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">Occupancy Certificate</p>
                       {documents.occupancyCertificate ? (
-                        <a href={documents.occupancyCertificate} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                          <FileText className="h-4 w-4" /> View
-                        </a>
+                        <SecureFileLink url={documents.occupancyCertificate} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
                       )}
@@ -1114,9 +1090,7 @@ export default function PropertyDetail() {
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">PLR Verification</p>
                       {documents.plrVerification ? (
-                        <a href={documents.plrVerification} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                          <FileText className="h-4 w-4" /> View
-                        </a>
+                        <SecureFileLink url={documents.plrVerification} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
                       )}
@@ -1127,9 +1101,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Remaining Payment</p>
                   {documents.remainingPaymentScreenshot ? (
-                    <a href={documents.remainingPaymentScreenshot} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                      <Image className="h-4 w-4" /> View
-                    </a>
+                    <SecureFileLink url={documents.remainingPaymentScreenshot} label="View" icon="image" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
                   )}
@@ -1157,7 +1129,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Lagthram Status</p>
                   <p className={`text-sm font-medium ${verification.lagthramStatus === "completed" ? "text-primary" :
-                      verification.lagthramStatus === "processing" ? "text-blue-600" : "text-amber-600"
+                    verification.lagthramStatus === "processing" ? "text-blue-600" : "text-amber-600"
                     }`}>
                     {verification.lagthramStatus}
                   </p>
@@ -1171,7 +1143,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Loan Status</p>
                   <p className={`text-sm font-medium ${verification.loanStatus === "completed" ? "text-primary" :
-                      verification.loanStatus === "processing" ? "text-blue-600" : "text-amber-600"
+                    verification.loanStatus === "processing" ? "text-blue-600" : "text-amber-600"
                     }`}>
                     {verification.loanStatus}
                   </p>
@@ -1205,9 +1177,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Final Lagthram</p>
                   {finalLagthram.finalDocument ? (
-                    <a href={finalLagthram.finalDocument} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                      <FileText className="h-4 w-4" /> View
-                    </a>
+                    <SecureFileLink url={finalLagthram.finalDocument} label="View" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
                   )}
@@ -1215,9 +1185,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Completion Certificate</p>
                   {finalLagthram.completionCertificate ? (
-                    <a href={finalLagthram.completionCertificate} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-emerald-600 hover:underline flex items-center gap-1">
-                      <FileText className="h-4 w-4" /> View
-                    </a>
+                    <SecureFileLink url={finalLagthram.completionCertificate} label="View" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
                   )}
@@ -1225,7 +1193,7 @@ export default function PropertyDetail() {
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Status</p>
                   <p className={`text-sm font-medium ${finalLagthram.approvalStatus === "approved" ? "text-primary" :
-                      finalLagthram.approvalStatus === "rejected" ? "text-red-600" : "text-amber-600"
+                    finalLagthram.approvalStatus === "rejected" ? "text-red-600" : "text-amber-600"
                     }`}>
                     {finalLagthram.approvalStatus}
                   </p>
@@ -1440,8 +1408,8 @@ export default function PropertyDetail() {
           </DialogHeader>
           <div className="py-4">
             <div className="grid gap-3 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-              {allDocs?.map((doc, idx) => (
-                <div key={idx} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 group shadow-sm hover:shadow-md hover:border-primary/20">
+              {allDocs?.map((doc) => (
+                <div key={doc.id || doc.name} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 group shadow-sm hover:shadow-md hover:border-primary/20">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 shrink-0 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm group-hover:bg-primary/5 transition-colors">
                       <FileText className="h-5 w-5 text-slate-500 group-hover:text-primary transition-colors" />
@@ -1451,9 +1419,9 @@ export default function PropertyDetail() {
                       <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{doc.type}</p>
                     </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary transition-colors shrink-0"
                     onClick={() => triggerDownload(doc.url, doc.name)}
                   >

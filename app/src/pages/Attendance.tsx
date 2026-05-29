@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { ElementType } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";

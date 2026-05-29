@@ -6,7 +6,7 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import './index.css'
 import 'leaflet/dist/leaflet.css'
 import { TRPCProvider } from "@/providers/trpc"
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RouteErrorBoundary as ErrorBoundary } from "@/components/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import App from './App.tsx'
 

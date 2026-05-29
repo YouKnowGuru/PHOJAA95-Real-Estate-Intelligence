@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { eq, count } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, publicQuery, adminQuery, authedQuery } from "./middleware";
+import { createRouter, staffQuery, adminQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { propertyTypes, properties } from "@db/schema";
 
 export const propertyTypeRouter = createRouter({
-  list: publicQuery.query(async () => {
+  list: staffQuery.query(async () => {
     const db = getDb();
     return db.select().from(propertyTypes).orderBy(propertyTypes.name);
   }),

@@ -8,10 +8,16 @@ function isLocalhost(headers: Headers): boolean {
 export function getSessionCookieOptions(headers: Headers): CookieOptions {
   const localhost = isLocalhost(headers);
 
+  // Security: Enforce secure cookies in production. In development (localhost),
+  // allow non-secure cookies since HTTPS is typically not available.
+  const isProduction = process.env.NODE_ENV === "production";
+
   return {
     httpOnly: true,
     path: "/",
-    sameSite: localhost ? "Lax" : "None",
-    secure: !localhost,
+    // Security fix: Always use Lax for CSRF protection. Only use None if explicitly
+    // required for cross-origin embedding (not the case for this app).
+    sameSite: "Lax",
+    secure: isProduction || !localhost, // Always secure in production
   };
 }

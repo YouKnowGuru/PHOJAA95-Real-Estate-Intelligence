@@ -20,6 +20,8 @@ export async function upsertUser(data: InsertUser) {
     ...data,
   };
 
+  // Security: Only auto-assign admin role if the unionId matches the ownerUnionId.
+  // The ownerUnionId should be set to the app creator's union ID.
   if (
     values.role === undefined &&
     values.unionId &&

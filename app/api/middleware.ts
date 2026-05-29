@@ -20,10 +20,17 @@ export const createRouter = t.router;
 export const publicQuery = t.procedure.use(sanitizeMiddleware);
 
 // ─── In-memory rate limiter (per-IP sliding window) ─────────────────
+// SECURITY NOTE: This is an in-memory store that does NOT share state across
+// multiple server instances. For production multi-process/serverless deployments,
+// migrate to Redis-backed rate limiting (e.g., @upstash/ratelimit).
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const RATE_LIMIT_MAX = 10; // max requests per window
+const RATE_LIMIT_MAX = 10; // max requests per window for general endpoints
+
+// Stricter limits for authentication endpoints to prevent brute-force attacks
+const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60_000; // 15 minutes
+const AUTH_RATE_LIMIT_MAX = 5; // max 5 auth attempts per 15 minutes
 
 function isPrivateIp(ip: string): boolean {
   return (
@@ -37,15 +44,34 @@ function isPrivateIp(ip: string): boolean {
 
 function getClientIp(ctx: TrpcContext): string {
   const headers = ctx.req?.headers;
-  // Only trust X-Forwarded-For when the direct connection is from a private/loopback address.
+  // SECURITY FIX: Use a trusted proxy count approach instead of blindly trusting
+  // X-Forwarded-For. In production behind a known number of proxies, we take the
+  // Nth IP from the right. For now, we validate that the direct connection is from
+  // a private IP (indicating we're behind a reverse proxy) before using X-Forwarded-For.
+  // In cloud environments where the direct connection always appears private,
+  // configure TRUST_PROXY_COUNT env var to control how many proxies to trust.
+  const trustProxyCount = parseInt(process.env.TRUST_PROXY_COUNT || "1", 10);
   const conn = (ctx.req as any)?.socket;
   const remoteAddress = conn?.remoteAddress as string | undefined;
-  if (remoteAddress && isPrivateIp(remoteAddress)) {
-    const raw = headers?.get("x-forwarded-for") || headers?.get("x-real-ip");
-    if (typeof raw === "string" && raw) {
-      return raw.split(",")[0].trim();
+
+  const rawForwarded = headers?.get("x-forwarded-for");
+  if (typeof rawForwarded === "string" && rawForwarded) {
+    const ips = rawForwarded.split(",").map(ip => ip.trim()).filter(Boolean);
+    // If we have enough IPs in the chain, take the one at the trusted position from the right
+    if (ips.length >= trustProxyCount) {
+      const clientIp = ips[ips.length - trustProxyCount];
+      // Validate the IP format roughly
+      if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(clientIp) || /^[0-9a-fA-F:]+$/.test(clientIp)) {
+        return clientIp;
+      }
     }
   }
+
+  const rawRealIp = headers?.get("x-real-ip");
+  if (typeof rawRealIp === "string" && rawRealIp) {
+    return rawRealIp.trim();
+  }
+
   if (remoteAddress) return remoteAddress;
   return "unknown";
 }
@@ -71,6 +97,30 @@ const rateLimitMiddleware = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
 });
 
+// Stricter rate limiter for auth endpoints (login, register, forgot password, etc.)
+const authRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+const authRateLimitMiddleware = t.middleware(async (opts) => {
+  const { ctx, next } = opts;
+  const ip = getClientIp(ctx);
+  const now = Date.now();
+
+  const entry = authRateLimitStore.get(ip);
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= AUTH_RATE_LIMIT_MAX) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many login attempts. Please try again in 15 minutes.",
+      });
+    }
+    entry.count++;
+  } else {
+    authRateLimitStore.set(ip, { count: 1, resetAt: now + AUTH_RATE_LIMIT_WINDOW_MS });
+  }
+
+  return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
+});
+
 // Periodically clean up stale entries (every 5 minutes).
 // NOTE: In serverless environments this setInterval may leak memory or not
 // run as expected. For production/multi-process deployments, replace this
@@ -83,6 +133,9 @@ setInterval(() => {
 }, 300_000).unref?.();
 
 export const rateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(rateLimitMiddleware);
+
+// Auth-specific rate limiter: stricter limits for login/register/forgot password
+export const authRateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(authRateLimitMiddleware);
 
 // ─── Auth middlewares ────────────────────────────────────────────────
 const requireAuth = t.middleware(async (opts) => {

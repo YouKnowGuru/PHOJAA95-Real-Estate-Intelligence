@@ -76,6 +76,10 @@ app.use("*", async (c, next) => {
   c.res.headers.set("X-Frame-Options", "DENY");
   c.res.headers.set("X-XSS-Protection", "1; mode=block");
   c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Security: Content Security Policy.
+  // Note: 'unsafe-inline' for scripts is needed for Vite/React in development.
+  // In production with a proper build, consider using CSP nonces or hashes.
+  // 'unsafe-eval' is required for some React/Vite features.
   c.res.headers.set(
     "Content-Security-Policy",
     [
@@ -84,7 +88,7 @@ app.use("*", async (c, next) => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com",
       "font-src 'self'",
-      "connect-src 'self' https://api.cloudinary.com",
+      "connect-src 'self' https://api.cloudinary.com wss: ws:",
       "frame-src 'self'",
       "object-src 'none'",
       "base-uri 'self'",
@@ -166,7 +170,18 @@ if (env.isProduction) {
 
   // Handle uncaught exceptions
   process.on("uncaughtException", (err) => {
-    logger.error("Uncaught exception", { error: err.message, stack: err.stack });
+    // Security: In production, do not log full stack traces to the main logger.
+    // Stack traces can reveal internal file paths, library versions, and architecture.
+    // Log only the error message with a correlation ID; send full stacks to a
+    // secure error tracking service (e.g., Sentry) if available.
+    const errorId = crypto.randomUUID();
+    if (env.isProduction) {
+      logger.error("Uncaught exception", { errorId, error: err.message });
+      // Store full stack trace in a separate secure log or error tracking service
+      console.error(`[ERROR:${errorId}]`, err.stack); // eslint-disable-line no-console
+    } else {
+      logger.error("Uncaught exception", { errorId, error: err.message, stack: err.stack });
+    }
     shutdown("uncaughtException");
   });
 

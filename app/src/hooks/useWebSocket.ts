@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 type WebSocketMessage = {
@@ -19,7 +19,14 @@ class WebSocketService {
   private shouldReconnect = true;
 
   constructor() {
-    const wsUrl = import.meta.env.VITE_WS_URL || "ws://localhost:5173/ws";
+    // Security: Default to secure WebSocket (wss://) in production.
+    // Only use ws:// for localhost development.
+    const isLocalhost = typeof window !== "undefined" && (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    );
+    const defaultUrl = isLocalhost ? "ws://localhost:5173/ws" : "wss://localhost:5173/ws";
+    const wsUrl = import.meta.env.VITE_WS_URL || defaultUrl;
     this.url = wsUrl;
   }
 
@@ -84,6 +91,11 @@ class WebSocketService {
     }
   }
 
+  /** Check if WebSocket is currently connected */
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
   subscribe(event: string, callback: EventCallback): () => void {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
@@ -106,7 +118,8 @@ class WebSocketService {
     }
   }
 
-  isConnected(): boolean {
+  /** Get connection state (for hooks that need reactivity) */
+  getConnectionState(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
 }
@@ -115,6 +128,7 @@ const wsService = new WebSocketService();
 
 export function useWebSocket(token?: string) {
   const queryClient = useQueryClient();
+  const [isConnected, setIsConnected] = useState(false);
 
   const handlePropertyUpdate = useCallback(
     (_data: Record<string, unknown>) => {
@@ -145,24 +159,34 @@ export function useWebSocket(token?: string) {
   );
 
   useEffect(() => {
-    wsService.connect(token);
+    // Only connect if not already connected (prevents multiple connections)
+    if (!wsService.isConnected()) {
+      wsService.connect(token);
+    }
 
     const unsubProperty = wsService.subscribe("property:updated", handlePropertyUpdate);
     const unsubPropertyCreate = wsService.subscribe("property:created", handlePropertyUpdate);
     const unsubNotification = wsService.subscribe("notification:new", handleNotification);
     const unsubAttendance = wsService.subscribe("attendance:updated", handleAttendance);
 
+    // Update connection state periodically
+    const interval = setInterval(() => {
+      setIsConnected(wsService.getConnectionState());
+    }, 1000);
+
     return () => {
       unsubProperty();
       unsubPropertyCreate();
       unsubNotification();
       unsubAttendance();
-      wsService.disconnect();
+      clearInterval(interval);
+      // NOTE: We do NOT disconnect here because other components may be using
+      // the same WebSocket. Disconnect only on app unmount.
     };
   }, [token, handlePropertyUpdate, handleNotification, handleAttendance]);
 
   return {
-    isConnected: wsService.isConnected(),
+    isConnected,
     send: wsService.send.bind(wsService),
   };
 }
@@ -171,6 +195,8 @@ export function useRealtimeNotifications() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    // Only subscribe — do NOT connect/disconnect here.
+    // The useWebSocket hook manages the connection lifecycle.
     const unsub = wsService.subscribe("notification:new", (_data) => {
       queryClient.invalidateQueries({ queryKey: ["notification", "list"] });
     });

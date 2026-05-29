@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import { OniLoader } from "./components/ui/oni-loader";
+import { RouteErrorBoundary } from "./components/ErrorBoundary";
 
 // Lazy load heavy pages to reduce initial bundle size
 const PropertyDetail = lazy(() => import("./pages/PropertyDetail"));
@@ -30,6 +31,17 @@ function PageLoader() {
     <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <OniLoader size="lg" text="Loading" />
     </div>
+  );
+}
+
+/** Wrap lazy-loaded routes with error boundary */
+function LazyRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <RouteErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        {children}
+      </Suspense>
+    </RouteErrorBoundary>
   );
 }
 
@@ -63,11 +75,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-      <Route path="/reset-password" element={
-        <Suspense fallback={<PageLoader />}>
-          <ResetPassword />
-        </Suspense>
-      } />
+      <Route path="/reset-password" element={<LazyRoute><ResetPassword /></LazyRoute>} />
       <Route
         path="/"
         element={
@@ -88,9 +96,7 @@ export default function App() {
         path="/properties/new"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <PropertyWizard />
-            </Suspense>
+            <LazyRoute><PropertyWizard /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -98,9 +104,7 @@ export default function App() {
         path="/properties/:id"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <PropertyDetail />
-            </Suspense>
+            <LazyRoute><PropertyDetail /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -118,9 +122,7 @@ export default function App() {
         path="/approvals"
         element={
           <ProtectedRoute requireAdmin>
-            <Suspense fallback={<PageLoader />}>
-              <ApprovalQueue />
-            </Suspense>
+            <LazyRoute><ApprovalQueue /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -128,9 +130,7 @@ export default function App() {
         path="/users"
         element={
           <ProtectedRoute requireAdmin>
-            <Suspense fallback={<PageLoader />}>
-              <Users />
-            </Suspense>
+            <LazyRoute><Users /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -138,9 +138,7 @@ export default function App() {
         path="/property-types"
         element={
           <ProtectedRoute requireAdmin>
-            <Suspense fallback={<PageLoader />}>
-              <PropertyTypes />
-            </Suspense>
+            <LazyRoute><PropertyTypes /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -148,9 +146,7 @@ export default function App() {
         path="/attendance"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <Attendance />
-            </Suspense>
+            <LazyRoute><Attendance /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -158,9 +154,7 @@ export default function App() {
         path="/payroll"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <Payroll />
-            </Suspense>
+            <LazyRoute><Payroll /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -168,9 +162,7 @@ export default function App() {
         path="/activity-logs"
         element={
           <ProtectedRoute requireAdmin>
-            <Suspense fallback={<PageLoader />}>
-              <ActivityLogs />
-            </Suspense>
+            <LazyRoute><ActivityLogs /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -178,9 +170,7 @@ export default function App() {
         path="/reports"
         element={
           <ProtectedRoute requireAdmin>
-            <Suspense fallback={<PageLoader />}>
-              <Reports />
-            </Suspense>
+            <LazyRoute><Reports /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -212,9 +202,7 @@ export default function App() {
         path="/billing"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <Billing />
-            </Suspense>
+            <LazyRoute><Billing /></LazyRoute>
           </ProtectedRoute>
         }
       />
@@ -222,9 +210,7 @@ export default function App() {
         path="/documents"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <DocumentLibrary />
-            </Suspense>
+            <LazyRoute><DocumentLibrary /></LazyRoute>
           </ProtectedRoute>
         }
       />

@@ -255,23 +255,31 @@ async function executeToolCall(
                 const { properties } = await import("../db/schema");
                 const [property] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
                 if (!property) return JSON.stringify({ error: "Property not found" });
+
+                // Security: Staff can only view their own properties' full details
+                const isAdmin = ctx.unifiedUser?.role === "admin";
+                if (!isAdmin && property.listedById !== ctx.unifiedUser?.id) {
+                    return JSON.stringify({ error: "You can only view properties assigned to you" });
+                }
+
+                // Security: Mask sensitive PII for staff users
                 return JSON.stringify({
                     id: property.id,
                     name: property.propertyName,
                     address: property.address,
                     owner: property.ownerName,
-                    ownerCID: property.ownerCID,
-                    ownerPhone: property.ownerPhone,
+                    ownerCID: isAdmin ? property.ownerCID : property.ownerCID ? `${property.ownerCID.slice(0, 3)}****${property.ownerCID.slice(-4)}` : null,
+                    ownerPhone: isAdmin ? property.ownerPhone : property.ownerPhone ? `${property.ownerPhone.slice(0, 4)}****${property.ownerPhone.slice(-3)}` : null,
                     buyer: property.buyerName,
-                    buyerCID: property.buyerCID,
-                    sellingPrice: property.sellingPrice,
-                    fee: property.realEstateFee,
+                    buyerCID: isAdmin ? property.buyerCID : property.buyerCID ? `${property.buyerCID.slice(0, 3)}****${property.buyerCID.slice(-4)}` : null,
+                    sellingPrice: isAdmin ? property.sellingPrice : null,
+                    fee: isAdmin ? property.realEstateFee : null,
                     status: property.approvalStatus,
                     workflowStatus: property.workflowStatus,
                     currentStep: property.currentStep,
                     isSold: property.isSold,
                     listedBy: property.listedById,
-                    adminNotes: property.adminNotes,
+                    adminNotes: isAdmin ? property.adminNotes : null,
                     rejectionComments: property.rejectionComments,
                     completedAt: property.completedAt,
                     createdAt: property.createdAt,
@@ -354,6 +362,11 @@ async function executeToolCall(
                 const targetUserId = userId || ctx.unifiedUser?.id;
                 if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
 
+                // Security: Staff can only access their own attendance data
+                if (ctx.unifiedUser?.role === "staff" && targetUserId !== ctx.unifiedUser.id) {
+                    return JSON.stringify({ error: "You can only access your own attendance information" });
+                }
+
                 const [year, monthStr] = targetMonth.split("-");
                 const startDate = new Date(Number(year), Number(monthStr) - 1, 1);
                 const endDate = new Date(Number(year), Number(monthStr), 1);
@@ -396,6 +409,11 @@ async function executeToolCall(
                 const { payroll } = await import("../db/schema");
                 const targetUserId = userId || ctx.unifiedUser?.id;
                 if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
+
+                // Security: Staff can only access their own payroll data
+                if (ctx.unifiedUser?.role === "staff" && targetUserId !== ctx.unifiedUser.id) {
+                    return JSON.stringify({ error: "You can only access your own payroll information" });
+                }
 
                 const records = await db.select().from(payroll)
                     .where(eq(payroll.userId, targetUserId as number))

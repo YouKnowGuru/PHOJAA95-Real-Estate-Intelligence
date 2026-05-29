@@ -4,7 +4,7 @@ import * as jose from "jose";
 import * as cookie from "cookie";
 import { eq, and, gt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, publicQuery, rateLimitedQuery, authedQuery } from "./middleware";
+import { createRouter, publicQuery, rateLimitedQuery, authRateLimitedQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { localUsers, passwordResetTokens } from "@db/schema";
 import { env } from "./lib/env";
@@ -18,7 +18,9 @@ if (!env.appSecret) {
 }
 const JWT_SECRET = new TextEncoder().encode(env.appSecret);
 
-export const passwordSchema = z.string().min(6).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must contain uppercase, lowercase, and number");
+// Security: Minimum 8 characters with complexity requirements.
+// NIST recommends minimum 8 characters for user-chosen passwords.
+export const passwordSchema = z.string().min(8).regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, "Password must be at least 8 characters and contain uppercase, lowercase, and number");
 
 const DEFAULT_SESSION_HOURS = 24;
 const REMEMBER_ME_DAYS = 30;
@@ -43,7 +45,11 @@ export async function verifyLocalToken(token: string) {
   try {
     const { payload } = await jose.jwtVerify(token, JWT_SECRET, { clockTolerance: 60 });
     return payload as unknown as { userId: number; email: string; role: string; rememberMe?: boolean };
-  } catch {
+  } catch (err) {
+    // Security: Log JWT verification failures for security monitoring.
+    // Do NOT log the token itself — only the error type.
+    const errorCode = err instanceof Error ? err.name : "UNKNOWN_JWT_ERROR";
+    logger.warn("JWT verification failed", { errorCode });
     return null;
   }
 }
@@ -62,7 +68,7 @@ export async function authenticateLocalRequest(headers: Headers) {
 }
 
 export const localAuthRouter = createRouter({
-  register: rateLimitedQuery
+  register: authRateLimitedQuery
     .input(
       z.object({
         fullName: z.string().min(2).max(255),
@@ -103,7 +109,7 @@ export const localAuthRouter = createRouter({
       return { success: true, userId: Number(result[0].insertId) };
     }),
 
-  login: rateLimitedQuery
+  login: authRateLimitedQuery
     .input(
       z.object({
         email: z.string().email(),
@@ -121,18 +127,17 @@ export const localAuthRouter = createRouter({
         const errCode = (err as NodeJS.ErrnoException).code;
         logger.error("Login database query failed", { error: errMsg, code: errCode });
 
-        if (errCode === "ECONNREFUSED" || errCode === "ETIMEDOUT" || errCode === "ENOTFOUND") {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message:
-              "Cannot connect to MySQL. On Hostinger use host localhost in DATABASE_URL. From your PC enable Remote MySQL in hPanel for srv1957.hstgr.io and your IP, then run npm run db:test.",
-          });
-        }
+        // Security: Never expose internal infrastructure details to clients.
+        // Log detailed diagnostics server-side only.
+        logger.error("Login database connection failed", {
+          error: errMsg,
+          code: errCode,
+          host: headers.get("host") || "unknown",
+        });
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message:
-            "Database is not ready. Run app/db/hostinger-fix-login.sql in phpMyAdmin, or restart the app after importing hostinger-full-setup.sql.",
+          message: "Unable to process login at this time. Please try again later or contact support.",
         });
       }
       if (users.length === 0) {
@@ -291,9 +296,9 @@ export const localAuthRouter = createRouter({
         fullName: z.string().min(2).optional(),
         phone: z.string().optional(),
         address: z.string().optional(),
-        profileImage: z.string().optional(),
-        pfNumber: z.string().optional(),
-        employeeId: z.string().optional(),
+        profileImage: z.string().url().refine((u) => u.startsWith("https://"), { message: "Profile image URL must use HTTPS" }).optional(),
+        // Security: Staff must NOT be able to self-assign HR fields.
+        // pfNumber, pfPercentage, and employeeId are admin-managed only.
       })
     )
     .mutation(async ({ input, ctx }) => {
@@ -345,10 +350,13 @@ export const localAuthRouter = createRouter({
         })
       );
 
-      return { success: true, token: newToken };
+      // Security: Do NOT return the token in the response body.
+      // The httpOnly cookie is already set; returning the token defeats
+      // the purpose of httpOnly cookies and exposes it to XSS.
+      return { success: true };
     }),
 
-  forgotPassword: rateLimitedQuery
+  forgotPassword: authRateLimitedQuery
     .input(
       z.object({
         email: z.string().email(),
@@ -391,7 +399,7 @@ export const localAuthRouter = createRouter({
       return { success: true, message: "If the email exists, a password reset link will be sent." };
     }),
 
-  resetPassword: rateLimitedQuery
+  resetPassword: authRateLimitedQuery
     .input(
       z.object({
         token: z.string(),
@@ -436,7 +444,7 @@ export const localAuthRouter = createRouter({
       return { success: true, message: "Password has been reset successfully" };
     }),
 
-  verifyResetToken: rateLimitedQuery
+  verifyResetToken: authRateLimitedQuery
     .input(
       z.object({
         token: z.string(),

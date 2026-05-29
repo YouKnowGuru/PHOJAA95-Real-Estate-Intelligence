@@ -251,7 +251,8 @@ export default function PropertyWizard() {
     
     const actualStep = existingProperty.property.currentStep;
     const isRejected = existingProperty.property.approvalStatus === "rejected";
-    const urlStep = parseInt(searchParams.get("step") || "1");
+    const stepParam = searchParams.get("step");
+    const urlStep = stepParam ? parseInt(stepParam, 10) : 1;
     
     // If URL step is ahead of actual step and not rejected, clamp to actual step
     if (!isAdmin && urlStep > actualStep && !(isRejected && existingProperty.property.currentStep === urlStep)) {
@@ -259,7 +260,8 @@ export default function PropertyWizard() {
       const basePath = propertyId ? `/properties/${propertyId}/wizard` : "/properties/new";
       navigate(`${basePath}?step=${actualStep}`, { replace: true });
     }
-  }, [existingProperty, navigate, propertyId, searchParams]);
+    // Fix: Use stepParam string instead of searchParams object to prevent infinite re-renders
+  }, [existingProperty, navigate, propertyId, searchParams.get("step")]);
 
   const createMutation = trpc.property.create.useMutation({
     onSuccess: (data) => {

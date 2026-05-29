@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { getDb } from "../queries/connection";
 import { localUsers } from "@db/schema";
 import { logger } from "./logger";
@@ -65,7 +66,9 @@ async function ensureDefaultAdminUser(db: ReturnType<typeof getDb>): Promise<voi
     const rows = await db.select({ count: sql<number>`count(*)` }).from(localUsers);
     if (Number(rows[0]?.count ?? 0) > 0) return;
 
-    const password = await bcrypt.hash("Admin123", 12);
+    // Generate a cryptographically secure random password
+    const tempPassword = randomBytes(16).toString("hex");
+    const password = await bcrypt.hash(tempPassword, 12);
     await db.insert(localUsers).values({
       fullName: "Admin User",
       email: "admin@phojaa95.com",
@@ -77,7 +80,16 @@ async function ensureDefaultAdminUser(db: ReturnType<typeof getDb>): Promise<voi
       loginAttempts: 0,
     });
 
-    logger.info("Default admin user created (admin@phojaa95.com / Admin123)");
+    // Log to stderr (not logger) so it appears in server logs but not structured logging
+    // eslint-disable-next-line no-console
+    console.error(
+      "\n" +
+      "╔══════════════════════════════════════════════════════════════════╗\n" +
+      "║  DEFAULT ADMIN USER CREATED                                      ║\n" +
+      "║  Email: admin@phojaa95.com                                       ║\n" +
+      "║  Password: " + tempPassword + "                    ║\n" +
+      "╚══════════════════════════════════════════════════════════════════╝\n"
+    );
   } catch (err) {
     logger.error("Could not ensure default admin user", { error: String(err) });
   }

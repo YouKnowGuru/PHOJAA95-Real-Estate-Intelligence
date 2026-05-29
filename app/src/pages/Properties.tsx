@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { trpc } from "@/lib/trpc";
 import type { RouterOutputs } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
 
 /**
  * Fix Cloudinary f_auto URLs that may serve JXL (JPEG XL) format
@@ -185,8 +186,8 @@ export default function Properties() {
         </SelectContent>
       </Select>
       {hasActiveFilters && (
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="sm"
           onClick={clearFilters}
           className="h-9 text-muted-foreground hover:text-foreground gap-1"
@@ -269,8 +270,8 @@ export default function Properties() {
           icon={Building2}
           title="No properties found"
           description={
-            isAdmin 
-              ? "Your search didn't return any results. Try adjusting your filters or adding a new listing." 
+            isAdmin
+              ? "Your search didn't return any results. Try adjusting your filters or adding a new listing."
               : "You haven't listed any properties yet. Start your journey by adding your first listing."
           }
           action={
@@ -291,12 +292,12 @@ export default function Properties() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {data?.items.map((property, index) => (
-              <PropertyCard 
-                key={property.id} 
-                property={property} 
-                index={index} 
-                isAdmin={isAdmin} 
-                onDelete={handleDelete} 
+              <PropertyCard
+                key={property.id}
+                property={property}
+                index={index}
+                isAdmin={isAdmin}
+                onDelete={handleDelete}
               />
             ))}
           </div>
@@ -425,10 +426,10 @@ export default function Properties() {
 
 type PropertyItem = RouterOutputs["property"]["list"]["items"][number];
 
-function PropertyCard({ property, index, isAdmin, onDelete }: { 
-  property: PropertyItem; 
-  index: number; 
-  isAdmin: boolean; 
+function PropertyCard({ property, index, isAdmin, onDelete }: {
+  property: PropertyItem;
+  index: number;
+  isAdmin: boolean;
   onDelete: (id: number, name: string) => void;
 }) {
   const [imageError, setImageError] = useState(false);
@@ -564,6 +565,4 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
   );
 }
 
-function cn(...classes: (string | undefined | false)[]) {
-  return classes.filter(Boolean).join(" ");
-}
+// Note: Uses the imported `cn` from @/lib/utils instead of a local redefinition

@@ -294,7 +294,7 @@ export default function Users() {
             </div>
             <div className="space-y-2">
               <Label>Password *</Label>
-              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required minLength={6} />
+              <Input type="password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} required minLength={8} />
             </div>
             <div className="space-y-2">
               <Label>Role</Label>

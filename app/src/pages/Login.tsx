@@ -14,7 +14,7 @@ export default function Login() {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Use mutation pending state instead of manual loading state
   const [view, setView] = useState<"login" | "forgot">("login");
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSuccess, setForgotSuccess] = useState("");
@@ -31,7 +31,7 @@ export default function Login() {
       utils.auth.me.invalidate();
       navigate("/");
     },
-    onError: (err) => { setError(err.message); setLoading(false); },
+    onError: (err) => { setError(err.message); },
   });
 
   const forgotMutation = trpc.localAuth.forgotPassword.useMutation({
@@ -42,7 +42,6 @@ export default function Login() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setLoading(true);
     loginMutation.mutate({ ...loginData, rememberMe });
   };
 
@@ -249,10 +248,10 @@ export default function Login() {
                   {/* Submit */}
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loginMutation.isPending || forgotMutation.isPending}
                     className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl shadow-sm"
                   >
-                    {loading ? (
+                    {loginMutation.isPending ? (
                       <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
@@ -315,10 +314,10 @@ export default function Login() {
 
                       <Button
                         type="submit"
-                        disabled={loading}
+                        disabled={loginMutation.isPending || forgotMutation.isPending}
                         className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl shadow-sm"
                       >
-                        {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Reset Link"}
+                        {forgotMutation.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : "Send Reset Link"}
                       </Button>
                     </motion.form>
                   )}

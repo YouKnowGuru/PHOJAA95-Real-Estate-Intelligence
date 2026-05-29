@@ -1,8 +1,11 @@
 import type { Context, Next } from "hono";
 import fs from "fs";
 import path from "path";
+import * as cookie from "cookie";
 import { UPLOAD_DIR } from "./paths";
 import { logger } from "./logger";
+import { verifyLocalToken } from "../local-auth-router";
+import { verifySessionToken } from "../kimi/session";
 
 const MIME_TYPES: Record<string, string> = {
   ".pdf": "application/pdf",
@@ -84,12 +87,41 @@ function respondUploadError(c: Context, result: Extract<ResolveResult, { ok: fal
   return c.text("Not a file", 400);
 }
 
+/** Check if the request is authenticated (local auth or OAuth). */
+async function isAuthenticated(req: Request): Promise<boolean> {
+  const headers = req.headers;
+
+  // Try local auth cookie
+  const cookies = cookie.parse(headers.get("cookie") || "");
+  const localToken = cookies["local_session"];
+  if (localToken) {
+    const claim = await verifyLocalToken(localToken);
+    if (claim) return true;
+  }
+
+  // Try OAuth session cookie
+  const oauthToken = cookies["session_token"];
+  if (oauthToken) {
+    const claim = await verifySessionToken(oauthToken);
+    if (claim) return true;
+  }
+
+  return false;
+}
+
 /** Hono middleware for GET /uploads/* — never falls through to the SPA. */
 export function createUploadMiddleware() {
   return async (c: Context, next: Next) => {
     const reqPath = c.req.path;
     if (!reqPath.startsWith("/uploads/")) {
       return next();
+    }
+
+    // Require authentication for all uploaded files
+    const authed = await isAuthenticated(c.req.raw);
+    if (!authed) {
+      logger.warn("Unauthorized upload file access attempt", { reqPath, ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") });
+      return c.json({ error: "Unauthorized — please log in to access this file" }, 401);
     }
 
     const relativePath = reqPath.replace(/^\/uploads\//, "");
@@ -108,7 +140,14 @@ export function createUploadMiddleware() {
 }
 
 /** Handler for GET /api/file/* (same files, explicit download route). */
-export function handleApiFileRequest(c: Context) {
+export async function handleApiFileRequest(c: Context) {
+  // Require authentication for all file downloads
+  const authed = await isAuthenticated(c.req.raw);
+  if (!authed) {
+    logger.warn("Unauthorized API file access attempt", { path: c.req.path, ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") });
+    return c.json({ error: "Unauthorized — please log in to access this file" }, 401);
+  }
+
   const rawKey = c.req.path.replace(/^\/api\/file\//, "");
   const result = resolveUploadFilePath(rawKey);
   if (!result.ok) {
