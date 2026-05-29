@@ -367,16 +367,16 @@ async function executeToolCall(
                     return JSON.stringify({ error: "You can only access your own attendance information" });
                 }
 
-                const [year, monthStr] = targetMonth.split("-");
-                const startDate = new Date(Number(year), Number(monthStr) - 1, 1);
-                const endDate = new Date(Number(year), Number(monthStr), 1);
+                // attendance.date is stored as string (YYYY-MM-DD), use string comparison
+                const startDateStr = `${targetMonth}-01`;
+                const endDateStr = new Date(Number(targetMonth.split("-")[0]), Number(targetMonth.split("-")[1]), 1).toISOString().slice(0, 10);
 
                 const records = await db.select().from(attendance)
                     .where(
                         and(
                             eq(attendance.userId, targetUserId as number),
-                            gte(attendance.date, startDate),
-                            lt(attendance.date, endDate),
+                            sql`${attendance.date} >= ${startDateStr}`,
+                            sql`${attendance.date} < ${endDateStr}`,
                         ),
                     )
                     .orderBy(attendance.date);
