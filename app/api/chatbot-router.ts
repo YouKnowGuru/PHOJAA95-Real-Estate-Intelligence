@@ -824,9 +824,9 @@ export const chatbotRouter = createRouter({
             // Friendly error messages for common issues
             let friendlyMessage = "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.";
             if (errorMsg.includes("429") || errorMsg.includes("Rate limit")) {
-                friendlyMessage = "The AI service is currently at its daily usage limit. Please try again tomorrow, or contact your admin to upgrade the OpenRouter plan for more requests.";
+                friendlyMessage = "The AI service is currently at its daily usage limit. Please try again tomorrow.";
             } else if (errorMsg.includes("401")) {
-                friendlyMessage = "The AI service authentication failed. Please contact your admin to check the OpenRouter API key.";
+                friendlyMessage = "The AI service authentication failed. Please contact the developer (Keshab) to check the OpenRouter API key.";
             } else if (errorMsg.includes("500") || errorMsg.includes("Provider returned error")) {
                 friendlyMessage = "The AI service is temporarily unavailable. Please try again in a few moments.";
             }
