@@ -105,7 +105,6 @@ export const attendanceRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const userId = ctx.unifiedUser!.id;
-      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const results = await db.select().from(attendance)
         .where(
