@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 interface SecureFileLinkProps {
   url: string;
-  label: string;
+  label?: string;
   icon?: "file" | "image";
   className?: string;
 }
@@ -17,7 +17,7 @@ interface SecureFileLinkProps {
  * Regular <a href="/uploads/..."> links open in new tabs WITHOUT
  * sending cookies, causing 401 errors.
  */
-export function SecureFileLink({ url, label, icon = "file", className = "" }: SecureFileLinkProps) {
+export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(
@@ -27,7 +27,6 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
       if (!url) return;
 
       // Validate URL
-      let fetchUrl = url;
       if (!url.startsWith("/") && !url.startsWith("http")) {
         toast.error("Invalid file URL");
         return;
@@ -35,7 +34,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
 
       setLoading(true);
       try {
-        const response = await fetch(fetchUrl, { credentials: "include" });
+        const response = await fetch(url, { credentials: "include" });
         if (!response.ok) {
           if (response.status === 401) {
             toast.error("Please log in to access this file");
@@ -57,19 +56,21 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
         } else {
           const urlParts = url.split("/");
           fileName = urlParts[urlParts.length - 1] || "download";
-          // Remove query params
           fileName = fileName.split("?")[0];
         }
 
-        // Create download link
+        // Create a temporary link element to trigger download
         const link = document.createElement("a");
+        link.style.display = "none";
+        document.body.appendChild(link);
+
+        // Set the href and download attributes
         link.href = blobUrl;
         link.download = fileName;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
 
-        // Trigger download
-        document.body.appendChild(link);
+        // For PDFs, some browsers open in viewer despite download attribute.
+        // We can try to force download by using a different MIME type approach,
+        // but the most reliable way is to just let the user know it's downloading.
         link.click();
 
         // Cleanup
@@ -78,7 +79,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
           window.URL.revokeObjectURL(blobUrl);
         }, 100);
 
-        toast.success(`Downloading ${fileName}`);
+        toast.success(`Downloading: ${fileName}`);
       } catch (err) {
         toast.error("Failed to download file. Please try again.");
         console.error("File download error:", err);
@@ -145,11 +146,9 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
 
         // Create download link
         const link = document.createElement("a");
+        link.style.display = "none";
         link.href = blobUrl;
         link.download = fileName;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-
         document.body.appendChild(link);
         link.click();
 
@@ -158,7 +157,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
           window.URL.revokeObjectURL(blobUrl);
         }, 100);
 
-        toast.success(`Downloading ${fileName}`);
+        toast.success(`Downloading: ${fileName}`);
       } catch (err) {
         toast.error("Failed to download file. Please try again.");
         console.error("File download error:", err);
