@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { FileText, Image, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
 
 interface SecureFileLinkProps {
   url: string;
@@ -10,64 +11,18 @@ interface SecureFileLinkProps {
 }
 
 /**
- * Download a file from an authenticated URL.
- * Uses fetch with credentials, then creates a download link.
- */
-async function downloadFile(url: string): Promise<void> {
-  // Fetch the file with authentication cookies
-  const response = await fetch(url, { 
-    method: "GET",
-    credentials: "include",
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      throw new Error("Please log in to access this file");
-    }
-    throw new Error(`Failed to load file: ${response.statusText}`);
-  }
-
-  // Get filename from Content-Disposition header or URL
-  let fileName = "download";
-  const contentDisposition = response.headers.get("content-disposition");
-  if (contentDisposition) {
-    const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-    if (match) fileName = match[1].replace(/['"]/g, "");
-  } else {
-    const urlParts = url.split("/");
-    fileName = urlParts[urlParts.length - 1] || "download";
-    fileName = fileName.split("?")[0];
-  }
-
-  // CRITICAL: Use arrayBuffer() instead of blob() to preserve binary data
-  const arrayBuffer = await response.arrayBuffer();
-  
-  // Create blob from array buffer with explicit MIME type
-  // This prevents browser from corrupting the binary data
-  const blob = new Blob([arrayBuffer], { type: "application/octet-stream" });
-
-  // Create object URL and trigger download
-  const blobUrl = window.URL.createObjectURL(blob);
-  
-  const link = document.createElement("a");
-  link.href = blobUrl;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  
-  // Cleanup
-  setTimeout(() => {
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(blobUrl);
-  }, 100);
-}
-
-/**
- * SecureFileLink — fetches authenticated files with credentials
- * and downloads them to the user's device.
+ * SecureFileLink — downloads authenticated files using signed URLs.
+ * 
+ * The process:
+ * 1. Extract the file key from the URL
+ * 2. Call tRPC to get a signed download URL
+ * 3. Use the signed URL to download the file directly
+ * 
+ * This avoids cookie/auth issues with fetch() + blob().
  */
 export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
+  const getDownloadUrl = trpc.upload.getDownloadUrl.useMutation();
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -75,15 +30,43 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
       e.stopPropagation();
       if (!url) return;
 
-      if (!url.startsWith("/") && !url.startsWith("http")) {
-        toast.error("Invalid file URL");
-        return;
-      }
-
       setLoading(true);
       try {
-        await downloadFile(url);
-        toast.success("File downloaded");
+        // Extract file key from URL (e.g., "/uploads/documents/abc.pdf" -> "documents/abc.pdf")
+        const key = url.replace(/^\/uploads\//, "");
+        
+        if (!key) {
+          toast.error("Invalid file URL");
+          return;
+        }
+
+        // Get signed URL from server
+        const result = await getDownloadUrl.mutateAsync({ key });
+        
+        if (!result.url) {
+          toast.error("Failed to get download URL");
+          return;
+        }
+
+        // Extract filename from URL
+        const urlParts = url.split("/");
+        const fileName = urlParts[urlParts.length - 1] || "download";
+
+        // Create a temporary link and click it
+        // The signed URL includes auth signature, so no cookies needed
+        const link = document.createElement("a");
+        link.href = result.url;
+        link.download = fileName;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        
+        // Cleanup
+        setTimeout(() => {
+          document.body.removeChild(link);
+        }, 100);
+
+        toast.success(`Downloading: ${fileName}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to download file";
         toast.error(message);
@@ -92,7 +75,7 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
         setLoading(false);
       }
     },
-    [url]
+    [url, getDownloadUrl]
   );
 
   const Icon = icon === "image" ? Image : FileText;
@@ -115,6 +98,7 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
  */
 export function SecureDocLink({ url, children, className = "" }: { url: string; children: React.ReactNode; className?: string }) {
   const [loading, setLoading] = useState(false);
+  const getDownloadUrl = trpc.upload.getDownloadUrl.useMutation();
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -124,8 +108,39 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
 
       setLoading(true);
       try {
-        await downloadFile(url);
-        toast.success("File downloaded");
+        // Extract file key from URL
+        const key = url.replace(/^\/uploads\//, "");
+        
+        if (!key) {
+          toast.error("Invalid file URL");
+          return;
+        }
+
+        // Get signed URL from server
+        const result = await getDownloadUrl.mutateAsync({ key });
+        
+        if (!result.url) {
+          toast.error("Failed to get download URL");
+          return;
+        }
+
+        // Extract filename
+        const urlParts = url.split("/");
+        const fileName = urlParts[urlParts.length - 1] || "download";
+
+        // Download using signed URL
+        const link = document.createElement("a");
+        link.href = result.url;
+        link.download = fileName;
+        link.target = "_blank";
+        document.body.appendChild(link);
+        link.click();
+        
+        setTimeout(() => {
+          document.body.removeChild(link);
+        }, 100);
+
+        toast.success(`Downloading: ${fileName}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to download file";
         toast.error(message);
@@ -134,7 +149,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         setLoading(false);
       }
     },
-    [url]
+    [url, getDownloadUrl]
   );
 
   return (
