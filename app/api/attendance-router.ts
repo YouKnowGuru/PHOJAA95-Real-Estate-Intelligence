@@ -228,7 +228,6 @@ export const attendanceRouter = createRouter({
     .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
-      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const summary = await db.select({
         userId: attendance.userId,
