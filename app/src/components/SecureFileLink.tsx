@@ -22,7 +22,13 @@ interface SecureFileLinkProps {
  */
 export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
-  const getDownloadUrl = trpc.upload.getDownloadUrl.useMutation();
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  
+  // Use useQuery for fetching signed URL (GET request)
+  const { refetch } = trpc.upload.getDownloadUrl.useQuery(
+    { key: url.replace(/^\/uploads\//, "") },
+    { enabled: false } // Don't fetch automatically
+  );
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -40,10 +46,10 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
           return;
         }
 
-        // Get signed URL from server
-        const result = await getDownloadUrl.mutateAsync({ key });
+        // Get signed URL from server using refetch (GET request)
+        const result = await refetch();
         
-        if (!result.url) {
+        if (!result.data?.url) {
           toast.error("Failed to get download URL");
           return;
         }
@@ -53,9 +59,8 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
         const fileName = urlParts[urlParts.length - 1] || "download";
 
         // Create a temporary link and click it
-        // The signed URL includes auth signature, so no cookies needed
         const link = document.createElement("a");
-        link.href = result.url;
+        link.href = result.data.url;
         link.download = fileName;
         link.target = "_blank";
         document.body.appendChild(link);
@@ -75,7 +80,7 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
         setLoading(false);
       }
     },
-    [url, getDownloadUrl]
+    [url, refetch]
   );
 
   const Icon = icon === "image" ? Image : FileText;
@@ -98,7 +103,12 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
  */
 export function SecureDocLink({ url, children, className = "" }: { url: string; children: React.ReactNode; className?: string }) {
   const [loading, setLoading] = useState(false);
-  const getDownloadUrl = trpc.upload.getDownloadUrl.useMutation();
+  
+  // Use useQuery for fetching signed URL (GET request)
+  const { refetch } = trpc.upload.getDownloadUrl.useQuery(
+    { key: url.replace(/^\/uploads\//, "") },
+    { enabled: false }
+  );
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -116,10 +126,10 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
           return;
         }
 
-        // Get signed URL from server
-        const result = await getDownloadUrl.mutateAsync({ key });
+        // Get signed URL from server using refetch (GET request)
+        const result = await refetch();
         
-        if (!result.url) {
+        if (!result.data?.url) {
           toast.error("Failed to get download URL");
           return;
         }
@@ -130,7 +140,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
 
         // Download using signed URL
         const link = document.createElement("a");
-        link.href = result.url;
+        link.href = result.data.url;
         link.download = fileName;
         link.target = "_blank";
         document.body.appendChild(link);
@@ -149,7 +159,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         setLoading(false);
       }
     },
-    [url, getDownloadUrl]
+    [url, refetch]
   );
 
   return (
