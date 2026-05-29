@@ -94,18 +94,30 @@ async function isAuthenticated(req: Request): Promise<boolean> {
   // Try local auth cookie
   const cookies = cookie.parse(headers.get("cookie") || "");
   const localToken = cookies["local_session"];
+  const oauthToken = cookies["session_token"];
+
+  logger.info("Auth check for upload", { hasLocalToken: !!localToken, hasOAuthToken: !!oauthToken });
+
   if (localToken) {
     const claim = await verifyLocalToken(localToken);
-    if (claim) return true;
+    if (claim) {
+      logger.info("Upload auth: local token valid", { userId: claim.userId });
+      return true;
+    }
+    logger.warn("Upload auth: local token invalid");
   }
 
   // Try OAuth session cookie
-  const oauthToken = cookies["session_token"];
   if (oauthToken) {
     const claim = await verifySessionToken(oauthToken);
-    if (claim) return true;
+    if (claim) {
+      logger.info("Upload auth: OAuth token valid", { userId: claim.userId });
+      return true;
+    }
+    logger.warn("Upload auth: OAuth token invalid");
   }
 
+  logger.warn("Upload auth: no valid token found");
   return false;
 }
 
