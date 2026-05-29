@@ -643,6 +643,7 @@ export const chatbotRouter = createRouter({
 
         try {
             // First attempt with tools
+            logger.info("Chatbot calling OpenRouter", { model: selectedModel, messageCount: messages.length });
             const response = await client.complete({
                 model: selectedModel,
                 messages,
@@ -651,6 +652,7 @@ export const chatbotRouter = createRouter({
                 temperature: 0.7,
                 max_tokens: 2000,
             });
+            logger.info("Chatbot OpenRouter response", { hasChoices: !!response.choices, choiceCount: response.choices?.length });
 
             if (!response.choices || response.choices.length === 0) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No response from AI model" });
@@ -741,17 +743,18 @@ export const chatbotRouter = createRouter({
             };
         } catch (err) {
             const errorMsg = err instanceof Error ? err.message : "Unknown error";
-            logger.error("Chatbot message processing failed", { error: errorMsg, conversationId: convId });
+            const errorStack = err instanceof Error ? err.stack : "";
+            logger.error("Chatbot message processing failed", { error: errorMsg, stack: errorStack, conversationId: convId });
             // Save error as assistant message
             await db.insert(chatMessages).values({
                 conversationId: convId,
                 role: "assistant",
-                content: "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.",
+                content: `I apologize, but I encountered an error processing your request. Error: ${errorMsg}`,
             });
 
             throw new TRPCError({
                 code: "INTERNAL_SERVER_ERROR",
-                message: "Failed to process chat message. Please try again.",
+                message: `Failed to process chat message: ${errorMsg}`,
             });
         }
     }),
