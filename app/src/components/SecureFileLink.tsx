@@ -10,6 +10,28 @@ interface SecureFileLinkProps {
 }
 
 /**
+ * Get MIME type from filename extension
+ */
+function getMimeTypeFromFileName(fileName: string): string {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    pdf: "application/pdf",
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    txt: "text/plain",
+    csv: "text/csv",
+  };
+  return mimeTypes[ext || ""] || "application/octet-stream";
+}
+
+/**
  * SecureFileLink — fetches authenticated files with credentials
  * and downloads them to the user's device.
  *
@@ -44,8 +66,8 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
           return;
         }
 
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
+        // Get the binary data as ArrayBuffer to preserve integrity
+        const arrayBuffer = await response.arrayBuffer();
 
         // Extract filename
         let fileName = "download";
@@ -59,25 +81,26 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
           fileName = fileName.split("?")[0];
         }
 
-        // Create a temporary link element to trigger download
-        const link = document.createElement("a");
-        link.style.display = "none";
-        document.body.appendChild(link);
+        // Determine MIME type from filename
+        const mimeType = getMimeTypeFromFileName(fileName);
 
-        // Set the href and download attributes
+        // Create blob with proper MIME type from ArrayBuffer
+        const blob = new Blob([arrayBuffer], { type: mimeType });
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        // Create download link
+        const link = document.createElement("a");
         link.href = blobUrl;
         link.download = fileName;
-
-        // For PDFs, some browsers open in viewer despite download attribute.
-        // We can try to force download by using a different MIME type approach,
-        // but the most reliable way is to just let the user know it's downloading.
+        link.style.display = "none";
+        document.body.appendChild(link);
         link.click();
 
         // Cleanup
         setTimeout(() => {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(blobUrl);
-        }, 100);
+        }, 1000);
 
         toast.success(`Downloading: ${fileName}`);
       } catch (err) {
@@ -129,8 +152,8 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
           return;
         }
 
-        const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
+        // Get binary data as ArrayBuffer
+        const arrayBuffer = await response.arrayBuffer();
 
         // Extract filename
         let fileName = "download";
@@ -144,18 +167,26 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
           fileName = fileName.split("?")[0];
         }
 
+        // Determine MIME type
+        const mimeType = getMimeTypeFromFileName(fileName);
+
+        // Create blob from ArrayBuffer with proper MIME type
+        const blob = new Blob([arrayBuffer], { type: mimeType });
+        const blobUrl = window.URL.createObjectURL(blob);
+
         // Create download link
         const link = document.createElement("a");
-        link.style.display = "none";
         link.href = blobUrl;
         link.download = fileName;
+        link.style.display = "none";
         document.body.appendChild(link);
         link.click();
 
+        // Cleanup
         setTimeout(() => {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(blobUrl);
-        }, 100);
+        }, 1000);
 
         toast.success(`Downloading: ${fileName}`);
       } catch (err) {
