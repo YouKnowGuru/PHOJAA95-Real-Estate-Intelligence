@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, gte, lte } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -123,8 +123,8 @@ export const attendanceRouter = createRouter({
         .where(
           and(
             eq(attendance.userId, userId),
-            sql`${attendance.date} >= ${startDate}`,
-            sql`${attendance.date} <= ${endDate}`
+            gte(attendance.date, startDate),
+            lte(attendance.date, endDate)
           )
         )
         .orderBy(desc(attendance.date))
@@ -141,8 +141,8 @@ export const attendanceRouter = createRouter({
         .where(
           and(
             eq(attendance.userId, userId),
-            sql`${attendance.date} >= ${startDate}`,
-            sql`${attendance.date} <= ${endDate}`
+            gte(attendance.date, startDate),
+            lte(attendance.date, endDate)
           )
         );
 
@@ -169,8 +169,8 @@ export const attendanceRouter = createRouter({
       if (input.userName) conditions.push(sql`${localUsers.fullName} LIKE ${`%${input.userName}%`}`);
       if (input.month) {
         const { startDate, endDate } = getMonthBoundaries(input.month);
-        conditions.push(sql`${attendance.date} >= ${startDate}`);
-        conditions.push(sql`${attendance.date} <= ${endDate}`);
+        conditions.push(gte(attendance.date, startDate));
+        conditions.push(lte(attendance.date, endDate));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -263,8 +263,8 @@ export const attendanceRouter = createRouter({
         .leftJoin(localUsers, eq(attendance.userId, localUsers.id))
         .where(
           and(
-            sql`${attendance.date} >= ${startDate}`,
-            sql`${attendance.date} <= ${endDate}`
+            gte(attendance.date, startDate),
+            lte(attendance.date, endDate)
           )
         )
         .groupBy(attendance.userId, localUsers.fullName);
@@ -287,8 +287,8 @@ export const attendanceRouter = createRouter({
         .from(attendance)
         .where(
           and(
-            sql`${attendance.date} >= ${startDate}`,
-            sql`${attendance.date} <= ${endDate}`
+            gte(attendance.date, startDate),
+            lte(attendance.date, endDate)
           )
         );
 
