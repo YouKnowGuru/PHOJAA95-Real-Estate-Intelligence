@@ -39,8 +39,12 @@ async function downloadFile(url: string): Promise<void> {
     fileName = fileName.split("?")[0];
   }
 
-  // Get the blob directly from response - this preserves binary integrity
-  const blob = await response.blob();
+  // CRITICAL: Use arrayBuffer() instead of blob() to preserve binary data
+  const arrayBuffer = await response.arrayBuffer();
+  
+  // Create blob from array buffer with explicit MIME type
+  // This prevents browser from corrupting the binary data
+  const blob = new Blob([arrayBuffer], { type: "application/octet-stream" });
 
   // Create object URL and trigger download
   const blobUrl = window.URL.createObjectURL(blob);
