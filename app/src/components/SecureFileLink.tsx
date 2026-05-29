@@ -10,10 +10,57 @@ interface SecureFileLinkProps {
 }
 
 /**
- * SecureFileLink — opens authenticated files in a new tab for download.
- *
- * The server sends Content-Disposition: attachment for PDFs which forces download.
- * The browser handles the download natively without corrupting the file.
+ * Download a file from an authenticated URL.
+ * Uses fetch with credentials, then creates a download link.
+ */
+async function downloadFile(url: string): Promise<void> {
+  // Fetch the file with authentication cookies
+  const response = await fetch(url, { 
+    method: "GET",
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Please log in to access this file");
+    }
+    throw new Error(`Failed to load file: ${response.statusText}`);
+  }
+
+  // Get filename from Content-Disposition header or URL
+  let fileName = "download";
+  const contentDisposition = response.headers.get("content-disposition");
+  if (contentDisposition) {
+    const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+    if (match) fileName = match[1].replace(/['"]/g, "");
+  } else {
+    const urlParts = url.split("/");
+    fileName = urlParts[urlParts.length - 1] || "download";
+    fileName = fileName.split("?")[0];
+  }
+
+  // Get the blob directly from response - this preserves binary integrity
+  const blob = await response.blob();
+
+  // Create object URL and trigger download
+  const blobUrl = window.URL.createObjectURL(blob);
+  
+  const link = document.createElement("a");
+  link.href = blobUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  
+  // Cleanup
+  setTimeout(() => {
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(blobUrl);
+  }, 100);
+}
+
+/**
+ * SecureFileLink — fetches authenticated files with credentials
+ * and downloads them to the user's device.
  */
 export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
@@ -24,7 +71,6 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
       e.stopPropagation();
       if (!url) return;
 
-      // Validate URL
       if (!url.startsWith("/") && !url.startsWith("http")) {
         toast.error("Invalid file URL");
         return;
@@ -32,59 +78,12 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
 
       setLoading(true);
       try {
-        // First, verify the file is accessible by making a HEAD request
-        const response = await fetch(url, { 
-          method: "HEAD",
-          credentials: "include" 
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            toast.error("Please log in to access this file");
-          } else {
-            toast.error(`Failed to access file: ${response.statusText}`);
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Extract filename from URL
-        let fileName = "download";
-        const contentDisposition = response.headers.get("content-disposition");
-        if (contentDisposition) {
-          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (match) fileName = match[1].replace(/['"]/g, "");
-        } else {
-          const urlParts = url.split("/");
-          fileName = urlParts[urlParts.length - 1] || "download";
-          fileName = fileName.split("?")[0];
-        }
-
-        // Open in new tab - the server will send the file with proper headers
-        // Content-Disposition: attachment forces download
-        // The browser handles the download natively without corrupting the file
-        const newWindow = window.open(url, "_blank");
-        if (!newWindow) {
-          toast.error("Popup blocked. Please allow popups for this site.");
-          setLoading(false);
-          return;
-        }
-
-        toast.success(`Downloading: ${fileName}`);
-        
-        // Close the empty tab after a moment if the browser didn't navigate it
-        setTimeout(() => {
-          try {
-            if (newWindow.location.href === "about:blank") {
-              newWindow.close();
-            }
-          } catch {
-            // Cross-origin, ignore
-          }
-        }, 2000);
+        await downloadFile(url);
+        toast.success("File downloaded");
       } catch (err) {
-        toast.error("Failed to download file. Please try again.");
-        console.error("File download error:", err);
+        const message = err instanceof Error ? err.message : "Failed to download file";
+        toast.error(message);
+        console.error("Download error:", err);
       } finally {
         setLoading(false);
       }
@@ -121,56 +120,12 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
 
       setLoading(true);
       try {
-        // Verify access first
-        const response = await fetch(url, { 
-          method: "HEAD",
-          credentials: "include" 
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            toast.error("Please log in to access this file");
-          } else {
-            toast.error(`Failed to access file: ${response.statusText}`);
-          }
-          setLoading(false);
-          return;
-        }
-
-        // Extract filename
-        let fileName = "download";
-        const contentDisposition = response.headers.get("content-disposition");
-        if (contentDisposition) {
-          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-          if (match) fileName = match[1].replace(/['"]/g, "");
-        } else {
-          const urlParts = url.split("/");
-          fileName = urlParts[urlParts.length - 1] || "download";
-          fileName = fileName.split("?")[0];
-        }
-
-        // Open in new tab for download
-        const newWindow = window.open(url, "_blank");
-        if (!newWindow) {
-          toast.error("Popup blocked. Please allow popups for this site.");
-          setLoading(false);
-          return;
-        }
-
-        toast.success(`Downloading: ${fileName}`);
-        
-        setTimeout(() => {
-          try {
-            if (newWindow.location.href === "about:blank") {
-              newWindow.close();
-            }
-          } catch {
-            // Ignore
-          }
-        }, 2000);
+        await downloadFile(url);
+        toast.success("File downloaded");
       } catch (err) {
-        toast.error("Failed to download file. Please try again.");
-        console.error("File download error:", err);
+        const message = err instanceof Error ? err.message : "Failed to download file";
+        toast.error(message);
+        console.error("Download error:", err);
       } finally {
         setLoading(false);
       }

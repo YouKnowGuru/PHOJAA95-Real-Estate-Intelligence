@@ -56,6 +56,14 @@ function getContentType(filePath: string): string {
 export function buildUploadFileResponse(filePath: string): Response {
   const contentType = getContentType(filePath);
   const file = fs.readFileSync(filePath);
+  
+  logger.info("Serving file", { 
+    filePath, 
+    contentType, 
+    size: file.length,
+    firstBytes: file.slice(0, 10).toString("hex")
+  });
+  
   const headers: Record<string, string> = {
     "Content-Type": contentType,
     "Content-Length": file.length.toString(),
