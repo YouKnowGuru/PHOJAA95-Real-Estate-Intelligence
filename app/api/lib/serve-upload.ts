@@ -75,8 +75,8 @@ export function buildUploadFileResponse(filePath: string): Response {
     "Cache-Control": "public, max-age=86400",
   };
   if (contentType === "application/pdf") {
-    // Force download instead of inline viewing for security
-    headers["Content-Disposition"] = `attachment; filename="${path.basename(filePath)}"`;
+    // Allow inline viewing for PDFs - browser handles display
+    headers["Content-Disposition"] = `inline; filename="${path.basename(filePath)}"`;
   } else if (
     contentType === "application/msword" ||
     contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

@@ -1,7 +1,6 @@
 import { useState, useCallback } from "react";
 import { FileText, Image, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { trpc } from "@/lib/trpc";
 
 interface SecureFileLinkProps {
   url: string;
@@ -11,76 +10,36 @@ interface SecureFileLinkProps {
 }
 
 /**
- * SecureFileLink — downloads authenticated files using signed URLs.
- * 
- * The process:
- * 1. Extract the file key from the URL
- * 2. Call tRPC to get a signed download URL
- * 3. Use the signed URL to download the file directly
- * 
- * This avoids cookie/auth issues with fetch() + blob().
+ * Download a file by opening it in a new tab.
+ * The server will authenticate via cookies and serve the file.
+ */
+function downloadFile(url: string): void {
+  // Open in new tab - browser will send cookies automatically
+  // Server authenticates and serves file with Content-Disposition: attachment
+  window.open(url, "_blank");
+}
+
+/**
+ * SecureFileLink — opens authenticated files in a new tab for download.
  */
 export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
-  const [signedUrl, setSignedUrl] = useState<string | null>(null);
-  
-  // Use useQuery for fetching signed URL (GET request)
-  const { refetch } = trpc.upload.getDownloadUrl.useQuery(
-    { key: url.replace(/^\/uploads\//, "") },
-    { enabled: false } // Don't fetch automatically
-  );
 
   const handleClick = useCallback(
-    async (e: React.MouseEvent) => {
+    (e: React.MouseEvent) => {
       e.preventDefault();
-      e.stopPropagation();
       if (!url) return;
 
       setLoading(true);
-      try {
-        // Extract file key from URL (e.g., "/uploads/documents/abc.pdf" -> "documents/abc.pdf")
-        const key = url.replace(/^\/uploads\//, "");
-        
-        if (!key) {
-          toast.error("Invalid file URL");
-          return;
-        }
-
-        // Get signed URL from server using refetch (GET request)
-        const result = await refetch();
-        
-        if (!result.data?.url) {
-          toast.error("Failed to get download URL");
-          return;
-        }
-
-        // Extract filename from URL
-        const urlParts = url.split("/");
-        const fileName = urlParts[urlParts.length - 1] || "download";
-
-        // Create a temporary link and click it
-        const link = document.createElement("a");
-        link.href = result.data.url;
-        link.download = fileName;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-        }, 100);
-
-        toast.success(`Downloading: ${fileName}`);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to download file";
-        toast.error(message);
-        console.error("Download error:", err);
-      } finally {
-        setLoading(false);
-      }
+      
+      // Simple approach: just open the URL in a new tab
+      // The server handles auth via cookies
+      downloadFile(url);
+      
+      setLoading(false);
+      toast.success("File download started");
     },
-    [url, refetch]
+    [url]
   );
 
   const Icon = icon === "image" ? Image : FileText;
@@ -99,67 +58,22 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
 }
 
 /**
- * Simple secure link for PropertyDetail page that matches the existing anchor style.
+ * Simple secure link for PropertyDetail page.
  */
 export function SecureDocLink({ url, children, className = "" }: { url: string; children: React.ReactNode; className?: string }) {
   const [loading, setLoading] = useState(false);
-  
-  // Use useQuery for fetching signed URL (GET request)
-  const { refetch } = trpc.upload.getDownloadUrl.useQuery(
-    { key: url.replace(/^\/uploads\//, "") },
-    { enabled: false }
-  );
 
   const handleClick = useCallback(
-    async (e: React.MouseEvent) => {
+    (e: React.MouseEvent) => {
       e.preventDefault();
-      e.stopPropagation();
       if (!url) return;
 
       setLoading(true);
-      try {
-        // Extract file key from URL
-        const key = url.replace(/^\/uploads\//, "");
-        
-        if (!key) {
-          toast.error("Invalid file URL");
-          return;
-        }
-
-        // Get signed URL from server using refetch (GET request)
-        const result = await refetch();
-        
-        if (!result.data?.url) {
-          toast.error("Failed to get download URL");
-          return;
-        }
-
-        // Extract filename
-        const urlParts = url.split("/");
-        const fileName = urlParts[urlParts.length - 1] || "download";
-
-        // Download using signed URL
-        const link = document.createElement("a");
-        link.href = result.data.url;
-        link.download = fileName;
-        link.target = "_blank";
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-        }, 100);
-
-        toast.success(`Downloading: ${fileName}`);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to download file";
-        toast.error(message);
-        console.error("Download error:", err);
-      } finally {
-        setLoading(false);
-      }
+      downloadFile(url);
+      setLoading(false);
+      toast.success("File download started");
     },
-    [url, refetch]
+    [url]
   );
 
   return (
