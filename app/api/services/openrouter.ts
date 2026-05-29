@@ -191,6 +191,17 @@ The core feature. Each property goes through 5 workflow steps:
 - **Settings** (/settings) - System configuration
 - **Profile** (/profile) - Edit your profile
 
+## CRITICAL SECURITY RULES
+${isAdmin ? "" : `13. You are a STAFF user. You may ONLY access your OWN data. You CANNOT access:
+    - Other users' data (including other staff or admins)
+    - System-wide statistics or counts
+    - Pending approvals queue
+    - User lists
+    - Admin-only pages (Users, Approvals, Reports, Activity Logs, Settings)
+14. If asked about other users, admin data, or system statistics, respond: "I don't have access to that information. Please contact an admin if needed."
+15. When searching properties, you will only see properties you created. You cannot view properties created by other staff.
+16. You can only view your own attendance and payroll records.`}
+
 ## Guidelines
 1. Be concise but thorough. Use markdown formatting for readability.
 2. When answering about system features, always mention what page to visit or button to click.
@@ -203,7 +214,7 @@ The core feature. Each property goes through 5 workflow steps:
 9. Use bullet points and numbered lists for clarity.
 10. Keep responses under 500 words unless the user asks for detailed information.
 11. If the user asks about their role or permissions, explain what they can and cannot do.
-12. ${isAdmin ? "As an admin, you can help with approving steps, managing users, viewing reports, and system configuration." : "As a staff member, you can create and manage properties, track attendance, and view your payroll."}`;
+12. ${isAdmin ? "As an admin, you can help with approving steps, managing users, viewing reports, and system configuration." : "As a staff member, you can create and manage your own properties, track your attendance, and view your payroll."}`;
 }
 
 // ─── API Client ─────────────────────────────────────────────────────

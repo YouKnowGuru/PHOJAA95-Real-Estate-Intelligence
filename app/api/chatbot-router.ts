@@ -34,6 +34,34 @@ const updateConversationSchema = z.object({
 
 // ─── Tool Definitions for Function Calling ──────────────────────────
 
+// ─── Role-Based Tool Filtering ────────────────────────────────────────
+
+/** Tools that are ONLY available to admin users */
+const ADMIN_ONLY_TOOLS = new Set([
+    "get_pending_approvals",
+    "get_system_stats",
+    "get_users_list",
+]);
+
+/** Tools available to staff users (subset of all tools) */
+const STAFF_TOOLS = new Set([
+    "search_properties",
+    "get_property_detail",
+    "get_user_info",
+    "get_attendance_summary",
+    "get_payroll_info",
+    "navigate_to_page",
+]);
+
+/** Filter tools based on user role */
+function getAllowedTools(role: string | undefined): OpenRouterTool[] {
+    if (role === "admin") {
+        return CHAT_TOOLS;
+    }
+    // Staff only gets staff-allowed tools
+    return CHAT_TOOLS.filter((t) => STAFF_TOOLS.has(t.function.name));
+}
+
 const CHAT_TOOLS: OpenRouterTool[] = [
     {
         type: "function",
@@ -207,6 +235,13 @@ async function executeToolCall(
                 };
                 const { properties } = await import("../db/schema");
                 const conditions = [];
+
+                // SECURITY: Staff can only search their own properties
+                const isAdmin = ctx.unifiedUser?.role === "admin";
+                if (!isAdmin) {
+                    conditions.push(eq(properties.listedById, ctx.unifiedUser!.id));
+                }
+
                 if (status) {
                     conditions.push(sql`${properties.approvalStatus} = ${status}`);
                 }
@@ -290,6 +325,10 @@ async function executeToolCall(
         }
 
         case "get_pending_approvals": {
+            // SECURITY: Admin-only tool
+            if (ctx.unifiedUser?.role !== "admin") {
+                return JSON.stringify({ error: "Access denied. Only admins can view pending approvals." });
+            }
             try {
                 const { limit = 10 } = args as { limit?: number };
                 const { properties } = await import("../db/schema");
@@ -313,6 +352,10 @@ async function executeToolCall(
         }
 
         case "get_system_stats": {
+            // SECURITY: Admin-only tool
+            if (ctx.unifiedUser?.role !== "admin") {
+                return JSON.stringify({ error: "Access denied. Only admins can view system statistics." });
+            }
             try {
                 const { statType } = args as { statType: string };
                 const { properties, localUsers, attendance, payroll } = await import("../db/schema");
@@ -445,6 +488,10 @@ async function executeToolCall(
         }
 
         case "get_users_list": {
+            // SECURITY: Admin-only tool
+            if (ctx.unifiedUser?.role !== "admin") {
+                return JSON.stringify({ error: "Access denied. Only admins can list users." });
+            }
             try {
                 const { role: roleFilter, limit = 20 } = args as { role?: string; limit?: number };
                 const { localUsers } = await import("../db/schema");
@@ -470,6 +517,18 @@ async function executeToolCall(
 
         case "navigate_to_page": {
             const { page, reason } = args as { page: string; reason?: string };
+
+            // SECURITY: Staff cannot be navigated to admin-only pages
+            const ADMIN_PAGES = new Set([
+                "users", "approvals", "activity-logs", "reports", "settings", "property-types",
+            ]);
+            if (ctx.unifiedUser?.role !== "admin" && ADMIN_PAGES.has(page)) {
+                return JSON.stringify({
+                    error: `Access denied. The page "${page}" is only accessible to admins.`,
+                    allowedPages: ["dashboard", "properties", "attendance", "payroll", "notifications", "profile"],
+                });
+            }
+
             return JSON.stringify({
                 action: "navigate",
                 page: `/${page}`,
@@ -657,11 +716,13 @@ export const chatbotRouter = createRouter({
 
         try {
             // First attempt with tools
-            logger.info("Chatbot calling OpenRouter", { model: selectedModel, messageCount: messages.length });
+            // SECURITY: Filter tools by role so AI cannot call admin tools for staff
+            const allowedTools = getAllowedTools(opts.ctx.unifiedUser?.role);
+            logger.info("Chatbot calling OpenRouter", { model: selectedModel, messageCount: messages.length, role: opts.ctx.unifiedUser?.role, toolCount: allowedTools.length });
             const response = await client.complete({
                 model: selectedModel,
                 messages,
-                tools: CHAT_TOOLS,
+                tools: allowedTools,
                 tool_choice: "auto",
                 temperature: 0.7,
                 max_tokens: 2000,
