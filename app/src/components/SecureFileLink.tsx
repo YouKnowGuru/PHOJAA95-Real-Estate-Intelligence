@@ -10,34 +10,10 @@ interface SecureFileLinkProps {
 }
 
 /**
- * Get MIME type from filename extension
- */
-function getMimeTypeFromFileName(fileName: string): string {
-  const ext = fileName.split(".").pop()?.toLowerCase();
-  const mimeTypes: Record<string, string> = {
-    pdf: "application/pdf",
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    gif: "image/gif",
-    webp: "image/webp",
-    doc: "application/msword",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xls: "application/vnd.ms-excel",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    txt: "text/plain",
-    csv: "text/csv",
-  };
-  return mimeTypes[ext || ""] || "application/octet-stream";
-}
-
-/**
- * SecureFileLink — fetches authenticated files with credentials
- * and downloads them to the user's device.
+ * SecureFileLink — opens authenticated files in a new tab for download.
  *
- * This is required because /uploads/* now requires authentication.
- * Regular <a href="/uploads/..."> links open in new tabs WITHOUT
- * sending cookies, causing 401 errors.
+ * The server sends Content-Disposition: attachment for PDFs which forces download.
+ * The browser handles the download natively without corrupting the file.
  */
 export function SecureFileLink({ url, label = "Download", icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
@@ -56,20 +32,23 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
 
       setLoading(true);
       try {
-        const response = await fetch(url, { credentials: "include" });
+        // First, verify the file is accessible by making a HEAD request
+        const response = await fetch(url, { 
+          method: "HEAD",
+          credentials: "include" 
+        });
+        
         if (!response.ok) {
           if (response.status === 401) {
             toast.error("Please log in to access this file");
           } else {
-            toast.error(`Failed to load file: ${response.statusText}`);
+            toast.error(`Failed to access file: ${response.statusText}`);
           }
+          setLoading(false);
           return;
         }
 
-        // Get the binary data as ArrayBuffer to preserve integrity
-        const arrayBuffer = await response.arrayBuffer();
-
-        // Extract filename
+        // Extract filename from URL
         let fileName = "download";
         const contentDisposition = response.headers.get("content-disposition");
         if (contentDisposition) {
@@ -81,28 +60,28 @@ export function SecureFileLink({ url, label = "Download", icon = "file", classNa
           fileName = fileName.split("?")[0];
         }
 
-        // Determine MIME type from filename
-        const mimeType = getMimeTypeFromFileName(fileName);
-
-        // Create blob with proper MIME type from ArrayBuffer
-        const blob = new Blob([arrayBuffer], { type: mimeType });
-        const blobUrl = window.URL.createObjectURL(blob);
-
-        // Create download link
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = fileName;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-        }, 1000);
+        // Open in new tab - the server will send the file with proper headers
+        // Content-Disposition: attachment forces download
+        // The browser handles the download natively without corrupting the file
+        const newWindow = window.open(url, "_blank");
+        if (!newWindow) {
+          toast.error("Popup blocked. Please allow popups for this site.");
+          setLoading(false);
+          return;
+        }
 
         toast.success(`Downloading: ${fileName}`);
+        
+        // Close the empty tab after a moment if the browser didn't navigate it
+        setTimeout(() => {
+          try {
+            if (newWindow.location.href === "about:blank") {
+              newWindow.close();
+            }
+          } catch {
+            // Cross-origin, ignore
+          }
+        }, 2000);
       } catch (err) {
         toast.error("Failed to download file. Please try again.");
         console.error("File download error:", err);
@@ -142,18 +121,21 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
 
       setLoading(true);
       try {
-        const response = await fetch(url, { credentials: "include" });
+        // Verify access first
+        const response = await fetch(url, { 
+          method: "HEAD",
+          credentials: "include" 
+        });
+        
         if (!response.ok) {
           if (response.status === 401) {
             toast.error("Please log in to access this file");
           } else {
-            toast.error(`Failed to load file: ${response.statusText}`);
+            toast.error(`Failed to access file: ${response.statusText}`);
           }
+          setLoading(false);
           return;
         }
-
-        // Get binary data as ArrayBuffer
-        const arrayBuffer = await response.arrayBuffer();
 
         // Extract filename
         let fileName = "download";
@@ -167,28 +149,25 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
           fileName = fileName.split("?")[0];
         }
 
-        // Determine MIME type
-        const mimeType = getMimeTypeFromFileName(fileName);
-
-        // Create blob from ArrayBuffer with proper MIME type
-        const blob = new Blob([arrayBuffer], { type: mimeType });
-        const blobUrl = window.URL.createObjectURL(blob);
-
-        // Create download link
-        const link = document.createElement("a");
-        link.href = blobUrl;
-        link.download = fileName;
-        link.style.display = "none";
-        document.body.appendChild(link);
-        link.click();
-
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(blobUrl);
-        }, 1000);
+        // Open in new tab for download
+        const newWindow = window.open(url, "_blank");
+        if (!newWindow) {
+          toast.error("Popup blocked. Please allow popups for this site.");
+          setLoading(false);
+          return;
+        }
 
         toast.success(`Downloading: ${fileName}`);
+        
+        setTimeout(() => {
+          try {
+            if (newWindow.location.href === "about:blank") {
+              newWindow.close();
+            }
+          } catch {
+            // Ignore
+          }
+        }, 2000);
       } catch (err) {
         toast.error("Failed to download file. Please try again.");
         console.error("File download error:", err);
