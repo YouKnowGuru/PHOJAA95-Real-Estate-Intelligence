@@ -281,7 +281,6 @@ export default function DocumentLibrary() {
                       <SecureFileLink
                         url={doc.fileUrl}
                         label="Download"
-                        download
                         className="flex-1 justify-center rounded-xl border border-border/40 bg-background hover:bg-accent px-3 py-2 text-xs font-medium"
                       />
                       <Button

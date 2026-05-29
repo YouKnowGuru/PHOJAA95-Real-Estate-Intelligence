@@ -7,19 +7,17 @@ interface SecureFileLinkProps {
   label: string;
   icon?: "file" | "image";
   className?: string;
-  /** If true, force download instead of opening in browser */
-  download?: boolean;
 }
 
 /**
  * SecureFileLink — fetches authenticated files with credentials
- * and opens them via blob URL in new tab or download.
+ * and downloads them to the user's device.
  *
  * This is required because /uploads/* now requires authentication.
  * Regular <a href="/uploads/..."> links open in new tabs WITHOUT
  * sending cookies, causing 401 errors.
  */
-export function SecureFileLink({ url, label, icon = "file", className = "", download = false }: SecureFileLinkProps) {
+export function SecureFileLink({ url, label, icon = "file", className = "" }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(
@@ -57,49 +55,30 @@ export function SecureFileLink({ url, label, icon = "file", className = "", down
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        // Extract filename from URL
-        const urlParts = url.split("/");
-        const fileName = urlParts[urlParts.length - 1] || "download";
-
-        const isPdf = blob.type === "application/pdf";
-        const forceDownload = download || !isPdf;
-
-        if (forceDownload) {
-          // Force download
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        // Extract filename from URL or Content-Disposition header
+        let fileName = "download";
+        const contentDisposition = response.headers.get("content-disposition");
+        if (contentDisposition) {
+          const match = contentDisposition.match(/filename="?([^"]+)"?/);
+          if (match) fileName = match[1];
         } else {
-          // Open PDF in new tab using iframe
-          const newWindow = window.open("", "_blank");
-          if (!newWindow) {
-            toast.error("Popup blocked. Please allow popups for this site.");
-            URL.revokeObjectURL(blobUrl);
-            return;
-          }
-          newWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>${fileName}</title>
-                <style>
-                  body { margin: 0; padding: 0; overflow: hidden; }
-                  iframe { width: 100vw; height: 100vh; border: none; }
-                </style>
-              </head>
-              <body>
-                <iframe src="${blobUrl}" type="application/pdf"></iframe>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
+          const urlParts = url.split("/");
+          fileName = urlParts[urlParts.length - 1] || "download";
         }
 
-        // Clean up blob URL after a delay
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        // Download using anchor element
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+
+        // Small delay before cleanup to ensure download starts
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
       } catch (err) {
         toast.error("Failed to load file. Please try again.");
         console.error("File fetch error:", err);
@@ -107,7 +86,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "", down
         setLoading(false);
       }
     },
-    [url, download]
+    [url]
   );
 
   const Icon = icon === "image" ? Image : FileText;
@@ -128,7 +107,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "", down
 /**
  * Simple secure link for PropertyDetail page that matches the existing anchor style.
  */
-export function SecureDocLink({ url, children, className = "", download = false }: { url: string; children: React.ReactNode; className?: string; download?: boolean }) {
+export function SecureDocLink({ url, children, className = "" }: { url: string; children: React.ReactNode; className?: string }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(
@@ -150,48 +129,29 @@ export function SecureDocLink({ url, children, className = "", download = false 
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        // Extract filename from URL
-        const urlParts = url.split("/");
-        const fileName = urlParts[urlParts.length - 1] || "download";
-
-        const isPdf = blob.type === "application/pdf";
-        const forceDownload = download || !isPdf;
-
-        if (forceDownload) {
-          // Force download
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = fileName;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
+        // Extract filename
+        let fileName = "download";
+        const contentDisposition = response.headers.get("content-disposition");
+        if (contentDisposition) {
+          const match = contentDisposition.match(/filename="?([^"]+)"?/);
+          if (match) fileName = match[1];
         } else {
-          // Open PDF in new tab using iframe
-          const newWindow = window.open("", "_blank");
-          if (!newWindow) {
-            toast.error("Popup blocked. Please allow popups for this site.");
-            URL.revokeObjectURL(blobUrl);
-            return;
-          }
-          newWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>${fileName}</title>
-                <style>
-                  body { margin: 0; padding: 0; overflow: hidden; }
-                  iframe { width: 100vw; height: 100vh; border: none; }
-                </style>
-              </head>
-              <body>
-                <iframe src="${blobUrl}" type="application/pdf"></iframe>
-              </body>
-            </html>
-          `);
-          newWindow.document.close();
+          const urlParts = url.split("/");
+          fileName = urlParts[urlParts.length - 1] || "download";
         }
 
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        // Download using anchor element
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        a.style.display = "none";
+        document.body.appendChild(a);
+        a.click();
+
+        setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(blobUrl);
+        }, 1000);
       } catch (err) {
         toast.error("Failed to load file. Please try again.");
         console.error("File fetch error:", err);
@@ -199,7 +159,7 @@ export function SecureDocLink({ url, children, className = "", download = false 
         setLoading(false);
       }
     },
-    [url, download]
+    [url]
   );
 
   return (
