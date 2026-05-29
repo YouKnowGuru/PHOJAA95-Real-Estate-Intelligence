@@ -7,17 +7,19 @@ interface SecureFileLinkProps {
   label: string;
   icon?: "file" | "image";
   className?: string;
+  /** If true, force download instead of opening in browser */
+  download?: boolean;
 }
 
 /**
  * SecureFileLink — fetches authenticated files with credentials
- * and opens them via download or object URL.
+ * and opens them via blob URL in new tab or download.
  *
  * This is required because /uploads/* now requires authentication.
  * Regular <a href="/uploads/..."> links open in new tabs WITHOUT
  * sending cookies, causing 401 errors.
  */
-export function SecureFileLink({ url, label, icon = "file", className = "" }: SecureFileLinkProps) {
+export function SecureFileLink({ url, label, icon = "file", className = "", download = false }: SecureFileLinkProps) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(
@@ -55,17 +57,46 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        // Extract filename from URL or use default
+        // Extract filename from URL
         const urlParts = url.split("/");
         const fileName = urlParts[urlParts.length - 1] || "download";
 
-        // Create download link
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const isPdf = blob.type === "application/pdf";
+        const forceDownload = download || !isPdf;
+
+        if (forceDownload) {
+          // Force download
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          // Open PDF in new tab using iframe
+          const newWindow = window.open("", "_blank");
+          if (!newWindow) {
+            toast.error("Popup blocked. Please allow popups for this site.");
+            URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          newWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>${fileName}</title>
+                <style>
+                  body { margin: 0; padding: 0; overflow: hidden; }
+                  iframe { width: 100vw; height: 100vh; border: none; }
+                </style>
+              </head>
+              <body>
+                <iframe src="${blobUrl}" type="application/pdf"></iframe>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
 
         // Clean up blob URL after a delay
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
@@ -76,7 +107,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
         setLoading(false);
       }
     },
-    [url]
+    [url, download]
   );
 
   const Icon = icon === "image" ? Image : FileText;
@@ -97,7 +128,7 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
 /**
  * Simple secure link for PropertyDetail page that matches the existing anchor style.
  */
-export function SecureDocLink({ url, children, className = "" }: { url: string; children: React.ReactNode; className?: string }) {
+export function SecureDocLink({ url, children, className = "", download = false }: { url: string; children: React.ReactNode; className?: string; download?: boolean }) {
   const [loading, setLoading] = useState(false);
 
   const handleClick = useCallback(
@@ -123,13 +154,42 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         const urlParts = url.split("/");
         const fileName = urlParts[urlParts.length - 1] || "download";
 
-        // Create download link
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        const isPdf = blob.type === "application/pdf";
+        const forceDownload = download || !isPdf;
+
+        if (forceDownload) {
+          // Force download
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        } else {
+          // Open PDF in new tab using iframe
+          const newWindow = window.open("", "_blank");
+          if (!newWindow) {
+            toast.error("Popup blocked. Please allow popups for this site.");
+            URL.revokeObjectURL(blobUrl);
+            return;
+          }
+          newWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>${fileName}</title>
+                <style>
+                  body { margin: 0; padding: 0; overflow: hidden; }
+                  iframe { width: 100vw; height: 100vh; border: none; }
+                </style>
+              </head>
+              <body>
+                <iframe src="${blobUrl}" type="application/pdf"></iframe>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
 
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } catch (err) {
@@ -139,7 +199,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         setLoading(false);
       }
     },
-    [url]
+    [url, download]
   );
 
   return (
