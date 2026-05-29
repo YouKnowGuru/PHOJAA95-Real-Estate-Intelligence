@@ -115,7 +115,7 @@ app.get("/ready", async (c) => {
   }
 });
 
-app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }}));
+app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
