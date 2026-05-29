@@ -253,7 +253,6 @@ export const attendanceRouter = createRouter({
     .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
-      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const statsResult = await db.select({
         present: sql<number>`SUM(CASE WHEN ${attendance.status} = 'present' THEN 1 ELSE 0 END)`,
