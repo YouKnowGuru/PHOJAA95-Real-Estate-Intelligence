@@ -23,65 +23,65 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!url) return;
 
       // Validate URL
-      if (url.startsWith("/")) {
-        // relative URL — ok
-      } else {
-        try {
-          const u = new URL(url);
-          if (u.protocol !== "http:" && u.protocol !== "https:") {
-            toast.error("Invalid file URL");
-            return;
-          }
-        } catch {
-          toast.error("Invalid file URL");
-          return;
-        }
+      let fetchUrl = url;
+      if (!url.startsWith("/") && !url.startsWith("http")) {
+        toast.error("Invalid file URL");
+        return;
       }
 
       setLoading(true);
       try {
-        const response = await fetch(url, { credentials: "include" });
+        const response = await fetch(fetchUrl, { credentials: "include" });
         if (!response.ok) {
           if (response.status === 401) {
-            toast.error("Please log in to view this file");
+            toast.error("Please log in to access this file");
           } else {
             toast.error(`Failed to load file: ${response.statusText}`);
           }
           return;
         }
-        const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
 
-        // Extract filename from URL or Content-Disposition header
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+
+        // Extract filename
         let fileName = "download";
         const contentDisposition = response.headers.get("content-disposition");
         if (contentDisposition) {
-          const match = contentDisposition.match(/filename="?([^"]+)"?/);
-          if (match) fileName = match[1];
+          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (match) fileName = match[1].replace(/['"]/g, "");
         } else {
           const urlParts = url.split("/");
           fileName = urlParts[urlParts.length - 1] || "download";
+          // Remove query params
+          fileName = fileName.split("?")[0];
         }
 
-        // Download using anchor element
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
+        // Create download link
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = fileName;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
 
-        // Small delay before cleanup to ensure download starts
+        // Trigger download
+        document.body.appendChild(link);
+        link.click();
+
+        // Cleanup
         setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
-        }, 1000);
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
+
+        toast.success(`Downloading ${fileName}`);
       } catch (err) {
-        toast.error("Failed to load file. Please try again.");
-        console.error("File fetch error:", err);
+        toast.error("Failed to download file. Please try again.");
+        console.error("File download error:", err);
       } finally {
         setLoading(false);
       }
@@ -113,6 +113,7 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
       e.preventDefault();
+      e.stopPropagation();
       if (!url) return;
 
       setLoading(true);
@@ -120,41 +121,47 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         const response = await fetch(url, { credentials: "include" });
         if (!response.ok) {
           if (response.status === 401) {
-            toast.error("Please log in to view this file");
+            toast.error("Please log in to access this file");
           } else {
             toast.error(`Failed to load file: ${response.statusText}`);
           }
           return;
         }
+
         const blob = await response.blob();
-        const blobUrl = URL.createObjectURL(blob);
+        const blobUrl = window.URL.createObjectURL(blob);
 
         // Extract filename
         let fileName = "download";
         const contentDisposition = response.headers.get("content-disposition");
         if (contentDisposition) {
-          const match = contentDisposition.match(/filename="?([^"]+)"?/);
-          if (match) fileName = match[1];
+          const match = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+          if (match) fileName = match[1].replace(/['"]/g, "");
         } else {
           const urlParts = url.split("/");
           fileName = urlParts[urlParts.length - 1] || "download";
+          fileName = fileName.split("?")[0];
         }
 
-        // Download using anchor element
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = fileName;
-        a.style.display = "none";
-        document.body.appendChild(a);
-        a.click();
+        // Create download link
+        const link = document.createElement("a");
+        link.href = blobUrl;
+        link.download = fileName;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+
+        document.body.appendChild(link);
+        link.click();
 
         setTimeout(() => {
-          document.body.removeChild(a);
-          URL.revokeObjectURL(blobUrl);
-        }, 1000);
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        }, 100);
+
+        toast.success(`Downloading ${fileName}`);
       } catch (err) {
-        toast.error("Failed to load file. Please try again.");
-        console.error("File fetch error:", err);
+        toast.error("Failed to download file. Please try again.");
+        console.error("File download error:", err);
       } finally {
         setLoading(false);
       }
