@@ -34,6 +34,7 @@ export default function AttendancePage() {
   const currentMonth = todayStr.substring(0, 7);
   const currentYear = new Date().getFullYear();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [searchName, setSearchName] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showMarkDialog, setShowMarkDialog] = useState(false);
@@ -152,10 +153,14 @@ export default function AttendancePage() {
     document.body.removeChild(link);
   };
 
+  // Generate month options for selected year
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
-    return `${currentYear}-${String(m).padStart(2, "0")}`;
+    return `${selectedYear}-${String(m).padStart(2, "0")}`;
   });
+
+  // Year options: from 2025 to current year + 1
+  const yearOptions = Array.from({ length: currentYear - 2024 + 1 }, (_, i) => (2025 + i).toString());
 
   const records = isAdmin ? adminList?.items : myAttendance?.records;
   const isLoading = isAdmin ? adminListLoading : myAttendanceLoading;
@@ -168,6 +173,21 @@ export default function AttendancePage() {
         icon={<Users className="h-5 w-5" />}
         actions={
           <div className="flex items-center gap-2">
+            <select
+              value={selectedYear}
+              onChange={(e) => {
+                const newYear = e.target.value;
+                setSelectedYear(newYear);
+                // Keep same month but update year
+                const month = selectedMonth.split("-")[1];
+                setSelectedMonth(`${newYear}-${month}`);
+              }}
+              className="h-9 rounded-lg border border-border bg-background px-3 text-sm"
+            >
+              {yearOptions.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
