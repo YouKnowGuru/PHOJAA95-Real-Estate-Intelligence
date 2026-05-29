@@ -138,11 +138,11 @@ export const attendanceRouter = createRouter({
     .input(
       z.object({
         userId: z.number().optional(),
-        userName: z.string().optional(),
+        userName: z.string().max(255).optional(),
         month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM").optional(),
         status: z.enum(["present", "late", "absent", "half_day"]).optional(),
         page: z.number().default(1),
-        limit: z.number().default(30),
+        limit: z.number().max(500).default(30),
       })
     )
     .query(async ({ input }) => {
@@ -151,7 +151,13 @@ export const attendanceRouter = createRouter({
 
       if (input.userId) conditions.push(eq(attendance.userId, input.userId));
       if (input.status) conditions.push(eq(attendance.status, input.status));
-      if (input.userName) conditions.push(sql`${localUsers.fullName} LIKE ${`%${input.userName}%`}`);
+      if (input.userName) {
+        // SECURITY: Sanitize userName to prevent SQL injection via LIKE patterns
+        const sanitizedName = input.userName.replace(/[%_]/g, "");
+        if (sanitizedName) {
+          conditions.push(sql`${localUsers.fullName} LIKE ${`%${sanitizedName}%`}`);
+        }
+      }
       if (input.month) {
         conditions.push(sql`DATE_FORMAT(${attendance.date}, '%Y-%m') = ${input.month}`);
       }

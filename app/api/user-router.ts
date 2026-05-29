@@ -231,11 +231,11 @@ export const userRouter = createRouter({
     .input(
       z.object({
         fullName: z.string().min(2).max(255).optional(),
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        pfNumber: z.string().optional(),
-        employeeId: z.string().optional(),
+        phone: z.string().max(50).optional(),
+        address: z.string().max(500).optional(),
         profileImage: z.string().optional(),
+        // SECURITY: Removed pfNumber and employeeId — staff cannot self-update HR fields
+        // Only admins can update these via the admin user management endpoint
       })
     )
     .mutation(async ({ input, ctx }) => {

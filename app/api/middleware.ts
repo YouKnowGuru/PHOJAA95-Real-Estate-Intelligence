@@ -137,6 +137,35 @@ export const rateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(rateLimi
 // Auth-specific rate limiter: stricter limits for login/register/forgot password
 export const authRateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(authRateLimitMiddleware);
 
+// Chatbot rate limiter: prevents API cost exhaustion
+const CHAT_RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const CHAT_RATE_LIMIT_MAX = 10; // 10 messages per minute
+
+const chatRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+const chatRateLimitMiddleware = t.middleware(async (opts) => {
+  const { ctx, next } = opts;
+  const userId = ctx.unifiedUser?.id ?? getClientIp(ctx);
+  const now = Date.now();
+
+  const entry = chatRateLimitStore.get(String(userId));
+  if (entry && now < entry.resetAt) {
+    if (entry.count >= CHAT_RATE_LIMIT_MAX) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many chat messages. Please slow down.",
+      });
+    }
+    entry.count++;
+  } else {
+    chatRateLimitStore.set(String(userId), { count: 1, resetAt: now + CHAT_RATE_LIMIT_WINDOW_MS });
+  }
+
+  return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
+});
+
+export const chatRateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(requireAuth).use(chatRateLimitMiddleware);
+
 // ─── Auth middlewares ────────────────────────────────────────────────
 const requireAuth = t.middleware(async (opts) => {
   const { ctx, next } = opts;

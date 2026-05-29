@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, desc, and, count, like, or, gte, lt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, authedQuery } from "./middleware";
+import { createRouter, authedQuery, chatRateLimitedQuery } from "./middleware";
 import { logger } from "./lib/logger";
 import { chatConversations, chatMessages } from "../db/schema";
 import type { InsertChatConversation, InsertChatMessage } from "../db/schema";
@@ -616,7 +616,7 @@ export const chatbotRouter = createRouter({
     }),
 
     // ── Send message (non-streaming fallback) ───────────────────────
-    sendMessage: authedQuery.input(sendMessageSchema).mutation(async (opts) => {
+    sendMessage: chatRateLimitedQuery.input(sendMessageSchema).mutation(async (opts) => {
         const db = getDb();
         const userId = opts.ctx.unifiedUser!.id;
         const { conversationId, message, model } = opts.input;

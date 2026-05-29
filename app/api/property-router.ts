@@ -1532,8 +1532,24 @@ export const propertyRouter = createRouter({
         .where(eq(propertyPriceHistory.propertyId, input.id))
         .orderBy(desc(propertyPriceHistory.createdAt));
 
+      // SECURITY: Mask PII for staff users
+      const isAdmin = userRole === "admin";
+      const p = property[0];
+      const maskedProperty = {
+        ...p,
+        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
+        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
+        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
+        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
+        buyerAddress: isAdmin ? p.buyerAddress : null,
+        sellingPrice: isAdmin ? p.sellingPrice : null,
+        realEstateFee: isAdmin ? p.realEstateFee : null,
+        loanAmount: isAdmin ? p.loanAmount : null,
+        adminNotes: isAdmin ? p.adminNotes : null,
+      };
+
       return {
-        property: property[0],
+        property: maskedProperty,
         agreement: agreement[0] || null,
         documents: documents[0] || null,
         verification: verification[0] || null,

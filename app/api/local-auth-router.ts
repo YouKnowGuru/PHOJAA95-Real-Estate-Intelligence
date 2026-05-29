@@ -74,20 +74,17 @@ export const localAuthRouter = createRouter({
         fullName: z.string().min(2).max(255),
         email: z.string().email(),
         password: passwordSchema,
-        phone: z.string().optional(),
-        address: z.string().optional(),
-        role: z.enum(["staff", "admin"]).default("staff"),
+        phone: z.string().max(50).optional(),
+        address: z.string().max(500).optional(),
+        // SECURITY: Removed role field — public registration always creates staff
+        // Only existing admins can create new admins via admin panel
       })
     )
     .mutation(async ({ input }) => {
       const db = getDb();
 
-      // Check if any admin already exists (first-admin seed protection)
-      const adminCount = await db.select().from(localUsers).where(eq(localUsers.role, "admin")).limit(1);
-      const hasExistingAdmin = adminCount.length > 0;
-
-      // Force role to "staff" for public registration — only existing admins can create new admins
-      const assignedRole = hasExistingAdmin ? "staff" : input.role;
+      // Public registration always creates staff users
+      const assignedRole = "staff";
 
       const existing = await db.select().from(localUsers).where(eq(localUsers.email, input.email)).limit(1);
       if (existing.length > 0) {

@@ -79,8 +79,11 @@ export const reportRouter = createRouter({
         .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(properties.createdAt));
 
+      // SECURITY: Mask PII in exports
       const formattedData = data.map((row) => ({
         ...row,
+        ownerCID: row.ownerCID ? `${row.ownerCID.slice(0, 3)}****${row.ownerCID.slice(-4)}` : "",
+        ownerPhone: row.ownerPhone ? `${row.ownerPhone.slice(0, 4)}****${row.ownerPhone.slice(-3)}` : "",
         sellingPrice: String(row.sellingPrice),
         realEstateFee: String(row.realEstateFee),
         currentStep: String(row.currentStep),
