@@ -164,8 +164,6 @@ const chatRateLimitMiddleware = t.middleware(async (opts) => {
   return next({ ctx: { ...ctx, unifiedUser: ctx.unifiedUser } });
 });
 
-export const chatRateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(requireAuth).use(chatRateLimitMiddleware);
-
 // ─── Auth middlewares ────────────────────────────────────────────────
 const requireAuth = t.middleware(async (opts) => {
   const { ctx, next } = opts;
@@ -216,3 +214,6 @@ const requireStaff = t.middleware(async (opts) => {
 export const authedQuery = t.procedure.use(sanitizeMiddleware).use(requireAuth);
 export const adminQuery = authedQuery.use(requireAdmin);
 export const staffQuery = authedQuery.use(requireStaff);
+
+// Chatbot rate limiter export (must be after requireAuth is defined)
+export const chatRateLimitedQuery = t.procedure.use(sanitizeMiddleware).use(requireAuth).use(chatRateLimitMiddleware);
