@@ -53,6 +53,16 @@ export async function uploadFile(
     throw new Error("File type not allowed. Allowed types: PDF, Word (.doc, .docx), PNG, JPEG");
   }
 
+  // Debug: Check magic bytes before validation
+  const isPdf = file.length > 4 && file[0] === 0x25 && file[1] === 0x50 && file[2] === 0x44 && file[3] === 0x46;
+  logger.info("Upload debug", { 
+    fileName, 
+    size: file.length, 
+    isPdf, 
+    firstBytes: file.slice(0, 10).toString("hex"),
+    firstChars: file.slice(0, 10).toString("ascii")
+  });
+
   if (!validateMagicBytes(file, resolvedMime)) {
     throw new Error("File content does not match claimed file type");
   }
@@ -69,9 +79,19 @@ export async function uploadFile(
   const filePath = path.join(folderPath, `${uuid}.${ext}`);
   await fs.writeFile(filePath, file);
 
-  const publicUrl = `/uploads/${key}`;
+  // Verify written file
+  const writtenFile = await fs.readFile(filePath);
+  const writtenIsPdf = writtenFile.length > 4 && writtenFile[0] === 0x25 && writtenFile[1] === 0x50 && writtenFile[2] === 0x44 && writtenFile[3] === 0x46;
+  logger.info("File uploaded and verified", { 
+    key, 
+    filePath, 
+    size: file.length, 
+    writtenSize: writtenFile.length,
+    mimeType: resolvedMime,
+    isPdf: writtenIsPdf
+  });
 
-  logger.info("File uploaded", { key, filePath, size: file.length, mimeType: resolvedMime });
+  const publicUrl = `/uploads/${key}`;
 
   return {
     key,

@@ -57,11 +57,16 @@ export function buildUploadFileResponse(filePath: string): Response {
   const contentType = getContentType(filePath);
   const file = fs.readFileSync(filePath);
   
+  // Check if file starts with PDF magic bytes (%PDF-)
+  const isPdf = file.length > 4 && file[0] === 0x25 && file[1] === 0x50 && file[2] === 0x44 && file[3] === 0x46;
+  
   logger.info("Serving file", { 
     filePath, 
     contentType, 
     size: file.length,
-    firstBytes: file.slice(0, 10).toString("hex")
+    isPdf,
+    firstBytes: file.slice(0, 10).toString("hex"),
+    firstChars: file.slice(0, 10).toString("ascii")
   });
   
   const headers: Record<string, string> = {
