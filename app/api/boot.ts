@@ -115,8 +115,7 @@ app.get("/ready", async (c) => {
   }
 });
 
-// SECURITY: Reduced from 50MB to 20MB to prevent DoS via large uploads
-app.use(bodyLimit({ maxSize: 20 * 1024 * 1024 }));
+app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }}));
 app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 app.use("/api/trpc/*", async (c) => {
   return fetchRequestHandler({
