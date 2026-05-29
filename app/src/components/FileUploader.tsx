@@ -7,36 +7,7 @@ import {
 } from "@contracts/upload";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
-
-/** Validate URL is safe (http/https only) before rendering as link */
-function isSafeUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url, window.location.href);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function SafeFileLink({ url }: { url: string }) {
-  if (!isSafeUrl(url)) {
-    return (
-      <span className="text-sm font-medium text-destructive truncate block">
-        Invalid file URL
-      </span>
-    );
-  }
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-sm font-medium text-primary hover:underline truncate block"
-    >
-      View Uploaded File
-    </a>
-  );
-}
+import { SecureFileLink } from "./SecureFileLink";
 
 interface FileUploaderProps {
   accept?: string;
@@ -177,7 +148,7 @@ export function FileUploader({
             <FileText className="h-8 w-8 text-green-500" />
           )}
           <div className="flex-1 min-w-0">
-            <SafeFileLink url={value} />
+            <SecureFileLink url={value} label="View Uploaded File" />
             <p className="text-xs text-muted-foreground">Click to open in new tab</p>
           </div>
           <Button
