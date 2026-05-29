@@ -136,6 +136,10 @@ export function useWebSocket(token?: string) {
   const handleAttendance = useCallback(
     (_data: Record<string, unknown>) => {
       queryClient.invalidateQueries({ queryKey: ["attendance", "list"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance", "myAttendance"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance", "dailyStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance", "monthlySummary"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance", "allStaffStats"] });
     },
     [queryClient]
   );

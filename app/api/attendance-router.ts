@@ -5,6 +5,29 @@ import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { attendance, localUsers } from "@db/schema";
 
+/**
+ * Get today's date string in Bhutan timezone (YYYY-MM-DD)
+ */
+function getBhutanDateStr(date: Date = new Date()): string {
+  return date.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
+}
+
+/**
+ * Get month boundaries in Bhutan timezone
+ */
+function getMonthBoundaries(monthStr: string): { startDate: string; endDate: string } {
+  const [year, month] = monthStr.split("-");
+  // Use Bhutan timezone for month boundary calculation
+  const start = new Date(`${year}-${month}-01T00:00:00+06:00`);
+  const end = new Date(start.getTime());
+  end.setMonth(end.getMonth() + 1);
+  end.setDate(0); // Last day of month
+  return {
+    startDate: getBhutanDateStr(start),
+    endDate: getBhutanDateStr(end),
+  };
+}
+
 export const attendanceRouter = createRouter({
   checkIn: staffQuery
     .input(z.object({ notes: z.string().optional() }))
@@ -13,8 +36,8 @@ export const attendanceRouter = createRouter({
       const userId = ctx.unifiedUser!.id;
       const now = new Date();
 
-      // Use local date string (Bhutan timezone UTC+6) instead of UTC
-      const localDateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
+      // Use Bhutan timezone for date
+      const localDateStr = getBhutanDateStr(now);
 
       // Use Bhutan timezone (Asia/Thimphu, UTC+6) for late detection
       const bhutanHour = parseInt(
@@ -23,13 +46,14 @@ export const attendanceRouter = createRouter({
       const status: "present" | "late" | "absent" | "half_day" = bhutanHour > 9 ? "late" : "present";
 
       return await db.transaction(async (tx) => {
+        // Use direct date string comparison instead of DATE() function to avoid timezone issues
         const existing = await tx
           .select()
           .from(attendance)
           .where(
             and(
               eq(attendance.userId, userId),
-              sql`DATE(${attendance.date}) = ${localDateStr}`
+              eq(attendance.date, localDateStr)
             )
           )
           .limit(1);
@@ -40,7 +64,7 @@ export const attendanceRouter = createRouter({
 
         const result = await tx.insert(attendance).values({
           userId,
-          date: new Date(`${localDateStr}T00:00:00+06:00`),
+          date: localDateStr,
           checkIn: now,
           status,
           notes: input.notes,
@@ -55,17 +79,18 @@ export const attendanceRouter = createRouter({
     const userId = ctx.unifiedUser!.id;
     const now = new Date();
 
-    // Use local date string (Bhutan timezone UTC+6) instead of UTC
-    const localDateStr = now.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
+    // Use Bhutan timezone for date
+    const localDateStr = getBhutanDateStr(now);
 
     return await db.transaction(async (tx) => {
+      // Use direct date string comparison
       const existing = await tx
         .select()
         .from(attendance)
         .where(
           and(
             eq(attendance.userId, userId),
-            sql`DATE(${attendance.date}) = ${localDateStr}`
+            eq(attendance.date, localDateStr)
           )
         )
         .limit(1);
@@ -92,10 +117,7 @@ export const attendanceRouter = createRouter({
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const userId = ctx.unifiedUser!.id;
-      const [year, month] = input.month.split("-");
-      const startDate = `${year}-${month}-01`;
-      const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const results = await db.select().from(attendance)
         .where(
@@ -146,10 +168,8 @@ export const attendanceRouter = createRouter({
       if (input.status) conditions.push(eq(attendance.status, input.status));
       if (input.userName) conditions.push(sql`${localUsers.fullName} LIKE ${`%${input.userName}%`}`);
       if (input.month) {
-        const [year, month] = input.month.split("-");
-        const lastDay = new Date(Number(year), Number(month), 0).getDate();
-        const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
-        conditions.push(sql`${attendance.date} >= ${`${year}-${month}-01`}`);
+        const { startDate, endDate } = getMonthBoundaries(input.month);
+        conditions.push(sql`${attendance.date} >= ${startDate}`);
         conditions.push(sql`${attendance.date} <= ${endDate}`);
       }
 
@@ -189,11 +209,12 @@ export const attendanceRouter = createRouter({
       const db = getDb();
 
       return await db.transaction(async (tx) => {
+        // Use direct date string comparison
         const existing = await tx.select().from(attendance)
           .where(
             and(
               eq(attendance.userId, input.userId),
-              sql`DATE(${attendance.date}) = ${input.date}`
+              eq(attendance.date, input.date)
             )
           )
           .limit(1);
@@ -205,7 +226,7 @@ export const attendanceRouter = createRouter({
         } else {
           await tx.insert(attendance).values({
             userId: input.userId,
-            date: new Date(`${input.date}T00:00:00+06:00`),
+            date: input.date,
             status: input.status,
             notes: input.notes,
           });
@@ -227,10 +248,7 @@ export const attendanceRouter = createRouter({
     .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
-      const [year, month] = input.month.split("-");
-      const startDate = `${year}-${month}-01`;
-      const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const summary = await db.select({
         userId: attendance.userId,
@@ -258,10 +276,7 @@ export const attendanceRouter = createRouter({
     .input(z.object({ month: z.string().regex(/^\d{4}-\d{2}$/, "Month must be YYYY-MM") }))
     .query(async ({ input }) => {
       const db = getDb();
-      const [year, month] = input.month.split("-");
-      const startDate = `${year}-${month}-01`;
-      const lastDay = new Date(Number(year), Number(month), 0).getDate();
-      const endDate = `${year}-${month}-${String(lastDay).padStart(2, "0")}`;
+      const { startDate, endDate } = getMonthBoundaries(input.month);
 
       const statsResult = await db.select({
         present: sql<number>`SUM(CASE WHEN ${attendance.status} = 'present' THEN 1 ELSE 0 END)`,
@@ -283,14 +298,14 @@ export const attendanceRouter = createRouter({
   dailyStatus: adminQuery
     .query(async () => {
       const db = getDb();
-      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
+      const today = getBhutanDateStr();
 
       const records = await db.select({
         status: attendance.status,
         count: count(),
       })
         .from(attendance)
-        .where(sql`DATE(${attendance.date}) = ${today}`)
+        .where(eq(attendance.date, today))
         .groupBy(attendance.status);
 
       const totalStaff = await db.select({ count: count() }).from(localUsers).where(eq(localUsers.role, "staff"));

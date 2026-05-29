@@ -84,6 +84,11 @@ export default function AttendancePage() {
   const checkInMutation = trpc.attendance.checkIn.useMutation({
     onSuccess: (data) => {
       toast.success(`Checked in! Status: ${data.status}`);
+      utils.attendance.myAttendance.invalidate();
+      utils.attendance.list.invalidate();
+      utils.attendance.dailyStatus.invalidate();
+      utils.attendance.monthlySummary.invalidate();
+      utils.attendance.allStaffStats.invalidate();
     },
     onError: (err) => toast.error(err.message),
   });
@@ -101,6 +106,7 @@ export default function AttendancePage() {
     onSuccess: () => {
       toast.success("Attendance marked successfully");
       setShowMarkDialog(false);
+      utils.attendance.myAttendance.invalidate();
       utils.attendance.list.invalidate();
       utils.attendance.monthlySummary.invalidate();
       utils.attendance.allStaffStats.invalidate();
