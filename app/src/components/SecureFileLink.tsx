@@ -11,7 +11,7 @@ interface SecureFileLinkProps {
 
 /**
  * SecureFileLink — fetches authenticated files with credentials
- * and opens them in a new blob URL.
+ * and opens them via download or object URL.
  *
  * This is required because /uploads/* now requires authentication.
  * Regular <a href="/uploads/..."> links open in new tabs WITHOUT
@@ -54,10 +54,19 @@ export function SecureFileLink({ url, label, icon = "file", className = "" }: Se
         }
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
-        const newWindow = window.open(blobUrl, "_blank");
-        if (!newWindow) {
-          toast.error("Popup blocked. Please allow popups for this site.");
-        }
+
+        // Extract filename from URL or use default
+        const urlParts = url.split("/");
+        const fileName = urlParts[urlParts.length - 1] || "download";
+
+        // Create download link
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
         // Clean up blob URL after a delay
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } catch (err) {
@@ -109,10 +118,19 @@ export function SecureDocLink({ url, children, className = "" }: { url: string; 
         }
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
-        const newWindow = window.open(blobUrl, "_blank");
-        if (!newWindow) {
-          toast.error("Popup blocked. Please allow popups for this site.");
-        }
+
+        // Extract filename from URL
+        const urlParts = url.split("/");
+        const fileName = urlParts[urlParts.length - 1] || "download";
+
+        // Create download link
+        const a = document.createElement("a");
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
         setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       } catch (err) {
         toast.error("Failed to load file. Please try again.");
