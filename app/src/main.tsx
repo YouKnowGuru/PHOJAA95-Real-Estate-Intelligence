@@ -10,6 +10,17 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
 import App from './App.tsx'
 
+// Handle Vite chunk load/preload errors automatically by reloading the page
+window.addEventListener("vite:preloadError", (event) => {
+  console.warn("Vite preload error detected, reloading page...", event);
+  const lastReload = sessionStorage.getItem("chunk-error-reload");
+  const now = Date.now();
+  if (!lastReload || now - parseInt(lastReload, 10) > 10000) {
+    sessionStorage.setItem("chunk-error-reload", now.toString());
+    window.location.reload();
+  }
+});
+
 function AppFallback() {
   return (
     <div className="flex h-screen items-center justify-center">
