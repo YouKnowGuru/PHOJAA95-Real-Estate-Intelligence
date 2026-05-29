@@ -2,6 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
+
+/**
+ * Fix Cloudinary f_auto URLs that may serve JXL (JPEG XL) format
+ * which is not supported by Safari/iOS. Replace with f_jpg for universal compatibility.
+ */
+function fixCloudinaryUrl(url: string): string {
+  if (!url) return url;
+  return url.replace(/\/f_auto(?=\/,)/g, "/f_jpg");
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -319,10 +328,10 @@ export default function PropertyDetail() {
           <div className="md:col-span-2 lg:col-span-2 xl:col-span-3 aspect-[16/9] relative rounded-2xl overflow-hidden shadow-sm border border-border/50 group bg-slate-100 dark:bg-slate-900">
             {data.images && data.images.length > 0 && !mainImageError ? (
               <img
-                src={data.images[0].url}
+                src={fixCloudinaryUrl(data.images[0].url)}
                 alt={property.propertyName}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 cursor-pointer"
-                onClick={() => setSelectedImage(data.images[0].url)}
+                onClick={() => setSelectedImage(fixCloudinaryUrl(data.images[0].url))}
                 onError={() => setMainImageError(true)}
               />
             ) : (
@@ -343,10 +352,10 @@ export default function PropertyDetail() {
               <div key={idx} className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-slate-50 dark:bg-slate-900 group">
                 {!thumbError[idx] ? (
                   <img
-                    src={img.url}
+                    src={fixCloudinaryUrl(img.url)}
                     alt={`Property ${idx + 1}`}
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 cursor-pointer"
-                    onClick={() => setSelectedImage(img.url)}
+                    onClick={() => setSelectedImage(fixCloudinaryUrl(img.url))}
                     onError={() => setThumbError(prev => ({ ...prev, [idx]: true }))}
                   />
                 ) : (
@@ -359,10 +368,10 @@ export default function PropertyDetail() {
             {data.images.length > 5 && (
               <div
                 className="aspect-square rounded-xl overflow-hidden border border-border/50 bg-slate-100 dark:bg-slate-900 flex items-center justify-center relative group cursor-pointer"
-                onClick={() => setSelectedImage(data.images[5].url)}
+                onClick={() => setSelectedImage(fixCloudinaryUrl(data.images[5].url))}
               >
                 <img
-                  src={data.images[5].url}
+                  src={fixCloudinaryUrl(data.images[5].url)}
                   className="w-full h-full object-cover opacity-40 blur-sm"
                   alt="More images"
                 />

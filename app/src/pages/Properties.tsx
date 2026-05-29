@@ -3,6 +3,16 @@ import { Link } from "react-router";
 import { trpc } from "@/lib/trpc";
 import type { RouterOutputs } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
+
+/**
+ * Fix Cloudinary f_auto URLs that may serve JXL (JPEG XL) format
+ * which is not supported by Safari/iOS. Replace with f_jpg for universal compatibility.
+ */
+function fixCloudinaryUrl(url: string): string {
+  if (!url) return url;
+  // Replace f_auto with f_jpg to avoid JXL on Safari
+  return url.replace(/\/f_auto(?=\/,)/g, "/f_jpg");
+}
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -440,7 +450,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
             <div className="relative aspect-[4/3] sm:aspect-[16/10] w-full overflow-hidden bg-muted">
               {property.images && property.images.length > 0 && !imageError ? (
                 <img
-                  src={property.images[0].url}
+                  src={fixCloudinaryUrl(property.images[0].url)}
                   alt={property.propertyName}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                   onError={() => setImageError(true)}

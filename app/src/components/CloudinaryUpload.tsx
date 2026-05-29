@@ -4,6 +4,15 @@ import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { cn } from "@/lib/utils";
 
+/**
+ * Fix Cloudinary f_auto URLs that may serve JXL (JPEG XL) format
+ * which is not supported by Safari/iOS. Replace with f_jpg for universal compatibility.
+ */
+function fixCloudinaryUrl(url: string): string {
+  if (!url) return url;
+  return url.replace(/\/f_auto(?=\/,)/g, "/f_jpg");
+}
+
 interface CloudinaryImage {
   url: string;
   publicId?: string;
@@ -105,7 +114,7 @@ export function CloudinaryUpload({
         {value.map((img, index) => (
           <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50">
             <img 
-              src={img.url} 
+              src={fixCloudinaryUrl(img.url)} 
               alt={`Property ${index}`} 
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
             />
