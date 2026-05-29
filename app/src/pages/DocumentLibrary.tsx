@@ -2,6 +2,7 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { FileUploader } from "@/components/FileUploader";
+import { SecureFileLink } from "@/components/SecureFileLink";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -277,12 +278,11 @@ export default function DocumentLibrary() {
                     </p>
 
                     <div className="flex gap-2 mt-4 pt-4 border-t border-border/30 mt-auto">
-                      <Button variant="outline" size="sm" className="flex-1 rounded-xl border-border/40" asChild>
-                        <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                          <Download className="mr-1.5 h-3.5 w-3.5" />
-                          Download
-                        </a>
-                      </Button>
+                      <SecureFileLink
+                        url={doc.fileUrl}
+                        label="Download"
+                        className="flex-1 justify-center rounded-xl border border-border/40 bg-background hover:bg-accent px-3 py-2 text-xs font-medium"
+                      />
                       <Button
                         variant="ghost"
                         size="icon"
