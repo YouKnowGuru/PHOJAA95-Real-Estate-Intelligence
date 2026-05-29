@@ -627,10 +627,24 @@ export const chatbotRouter = createRouter({
         }
 
         for (const msg of history) {
+            // Parse toolCalls if stored as string (Drizzle JSON field quirk)
+            let parsedToolCalls: OpenRouterMessage["tool_calls"] | undefined;
+            if (msg.toolCalls) {
+                if (typeof msg.toolCalls === "string") {
+                    try {
+                        parsedToolCalls = JSON.parse(msg.toolCalls) as OpenRouterMessage["tool_calls"];
+                    } catch {
+                        parsedToolCalls = undefined;
+                    }
+                } else {
+                    parsedToolCalls = msg.toolCalls as OpenRouterMessage["tool_calls"];
+                }
+            }
+
             messages.push({
                 role: msg.role as OpenRouterMessage["role"],
                 content: msg.content,
-                tool_calls: msg.toolCalls as OpenRouterMessage["tool_calls"] | undefined,
+                tool_calls: parsedToolCalls,
                 tool_call_id: msg.toolCallId || undefined,
                 name: msg.toolName || undefined,
             });
