@@ -15,8 +15,29 @@ const MAGIC_BYTES: Record<string, number[]> = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [0x50, 0x4b, 0x03, 0x04],
 };
 
+/**
+ * Sanitize a single path component (filename or folder name).
+ * Replaces slashes and collapses ".." — safe for individual name segments.
+ */
 function sanitizePath(input: string): string {
   return input.replace(/[\\/]/g, "_").replace(/\.{2,}/g, "_");
+}
+
+/**
+ * Sanitize a full storage key that may contain forward-slash separators
+ * (e.g. "properties/123/step-2/abc.pdf"). Only blocks path traversal (..);
+ * preserves the directory structure.
+ *
+ * SECURITY: The result is always validated against UPLOAD_DIR with path.resolve
+ * before any file operation, so the traversal check here is defence-in-depth.
+ */
+function sanitizeKey(key: string): string {
+  // Reject any key that contains ".." (path traversal attempt)
+  if (key.includes("..")) {
+    throw new Error("Invalid file key: path traversal not allowed");
+  }
+  // Normalise backslashes to forward slashes, then strip leading slashes
+  return key.replace(/\\/g, "/").replace(/^\/+/, "");
 }
 
 function validateMagicBytes(buffer: Buffer, claimedMimeType: string): boolean {
@@ -104,22 +125,25 @@ export async function uploadFile(
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  const safeKey = sanitizePath(key);
+  // Use sanitizeKey (preserves '/') not sanitizePath (replaces '/' → '_').
+  // Storage keys contain sub-directories, e.g. "properties/123/step-2/abc.pdf".
+  const safeKey = sanitizeKey(key);
   const filePath = path.join(UPLOAD_DIR, safeKey);
   const resolvedPath = path.resolve(filePath);
   const resolvedUploadDir = path.resolve(UPLOAD_DIR);
-  if (!resolvedPath.startsWith(resolvedUploadDir)) {
+  if (!resolvedPath.startsWith(resolvedUploadDir + path.sep) && resolvedPath !== resolvedUploadDir) {
     throw new Error("Invalid file path");
   }
   try {
     await fs.unlink(resolvedPath);
   } catch {
-    // ignore
+    // ignore — file may have already been deleted
   }
 }
 
 export async function getSignedDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
-  const safeKey = sanitizePath(key);
+  // Use sanitizeKey (preserves '/') so the URL path keeps sub-directory structure.
+  const safeKey = sanitizeKey(key);
   // Generate a time-limited signed URL with HMAC signature
   const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
   const signature = await generateSignature(safeKey, expiresAt);
@@ -151,7 +175,7 @@ export async function verifySignature(key: string, expiresAt: number, signature:
 }
 
 export async function listFiles(prefix: string): Promise<string[]> {
-  const safePrefix = sanitizePath(prefix);
+  const safePrefix = sanitizeKey(prefix);
   const folderPath = path.join(UPLOAD_DIR, safePrefix);
   const resolvedPath = path.resolve(folderPath);
   const resolvedUploadDir = path.resolve(UPLOAD_DIR);
@@ -166,7 +190,7 @@ export async function listFiles(prefix: string): Promise<string[]> {
 }
 
 export async function deleteFolder(prefix: string): Promise<void> {
-  const safePrefix = sanitizePath(prefix);
+  const safePrefix = sanitizeKey(prefix);
   const folderPath = path.join(UPLOAD_DIR, safePrefix);
   const resolvedPath = path.resolve(folderPath);
   const resolvedUploadDir = path.resolve(UPLOAD_DIR);

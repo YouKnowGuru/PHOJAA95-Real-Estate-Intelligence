@@ -80,6 +80,14 @@ export function buildUploadFileResponse(filePath: string): Response {
     // Accept-Ranges lets browsers resume downloads and fetch partial
     // content for PDF viewers, improving reliability.
     "Accept-Ranges": "bytes",
+    // Vary tells CDN/caches that Accept-Encoding affects the response.
+    // Combined with no-transform this prevents double-compression.
+    "Vary": "Accept-Encoding",
+    // Security headers: these raw Response objects bypass the Hono
+    // global security middleware (which mutates c.res, not a returned
+    // Response), so we must set them explicitly here.
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
   };
   if (contentType === "application/pdf") {
     // Use attachment (not inline) so the browser consistently triggers
@@ -92,7 +100,13 @@ export function buildUploadFileResponse(filePath: string): Response {
   ) {
     headers["Content-Disposition"] = `attachment; filename="${path.basename(filePath)}"`;
   }
-  return new Response(file, { status: 200, headers });
+
+  // BINARY-SAFETY: Explicitly convert Buffer to Uint8Array for the Web Response
+  // constructor. Node.js Buffer is a Uint8Array subclass but some versions of
+  // Hono/undici treat them differently — explicit conversion prevents body
+  // truncation or encoding issues on binary responses.
+  const body = new Uint8Array(file.buffer, file.byteOffset, file.byteLength);
+  return new Response(body, { status: 200, headers });
 }
 
 function respondUploadError(c: Context, result: Extract<ResolveResult, { ok: false }>, reqPath: string) {
@@ -134,7 +148,7 @@ async function isAuthenticated(req: Request): Promise<boolean> {
   if (oauthToken) {
     const claim = await verifySessionToken(oauthToken);
     if (claim) {
-      logger.info("Upload auth: OAuth token valid", { userId: claim.userId });
+      logger.info("Upload auth: OAuth token valid", { unionId: claim.unionId });
       return true;
     }
     logger.warn("Upload auth: OAuth token invalid");

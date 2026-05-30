@@ -171,5 +171,8 @@ export function generateCertificatePdfBase64(data: CertificateData): string {
   y += 5;
   doc.text("Date", pageWidth - margin - 60, y);
 
-  return doc.output("datauristring");
+  // Return only the raw base64 portion (strip "data:application/pdf;base64," prefix).
+  // The exportBilling handler does the same split on line 2318 of property-router.ts —
+  // keep both consistent so callers always receive pure base64, not a full Data-URI.
+  return doc.output("datauristring").split(",")[1];
 }
