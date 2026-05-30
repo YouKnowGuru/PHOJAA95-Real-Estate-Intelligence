@@ -97,6 +97,7 @@ export function GoogleMapPicker({
         attribution: '&copy; <a href="https://www.google.com/maps">Google</a>',
         maxZoom: 22,
         subdomains: ["mt0", "mt1", "mt2", "mt3"],
+        crossOrigin: true,
       }
     ).addTo(map);
 
@@ -107,6 +108,7 @@ export function GoogleMapPicker({
         attribution: '&copy; <a href="https://www.google.com/maps">Google</a>',
         maxZoom: 22,
         subdomains: ["mt0", "mt1", "mt2", "mt3"],
+        crossOrigin: true,
       }
     ).addTo(map);
 

@@ -75,7 +75,7 @@ app.use("*", async (c, next) => {
   c.res.headers.set("X-Content-Type-Options", "nosniff");
   c.res.headers.set("X-Frame-Options", "DENY");
   c.res.headers.set("X-XSS-Protection", "1; mode=block");
-  c.res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  c.res.headers.set("Referrer-Policy", "no-referrer-when-downgrade");
   // Security: Content Security Policy.
   // Note: 'unsafe-inline' for scripts is needed for Vite/React in development.
   // In production with a proper build, consider using CSP nonces or hashes.
@@ -85,10 +85,10 @@ app.use("*", async (c, next) => {
     [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com",
-      "font-src 'self'",
-      "connect-src 'self' https://api.cloudinary.com wss: ws:",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://res.cloudinary.com https://*.cloudinary.com https://*.google.com https://*.gstatic.com https://*.openstreetmap.org",
+      "font-src 'self' https://fonts.gstatic.com",
+      "connect-src 'self' https://api.cloudinary.com wss: ws: https://nominatim.openstreetmap.org",
       "frame-src 'self'",
       "object-src 'none'",
       "base-uri 'self'",
@@ -107,6 +107,9 @@ app.get("/ready", async (c) => {
     // Basic DB connectivity check
     const { getDb } = await import("./queries/connection");
     const db = getDb();
+    if (!db) {
+      throw new Error("Database connection not initialized");
+    }
     await db.execute("SELECT 1");
     return c.json({ status: "ready", db: "connected" });
   } catch (err) {
