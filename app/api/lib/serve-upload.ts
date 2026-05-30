@@ -56,27 +56,36 @@ function getContentType(filePath: string): string {
 export function buildUploadFileResponse(filePath: string): Response {
   const contentType = getContentType(filePath);
   const file = fs.readFileSync(filePath);
-  
+
   // Check if file starts with PDF magic bytes (%PDF-)
   const isPdf = file.length > 4 && file[0] === 0x25 && file[1] === 0x50 && file[2] === 0x44 && file[3] === 0x46;
-  
-  logger.info("Serving file", { 
-    filePath, 
-    contentType, 
+
+  logger.info("Serving file", {
+    filePath,
+    contentType,
     size: file.length,
     isPdf,
     firstBytes: file.slice(0, 10).toString("hex"),
     firstChars: file.slice(0, 10).toString("ascii")
   });
-  
+
   const headers: Record<string, string> = {
     "Content-Type": contentType,
     "Content-Length": file.length.toString(),
-    "Cache-Control": "public, max-age=86400",
+    // no-transform prevents CDNs/proxies from compressing or otherwise
+    // transforming binary file responses. PDFs are already compressed
+    // internally; gzip/brotli on top often makes them larger and can
+    // corrupt downloads if the Content-Encoding header is mishandled.
+    "Cache-Control": "public, max-age=86400, no-transform",
+    // Accept-Ranges lets browsers resume downloads and fetch partial
+    // content for PDF viewers, improving reliability.
+    "Accept-Ranges": "bytes",
   };
   if (contentType === "application/pdf") {
-    // Allow inline viewing for PDFs - browser handles display
-    headers["Content-Disposition"] = `inline; filename="${path.basename(filePath)}"`;
+    // Use attachment (not inline) so the browser consistently triggers
+    // a download dialog instead of relying on the PDF viewer plugin,
+    // which avoids CDN compression issues with inline display.
+    headers["Content-Disposition"] = `attachment; filename="${path.basename(filePath)}"`;
   } else if (
     contentType === "application/msword" ||
     contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
