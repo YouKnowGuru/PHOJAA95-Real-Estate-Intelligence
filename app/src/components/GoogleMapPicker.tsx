@@ -39,7 +39,6 @@ export function GoogleMapPicker({
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [address, setAddress] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<SearchResult[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -135,7 +134,15 @@ export function GoogleMapPicker({
       handleLocationChange(clickLat, clickLng);
     });
 
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+    });
+    if (mapRef.current) {
+      resizeObserver.observe(mapRef.current);
+    }
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapInstanceRef.current = null;
       markerRef.current = null;
@@ -183,7 +190,6 @@ export function GoogleMapPicker({
       const data = await response.json();
       const addressStr = data.display_name || "";
       if (addressStr) {
-        setAddress(addressStr);
         setSearchQuery(addressStr);
         // Hide suggestions when setting from map click to prevent overlay blocking the page
         setShowSuggestions(false);
@@ -250,7 +256,6 @@ export function GoogleMapPicker({
 
   const selectSuggestion = (result: SearchResult) => {
     setSearchQuery(result.display_name);
-    setAddress(result.display_name);
     setSuggestions([]);
     setShowSuggestions(false);
     setActiveIndex(-1);
@@ -323,7 +328,6 @@ export function GoogleMapPicker({
         const newLat = parseFloat(resultLat);
         const newLon = parseFloat(resultLon);
 
-        setAddress(display_name);
         setSearchQuery(display_name);
         onChangeRef.current?.({ lat: resultLat, lng: resultLon, address: display_name });
 
