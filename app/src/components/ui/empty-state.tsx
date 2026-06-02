@@ -3,11 +3,12 @@ import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { PackageOpen } from "lucide-react";
 
-interface EmptyStateProps extends React.ComponentProps<"div"> {
+interface EmptyStateProps {
   icon?: React.ElementType;
   title?: string;
   description?: string;
   action?: React.ReactNode;
+  className?: string;
 }
 
 export function EmptyState({

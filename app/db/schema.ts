@@ -36,7 +36,7 @@ export const localUsers = mysqlTable("local_users", {
   fullName: varchar("full_name", { length: 255 }).notNull(),
   email: varchar("email", { length: 320 }).notNull().unique(),
   password: varchar("password", { length: 255 }).notNull(),
-  role: mysqlEnum("role", ["staff", "admin"]).default("staff").notNull(),
+  role: mysqlEnum("role", ["staff", "admin", "developer", "architecture_staff"]).default("staff").notNull(),
   phone: varchar("phone", { length: 20 }),
   address: text("address"),
   profileImage: text("profile_image"),
@@ -450,3 +450,825 @@ export const libraryDocuments = mysqlTable("library_documents", {
 
 export type LibraryDocument = typeof libraryDocuments.$inferSelect;
 export type InsertLibraryDocument = typeof libraryDocuments.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════
+// SOFTWARE DEVELOPMENT MANAGEMENT MODULE
+// ═══════════════════════════════════════════════════════════════════════
+
+// ─── SOFTWARE PRODUCTS ───────────────────────────────────────────────
+export const softwareProducts = mysqlTable("software_products", {
+  id: serial("id").primaryKey(),
+  productCode: varchar("product_code", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  category: mysqlEnum("category", [
+    "website",
+    "web_application",
+    "android_application",
+    "ios_application",
+    "desktop_software",
+    "erp_system",
+    "pos_system",
+    "crm_system",
+    "ecommerce_platform",
+    "saas_platform",
+    "api_service",
+    "custom_software",
+    "other",
+  ]).notNull(),
+  shortDescription: text("short_description"),
+  detailedDescription: text("detailed_description"),
+  features: json("features"),
+  technologiesUsed: text("technologies_used"),
+  estimatedDuration: varchar("estimated_duration", { length: 100 }),
+  price: decimal("price", { precision: 15, scale: 2 }).default("0").notNull(),
+  thumbnail: text("thumbnail"),
+  screenshots: json("screenshots"),
+  demoUrl: text("demo_url"),
+  documentationUrl: text("documentation_url"),
+  version: varchar("version", { length: 50 }).default("1.0.0"),
+  warrantyPeriod: int("warranty_period").default(0),
+  maintenancePeriod: int("maintenance_period").default(0),
+  status: mysqlEnum("status", [
+    "draft",
+    "pending_approval",
+    "approved",
+    "under_development",
+    "testing",
+    "completed",
+    "published",
+    "archived",
+    "rejected",
+  ]).default("draft").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_products_status").on(table.status),
+  index("idx_software_products_category").on(table.category),
+  index("idx_software_products_created_by").on(table.createdBy),
+  index("idx_software_products_code").on(table.productCode),
+]);
+
+export type SoftwareProduct = typeof softwareProducts.$inferSelect;
+export type InsertSoftwareProduct = typeof softwareProducts.$inferInsert;
+
+// ─── SOFTWARE PRODUCT FEATURES (additional features for sales) ───────
+export const softwareProductFeatures = mysqlTable("software_product_features", {
+  id: serial("id").primaryKey(),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull().references(() => softwareProducts.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 15, scale: 2 }).default("0").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_spf_product").on(table.productId),
+]);
+
+export type SoftwareProductFeature = typeof softwareProductFeatures.$inferSelect;
+
+// ─── SOFTWARE CUSTOMERS ──────────────────────────────────────────────
+export const softwareCustomers = mysqlTable("software_customers", {
+  id: serial("id").primaryKey(),
+  customerId: varchar("customer_id", { length: 50 }).notNull().unique(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  companyName: varchar("company_name", { length: 255 }),
+  contactPerson: varchar("contact_person", { length: 255 }),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  alternatePhone: varchar("alternate_phone", { length: 20 }),
+  email: varchar("email", { length: 320 }).notNull(),
+  country: varchar("country", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  city: varchar("city", { length: 100 }),
+  address: text("address"),
+  postalCode: varchar("postal_code", { length: 20 }),
+  taxNumber: varchar("tax_number", { length: 100 }),
+  notes: text("notes"),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_customers_email").on(table.email),
+  index("idx_software_customers_phone").on(table.phone),
+  index("idx_software_customers_customer_id").on(table.customerId),
+]);
+
+export type SoftwareCustomer = typeof softwareCustomers.$inferSelect;
+export type InsertSoftwareCustomer = typeof softwareCustomers.$inferInsert;
+
+// ─── SOFTWARE PROJECTS ───────────────────────────────────────────────
+export const softwareProjects = mysqlTable("software_projects", {
+  id: serial("id").primaryKey(),
+  projectId: varchar("project_id", { length: 50 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull(),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => softwareCustomers.id, { onDelete: "restrict" }),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull().references(() => softwareProducts.id, { onDelete: "restrict" }),
+  description: text("description"),
+  scopeOfWork: text("scope_of_work"),
+  requirements: text("requirements"),
+  estimatedBudget: decimal("estimated_budget", { precision: 15, scale: 2 }),
+  estimatedDuration: varchar("estimated_duration", { length: 100 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  priority: mysqlEnum("priority", ["low", "medium", "high", "urgent"]).default("medium").notNull(),
+  assignedDeveloperId: bigint("assigned_developer_id", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  status: mysqlEnum("status", [
+    "draft",
+    "pending_approval",
+    "approved",
+    "in_progress",
+    "testing",
+    "uat",
+    "completed",
+    "delivered",
+    "rejected",
+    "cancelled",
+  ]).default("draft").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  completionNotes: text("completion_notes"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_projects_status").on(table.status),
+  index("idx_software_projects_customer").on(table.customerId),
+  index("idx_software_projects_product").on(table.productId),
+  index("idx_software_projects_developer").on(table.assignedDeveloperId),
+  index("idx_software_projects_project_id").on(table.projectId),
+]);
+
+export type SoftwareProject = typeof softwareProjects.$inferSelect;
+export type InsertSoftwareProject = typeof softwareProjects.$inferInsert;
+
+// ─── SOFTWARE PROJECT FILES ──────────────────────────────────────────
+export const softwareProjectFiles = mysqlTable("software_project_files", {
+  id: serial("id").primaryKey(),
+  projectId: bigint("project_id", { mode: "number", unsigned: true }).notNull().references(() => softwareProjects.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: varchar("file_type", { length: 100 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  category: mysqlEnum("category", [
+    "proposal",
+    "quotation",
+    "contract",
+    "agreement",
+    "requirements",
+    "design",
+    "screenshot",
+    "apk",
+    "executable",
+    "zip",
+    "source_code",
+    "invoice",
+    "certificate",
+    "other",
+  ]).default("other").notNull(),
+  version: varchar("version", { length: 20 }).default("1.0"),
+  uploadedBy: bigint("uploaded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_spf_project").on(table.projectId),
+  index("idx_spf_category").on(table.category),
+]);
+
+export type SoftwareProjectFile = typeof softwareProjectFiles.$inferSelect;
+
+// ─── SOFTWARE SALES ──────────────────────────────────────────────────
+export const softwareSales = mysqlTable("software_sales", {
+  id: serial("id").primaryKey(),
+  saleNumber: varchar("sale_number", { length: 50 }).notNull().unique(),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => softwareCustomers.id, { onDelete: "restrict" }),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull().references(() => softwareProducts.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number", unsigned: true }).references(() => softwareProjects.id, { onDelete: "set null" }),
+  basePrice: decimal("base_price", { precision: 15, scale: 2 }).notNull(),
+  additionalFeaturesCost: decimal("additional_features_cost", { precision: 15, scale: 2 }).default("0").notNull(),
+  discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  grandTotal: decimal("grand_total", { precision: 15, scale: 2 }).notNull(),
+  paymentType: mysqlEnum("payment_type", ["full", "advance_50", "milestone"]).default("full").notNull(),
+  paymentStatus: mysqlEnum("payment_status", ["pending", "partially_paid", "paid", "refunded", "cancelled"]).default("pending").notNull(),
+  advanceAmount: decimal("advance_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  totalPaid: decimal("total_paid", { precision: 15, scale: 2 }).default("0").notNull(),
+  outstandingBalance: decimal("outstanding_balance", { precision: 15, scale: 2 }).notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "pending_approval",
+    "approved",
+    "rejected",
+    "payment_pending",
+    "partially_paid",
+    "fully_paid",
+    "completed",
+  ]).default("draft").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  revisionNotes: text("revision_notes"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_sales_status").on(table.status),
+  index("idx_software_sales_customer").on(table.customerId),
+  index("idx_software_sales_product").on(table.productId),
+  index("idx_software_sales_number").on(table.saleNumber),
+]);
+
+export type SoftwareSale = typeof softwareSales.$inferSelect;
+export type InsertSoftwareSale = typeof softwareSales.$inferInsert;
+
+// ─── SOFTWARE SALE FEATURES ──────────────────────────────────────────
+export const softwareSaleFeatures = mysqlTable("software_sale_features", {
+  id: serial("id").primaryKey(),
+  saleId: bigint("sale_id", { mode: "number", unsigned: true }).notNull().references(() => softwareSales.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  price: decimal("price", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_ssf_sale").on(table.saleId),
+]);
+
+export type SoftwareSaleFeature = typeof softwareSaleFeatures.$inferSelect;
+
+// ─── SOFTWARE PAYMENTS ───────────────────────────────────────────────
+export const softwarePayments = mysqlTable("software_payments", {
+  id: serial("id").primaryKey(),
+  paymentNumber: varchar("payment_number", { length: 50 }).notNull().unique(),
+  saleId: bigint("sale_id", { mode: "number", unsigned: true }).notNull().references(() => softwareSales.id, { onDelete: "restrict" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => softwareCustomers.id, { onDelete: "restrict" }),
+  invoiceId: bigint("invoice_id", { mode: "number", unsigned: true }).references(() => softwareInvoices.id, { onDelete: "set null" }),
+  paymentDate: date("payment_date").notNull(),
+  paymentMethod: mysqlEnum("payment_method", [
+    "cash",
+    "bank_transfer",
+    "mobile_banking",
+    "cheque",
+    "online_payment",
+  ]).notNull(),
+  referenceNumber: varchar("reference_number", { length: 255 }),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  notes: text("notes"),
+  recordedBy: bigint("recorded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_software_payments_sale").on(table.saleId),
+  index("idx_software_payments_number").on(table.paymentNumber),
+]);
+
+// ─── SOFTWARE INVOICES ───────────────────────────────────────────────
+export const softwareInvoices = mysqlTable("software_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  saleId: bigint("sale_id", { mode: "number", unsigned: true }).notNull().references(() => softwareSales.id, { onDelete: "restrict" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => softwareCustomers.id, { onDelete: "restrict" }),
+  issueDate: date("issue_date").notNull(),
+  dueDate: date("due_date"),
+  subtotal: decimal("subtotal", { precision: 15, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  amountPaid: decimal("amount_paid", { precision: 15, scale: 2 }).default("0").notNull(),
+  outstandingAmount: decimal("outstanding_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "sent",
+    "partially_paid",
+    "paid",
+    "overdue",
+    "cancelled",
+  ]).default("draft").notNull(),
+  termsAndConditions: text("terms_and_conditions"),
+  generatedBy: bigint("generated_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  sentAt: timestamp("sent_at"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_invoices_status").on(table.status),
+  index("idx_software_invoices_sale").on(table.saleId),
+  index("idx_software_invoices_number").on(table.invoiceNumber),
+]);
+
+export type SoftwareInvoice = typeof softwareInvoices.$inferSelect;
+export type InsertSoftwareInvoice = typeof softwareInvoices.$inferInsert;
+
+// ─── SOFTWARE INVOICE ITEMS ──────────────────────────────────────────
+export const softwareInvoiceItems = mysqlTable("software_invoice_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: bigint("invoice_id", { mode: "number", unsigned: true }).notNull().references(() => softwareInvoices.id, { onDelete: "cascade" }),
+  description: varchar("description", { length: 255 }).notNull(),
+  quantity: int("quantity").default(1).notNull(),
+  unitPrice: decimal("unit_price", { precision: 15, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_sii_invoice").on(table.invoiceId),
+]);
+
+export type SoftwareInvoiceItem = typeof softwareInvoiceItems.$inferSelect;
+
+// ─── SOFTWARE CERTIFICATES ───────────────────────────────────────────
+export const softwareCertificates = mysqlTable("software_certificates", {
+  id: serial("id").primaryKey(),
+  certificateNumber: varchar("certificate_number", { length: 50 }).notNull().unique(),
+  certificateType: mysqlEnum("certificate_type", [
+    "project_completion",
+    "software_ownership",
+  ]).notNull(),
+  saleId: bigint("sale_id", { mode: "number", unsigned: true }).notNull().references(() => softwareSales.id, { onDelete: "restrict" }),
+  projectId: bigint("project_id", { mode: "number", unsigned: true }).references(() => softwareProjects.id, { onDelete: "set null" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => softwareCustomers.id, { onDelete: "restrict" }),
+  productId: bigint("product_id", { mode: "number", unsigned: true }).notNull().references(() => softwareProducts.id, { onDelete: "restrict" }),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  companyName: varchar("company_name", { length: 255 }),
+  productName: varchar("product_name", { length: 255 }).notNull(),
+  productVersion: varchar("product_version", { length: 50 }),
+  completionDate: date("completion_date").notNull(),
+  warrantyPeriod: int("warranty_period").default(0),
+  maintenancePeriod: int("maintenance_period").default(0),
+  developerName: varchar("developer_name", { length: 255 }),
+  verificationNumber: varchar("verification_number", { length: 100 }).notNull().unique(),
+  generatedBy: bigint("generated_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_software_certificates_number").on(table.certificateNumber),
+  index("idx_software_certificates_verification").on(table.verificationNumber),
+  index("idx_software_certificates_sale").on(table.saleId),
+]);
+
+export type SoftwareCertificate = typeof softwareCertificates.$inferSelect;
+export type InsertSoftwareCertificate = typeof softwareCertificates.$inferInsert;
+
+// ─── SOFTWARE DOCUMENTS ──────────────────────────────────────────────
+export const softwareDocuments = mysqlTable("software_documents", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: mysqlEnum("category", [
+    "proposal",
+    "quotation",
+    "contract",
+    "agreement",
+    "requirements",
+    "design",
+    "screenshot",
+    "apk",
+    "executable",
+    "zip",
+    "source_code",
+    "invoice",
+    "certificate",
+    "other",
+  ]).default("other").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileType: varchar("file_type", { length: 100 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  version: varchar("version", { length: 20 }).default("1.0"),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  uploadedBy: bigint("uploaded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_software_docs_category").on(table.category),
+  index("idx_software_docs_entity").on(table.entityType, table.entityId),
+  index("idx_software_docs_uploaded_by").on(table.uploadedBy),
+]);
+
+export type SoftwareDocument = typeof softwareDocuments.$inferSelect;
+export type InsertSoftwareDocument = typeof softwareDocuments.$inferInsert;
+
+// ─── SOFTWARE NOTIFICATIONS (module-specific) ────────────────────────
+export const softwareNotifications = mysqlTable("software_notifications", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", [
+    "product_approved",
+    "product_rejected",
+    "project_approved",
+    "project_rejected",
+    "sale_approved",
+    "sale_rejected",
+    "invoice_generated",
+    "payment_received",
+    "project_completed",
+    "certificate_generated",
+    "info",
+    "warning",
+  ]).default("info").notNull(),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_software_notif_user").on(table.userId),
+  index("idx_software_notif_read").on(table.isRead),
+  index("idx_software_notif_type").on(table.type),
+]);
+
+export type SoftwareNotification = typeof softwareNotifications.$inferSelect;
+
+// ─── SOFTWARE ACTIVITY LOGS ──────────────────────────────────────────
+export const softwareActivityLogs = mysqlTable("software_activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  userName: varchar("user_name", { length: 255 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  previousValue: json("previous_value"),
+  newValue: json("new_value"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_software_activity_user").on(table.userId),
+  index("idx_software_activity_created").on(table.createdAt),
+  index("idx_software_activity_entity").on(table.entityType, table.entityId),
+]);
+
+export type SoftwareActivityLog = typeof softwareActivityLogs.$inferSelect;
+
+// ═══════════════════════════════════════════════════════════════════
+// ARCHITECTURE MANAGEMENT MODULE
+// ═══════════════════════════════════════════════════════════════════
+
+// ─── ARCHITECTURE CATEGORIES ─────────────────────────────────────────
+export const architectureCategories = mysqlTable("architecture_categories", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_arch_categories_active").on(table.isActive),
+]);
+
+export type ArchitectureCategory = typeof architectureCategories.$inferSelect;
+export type InsertArchitectureCategory = typeof architectureCategories.$inferInsert;
+
+// ─── ARCHITECTURE PROJECTS (portfolio / design submissions) ──────────
+export const architectureProjects = mysqlTable("architecture_projects", {
+  id: serial("id").primaryKey(),
+  projectCode: varchar("project_code", { length: 50 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  categoryId: bigint("category_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCategories.id, { onDelete: "restrict" }),
+  description: text("description"),
+  designConcept: text("design_concept"),
+  projectLocation: varchar("project_location", { length: 255 }),
+  landSize: varchar("land_size", { length: 100 }),
+  buildingSize: varchar("building_size", { length: 100 }),
+  numberOfFloors: int("number_of_floors"),
+  estimatedCompletionTime: varchar("estimated_completion_time", { length: 100 }),
+  estimatedCost: decimal("estimated_cost", { precision: 15, scale: 2 }),
+  features: json("features"),
+  specialFeatures: text("special_features"),
+  notes: text("notes"),
+  status: mysqlEnum("status", [
+    "draft",
+    "submitted",
+    "under_review",
+    "approved",
+    "rejected",
+    "in_progress",
+    "completed",
+  ]).default("draft").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_arch_projects_status").on(table.status),
+  index("idx_arch_projects_category").on(table.categoryId),
+  index("idx_arch_projects_created_by").on(table.createdBy),
+  index("idx_arch_projects_code").on(table.projectCode),
+]);
+
+export type ArchitectureProject = typeof architectureProjects.$inferSelect;
+export type InsertArchitectureProject = typeof architectureProjects.$inferInsert;
+
+// ─── ARCHITECTURE PROJECT FILES ──────────────────────────────────────
+export const architectureProjectFiles = mysqlTable("architecture_project_files", {
+  id: serial("id").primaryKey(),
+  projectId: bigint("project_id", { mode: "number", unsigned: true }).notNull().references(() => architectureProjects.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileType: varchar("file_type", { length: 100 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  category: mysqlEnum("category", [
+    "pdf_drawing",
+    "autocad",
+    "image",
+    "render",
+    "video",
+    "document",
+    "floor_plan",
+    "design_2d",
+    "design_3d",
+    "attachment",
+    "other",
+  ]).default("other").notNull(),
+  uploadedBy: bigint("uploaded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_files_project").on(table.projectId),
+  index("idx_arch_files_category").on(table.category),
+]);
+
+export type ArchitectureProjectFile = typeof architectureProjectFiles.$inferSelect;
+
+// ─── ARCHITECTURE CUSTOMERS ──────────────────────────────────────────
+export const architectureCustomers = mysqlTable("architecture_customers", {
+  id: serial("id").primaryKey(),
+  customerId: varchar("customer_id", { length: 50 }).notNull().unique(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  alternatePhone: varchar("alternate_phone", { length: 20 }),
+  country: varchar("country", { length: 100 }),
+  state: varchar("state", { length: 100 }),
+  city: varchar("city", { length: 100 }),
+  address: text("address"),
+  postalCode: varchar("postal_code", { length: 20 }),
+  mapLocation: text("map_location"),
+  notes: text("notes"),
+  portalToken: varchar("portal_token", { length: 128 }).unique(),
+  portalTokenExpiresAt: timestamp("portal_token_expires_at"),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_arch_customers_email").on(table.email),
+  index("idx_arch_customers_phone").on(table.phone),
+  index("idx_arch_customers_portal").on(table.portalToken),
+]);
+
+export type ArchitectureCustomer = typeof architectureCustomers.$inferSelect;
+export type InsertArchitectureCustomer = typeof architectureCustomers.$inferInsert;
+
+// ─── ARCHITECTURE ORDERS (sales) ─────────────────────────────────────
+export const architectureOrders = mysqlTable("architecture_orders", {
+  id: serial("id").primaryKey(),
+  orderNumber: varchar("order_number", { length: 50 }).notNull().unique(),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCustomers.id, { onDelete: "restrict" }),
+  portfolioProjectId: bigint("portfolio_project_id", { mode: "number", unsigned: true }).references(() => architectureProjects.id, { onDelete: "set null" }),
+  categoryId: bigint("category_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCategories.id, { onDelete: "restrict" }),
+  projectName: varchar("project_name", { length: 255 }).notNull(),
+  projectType: varchar("project_type", { length: 100 }),
+  description: text("description"),
+  features: json("features"),
+  extraFeatures: text("extra_features"),
+  estimatedCompletionDate: date("estimated_completion_date"),
+  totalPrice: decimal("total_price", { precision: 15, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  finalAmount: decimal("final_amount", { precision: 15, scale: 2 }).notNull(),
+  advancePayment: decimal("advance_payment", { precision: 15, scale: 2 }).default("0").notNull(),
+  remainingPayment: decimal("remaining_payment", { precision: 15, scale: 2 }).notNull(),
+  totalPaid: decimal("total_paid", { precision: 15, scale: 2 }).default("0").notNull(),
+  paymentStatus: mysqlEnum("payment_status", ["unpaid", "partially_paid", "fully_paid"]).default("unpaid").notNull(),
+  developmentStage: mysqlEnum("development_stage", [
+    "planning",
+    "draft_design",
+    "review",
+    "revision",
+    "final_design",
+    "completed",
+  ]).default("planning").notNull(),
+  progressPercentage: int("progress_percentage").default(0).notNull(),
+  status: mysqlEnum("status", [
+    "draft",
+    "pending_approval",
+    "approved",
+    "rejected",
+    "payment_pending",
+    "in_progress",
+    "completed",
+    "cancelled",
+  ]).default("draft").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  completedAt: timestamp("completed_at"),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_arch_orders_status").on(table.status),
+  index("idx_arch_orders_customer").on(table.customerId),
+  index("idx_arch_orders_number").on(table.orderNumber),
+  index("idx_arch_orders_created_by").on(table.createdBy),
+  index("idx_arch_orders_payment").on(table.paymentStatus),
+]);
+
+export type ArchitectureOrder = typeof architectureOrders.$inferSelect;
+export type InsertArchitectureOrder = typeof architectureOrders.$inferInsert;
+
+// ─── ARCHITECTURE ORDER PROGRESS TIMELINE ────────────────────────────
+export const architectureOrderProgress = mysqlTable("architecture_order_progress", {
+  id: serial("id").primaryKey(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull().references(() => architectureOrders.id, { onDelete: "cascade" }),
+  stage: mysqlEnum("stage", [
+    "planning",
+    "draft_design",
+    "review",
+    "revision",
+    "final_design",
+    "completed",
+  ]).notNull(),
+  progressPercentage: int("progress_percentage").default(0).notNull(),
+  notes: text("notes"),
+  updatedBy: bigint("updated_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_progress_order").on(table.orderId),
+]);
+
+export type ArchitectureOrderProgress = typeof architectureOrderProgress.$inferSelect;
+
+// ─── ARCHITECTURE PAYMENTS ───────────────────────────────────────────
+export const architecturePayments = mysqlTable("architecture_payments", {
+  id: serial("id").primaryKey(),
+  paymentNumber: varchar("payment_number", { length: 50 }).notNull().unique(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull().references(() => architectureOrders.id, { onDelete: "restrict" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCustomers.id, { onDelete: "restrict" }),
+  paymentType: mysqlEnum("payment_type", ["advance", "final", "other"]).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  paymentMethod: mysqlEnum("payment_method", [
+    "cash",
+    "bank_transfer",
+    "mobile_banking",
+    "cheque",
+    "online_payment",
+  ]).notNull(),
+  referenceNumber: varchar("reference_number", { length: 255 }),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  proofDocumentUrl: text("proof_document_url"),
+  notes: text("notes"),
+  recordedBy: bigint("recorded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_payments_order").on(table.orderId),
+  index("idx_arch_payments_number").on(table.paymentNumber),
+]);
+
+export type ArchitecturePayment = typeof architecturePayments.$inferSelect;
+
+// ─── ARCHITECTURE PAYMENT VERIFICATIONS ──────────────────────────────
+export const architecturePaymentVerifications = mysqlTable("architecture_payment_verifications", {
+  id: serial("id").primaryKey(),
+  paymentId: bigint("payment_id", { mode: "number", unsigned: true }).notNull().references(() => architecturePayments.id, { onDelete: "cascade" }),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull().references(() => architectureOrders.id, { onDelete: "restrict" }),
+  status: mysqlEnum("status", ["pending_verification", "verified", "rejected"]).default("pending_verification").notNull(),
+  verificationNotes: text("verification_notes"),
+  verifiedBy: bigint("verified_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_verifications_payment").on(table.paymentId),
+  index("idx_arch_verifications_status").on(table.status),
+]);
+
+export type ArchitecturePaymentVerification = typeof architecturePaymentVerifications.$inferSelect;
+
+// ─── ARCHITECTURE INVOICES ───────────────────────────────────────────
+export const architectureInvoices = mysqlTable("architecture_invoices", {
+  id: serial("id").primaryKey(),
+  invoiceNumber: varchar("invoice_number", { length: 50 }).notNull().unique(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull().references(() => architectureOrders.id, { onDelete: "restrict" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCustomers.id, { onDelete: "restrict" }),
+  issueDate: date("issue_date").notNull(),
+  dueDate: date("due_date"),
+  subtotal: decimal("subtotal", { precision: 15, scale: 2 }).notNull(),
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  discountAmount: decimal("discount_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  amountPaid: decimal("amount_paid", { precision: 15, scale: 2 }).default("0").notNull(),
+  remainingAmount: decimal("remaining_amount", { precision: 15, scale: 2 }).default("0").notNull(),
+  paymentStatus: mysqlEnum("payment_status", ["unpaid", "partially_paid", "fully_paid"]).default("unpaid").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "partially_paid", "paid", "overdue", "cancelled"]).default("draft").notNull(),
+  generatedBy: bigint("generated_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_arch_invoices_order").on(table.orderId),
+  index("idx_arch_invoices_number").on(table.invoiceNumber),
+]);
+
+export type ArchitectureInvoice = typeof architectureInvoices.$inferSelect;
+
+// ─── ARCHITECTURE INVOICE ITEMS ──────────────────────────────────────
+export const architectureInvoiceItems = mysqlTable("architecture_invoice_items", {
+  id: serial("id").primaryKey(),
+  invoiceId: bigint("invoice_id", { mode: "number", unsigned: true }).notNull().references(() => architectureInvoices.id, { onDelete: "cascade" }),
+  description: varchar("description", { length: 255 }).notNull(),
+  quantity: int("quantity").default(1).notNull(),
+  unitPrice: decimal("unit_price", { precision: 15, scale: 2 }).notNull(),
+  totalPrice: decimal("total_price", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_invoice_items").on(table.invoiceId),
+]);
+
+export type ArchitectureInvoiceItem = typeof architectureInvoiceItems.$inferSelect;
+
+// ─── ARCHITECTURE CERTIFICATES ─────────────────────────────────────────
+export const architectureCertificates = mysqlTable("architecture_certificates", {
+  id: serial("id").primaryKey(),
+  certificateNumber: varchar("certificate_number", { length: 50 }).notNull().unique(),
+  orderId: bigint("order_id", { mode: "number", unsigned: true }).notNull().references(() => architectureOrders.id, { onDelete: "restrict" }),
+  customerId: bigint("customer_id", { mode: "number", unsigned: true }).notNull().references(() => architectureCustomers.id, { onDelete: "restrict" }),
+  customerName: varchar("customer_name", { length: 255 }).notNull(),
+  projectName: varchar("project_name", { length: 255 }).notNull(),
+  projectCategory: varchar("project_category", { length: 255 }).notNull(),
+  projectLocation: varchar("project_location", { length: 255 }),
+  completionDate: date("completion_date").notNull(),
+  staffName: varchar("staff_name", { length: 255 }),
+  companyName: varchar("company_name", { length: 255 }),
+  verificationNumber: varchar("verification_number", { length: 100 }).notNull().unique(),
+  validationUrl: text("validation_url"),
+  generatedBy: bigint("generated_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_certificates_number").on(table.certificateNumber),
+  index("idx_arch_certificates_verification").on(table.verificationNumber),
+]);
+
+export type ArchitectureCertificate = typeof architectureCertificates.$inferSelect;
+
+// ─── ARCHITECTURE DOCUMENTS ──────────────────────────────────────────
+export const architectureDocuments = mysqlTable("architecture_documents", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: mysqlEnum("category", [
+    "pdf_drawing",
+    "autocad",
+    "image",
+    "render",
+    "video",
+    "document",
+    "floor_plan",
+    "design_2d",
+    "design_3d",
+    "invoice",
+    "certificate",
+    "other",
+  ]).default("other").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  fileType: varchar("file_type", { length: 100 }).notNull(),
+  fileSize: int("file_size").notNull(),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  uploadedBy: bigint("uploaded_by", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  deletedAt: timestamp("deleted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_docs_entity").on(table.entityType, table.entityId),
+  index("idx_arch_docs_category").on(table.category),
+]);
+
+export type ArchitectureDocument = typeof architectureDocuments.$inferSelect;
+
+// ─── ARCHITECTURE ACTIVITY LOGS ──────────────────────────────────────
+export const architectureActivityLogs = mysqlTable("architecture_activity_logs", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  userName: varchar("user_name", { length: 255 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: bigint("entity_id", { mode: "number", unsigned: true }),
+  previousValue: json("previous_value"),
+  newValue: json("new_value"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_arch_activity_user").on(table.userId),
+  index("idx_arch_activity_entity").on(table.entityType, table.entityId),
+  index("idx_arch_activity_created").on(table.createdAt),
+]);
+
+export type ArchitectureActivityLog = typeof architectureActivityLogs.$inferSelect;

@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -206,7 +208,7 @@ function renderInlineMarkdown(text: string): React.ReactNode {
 
 // ─── Message Bubble ─────────────────────────────────────────────────
 
-function MessageBubble({ message, isStreaming }: { message: Message; isStreaming?: boolean }) {
+function MessageBubble({ message, isWaiting }: { message: Message; isWaiting?: boolean }) {
     const isUser = message.role === "user";
     const isTool = message.role === "tool";
 
@@ -237,7 +239,7 @@ function MessageBubble({ message, isStreaming }: { message: Message; isStreaming
                         : "bg-white dark:bg-slate-800/90 border border-border/30 rounded-tl-sm text-foreground",
                 )}
             >
-                {isStreaming && !message.content ? (
+                {isWaiting && !message.content ? (
                     <div className="flex items-center gap-1.5 sm:gap-2 py-2 px-1">
                         <motion.span animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0 }} className="h-1.5 sm:h-2 w-1.5 sm:w-2 rounded-full bg-violet-500" />
                         <motion.span animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 1.2, delay: 0.15 }} className="h-1.5 sm:h-2 w-1.5 sm:w-2 rounded-full bg-indigo-500" />
@@ -434,6 +436,52 @@ function ConversationSidebar({
     );
 }
 
+function getChatSuggestions(role?: string) {
+    if (role === "developer") {
+        return [
+            { text: "What's my role and access?", icon: "👤" },
+            { text: "How do I submit a product for approval?", icon: "📦" },
+            { text: "Open the software development module", icon: "💻" },
+            { text: "Show my payroll info", icon: "💰" },
+        ];
+    }
+    if (role === "architecture_staff") {
+        return [
+            { text: "What's my role and access?", icon: "👤" },
+            { text: "How do I create an architecture order?", icon: "📐" },
+            { text: "Open architecture management", icon: "🏛️" },
+            { text: "Show my payroll info", icon: "💰" },
+        ];
+    }
+    if (role === "admin") {
+        return [
+            { text: "Show pending approvals", icon: "📋" },
+            { text: "System statistics overview", icon: "📊" },
+            { text: "Open software development", icon: "💻" },
+            { text: "Open architecture management", icon: "🏛️" },
+        ];
+    }
+    return [
+        { text: "Show me property stats", icon: "📊" },
+        { text: "How do I add a new property?", icon: "🏠" },
+        { text: "What's my role?", icon: "👤" },
+        { text: "Show my payroll info", icon: "💰" },
+    ];
+}
+
+function getWelcomeDescription(role?: string) {
+    if (role === "developer") {
+        return "Ask about products, projects, sales, payments, payroll, or how to use the Software Development module.";
+    }
+    if (role === "architecture_staff") {
+        return "Ask about portfolio projects, customers, orders, payments, or Architecture Management workflows.";
+    }
+    if (role === "admin") {
+        return "Ask about properties, approvals, architecture, software dev, reports, or any system feature.";
+    }
+    return "Ask me about properties, system features, reports, or anything related to the PHOJAA95 platform.";
+}
+
 // ─── Main Chatbot Panel ─────────────────────────────────────────────
 
 export default function ChatbotPanel({
@@ -443,11 +491,14 @@ export default function ChatbotPanel({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
+    const { user } = useAuth();
     const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
-    const [isStreaming, setIsStreaming] = useState(false);
-    const [streamingContent, setStreamingContent] = useState("");
-    const [showSidebar, setShowSidebar] = useState(false); // Default false for mobile first
+    const [isWaitingReply, setIsWaitingReply] = useState(false);
+    const [showSidebar, setShowSidebar] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+
+    const suggestions = useMemo(() => getChatSuggestions(user?.role), [user?.role]);
+    const welcomeDescription = useMemo(() => getWelcomeDescription(user?.role), [user?.role]);
 
     useEffect(() => {
         let timeout: ReturnType<typeof setTimeout>;
@@ -483,8 +534,7 @@ export default function ChatbotPanel({
     // Mutations
     const sendMessage = trpc.chatbot.sendMessage.useMutation({
         onSuccess: (data) => {
-            setIsStreaming(false);
-            setStreamingContent("");
+            setIsWaitingReply(false);
             if (!activeConversationId && data.conversationId) {
                 setActiveConversationId(data.conversationId);
             }
@@ -493,16 +543,16 @@ export default function ChatbotPanel({
             }
             refetchConversations();
         },
-        onError: () => {
-            setIsStreaming(false);
-            setStreamingContent("");
+        onError: (err) => {
+            setIsWaitingReply(false);
+            toast.error(err.message || "Failed to send message");
             if (activeConversationId) refetchConversation();
         },
     });
 
     const deleteConversation = trpc.chatbot.deleteConversation.useMutation({
-        onSuccess: () => {
-            if (activeConversationId) setActiveConversationId(null);
+        onSuccess: (_data, { conversationId }) => {
+            setActiveConversationId((current) => (current === conversationId ? null : current));
             refetchConversations();
         },
     });
@@ -510,13 +560,12 @@ export default function ChatbotPanel({
     // Auto-scroll
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [activeConversation?.messages, streamingContent]);
+    }, [activeConversation?.messages, isWaitingReply]);
 
     // Handlers
     const handleSend = useCallback(
         (message: string) => {
-            setIsStreaming(true);
-            setStreamingContent("");
+            setIsWaitingReply(true);
             sendMessage.mutate({
                 conversationId: activeConversationId ?? undefined,
                 message,
@@ -527,14 +576,12 @@ export default function ChatbotPanel({
 
     const handleNewChat = useCallback(() => {
         setActiveConversationId(null);
-        setStreamingContent("");
-        setIsStreaming(false);
+        setIsWaitingReply(false);
     }, []);
 
     const handleSelectConversation = useCallback((id: number) => {
         setActiveConversationId(id);
-        setStreamingContent("");
-        setIsStreaming(false);
+        setIsWaitingReply(false);
     }, []);
 
     const messages: Message[] = (activeConversation?.messages || []).map((m) => ({
@@ -648,7 +695,7 @@ export default function ChatbotPanel({
                     <div className="flex flex-1 flex-col relative w-full h-full overflow-hidden">
                         <ScrollArea className="flex-1 h-0">
                             <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6 w-full max-w-full">
-                                {messages.length === 0 && !isStreaming && (
+                                {messages.length === 0 && !isWaitingReply && (
                                     <motion.div 
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -664,15 +711,10 @@ export default function ChatbotPanel({
                                             How can I help you today?
                                         </h3>
                                         <p className="text-sm text-muted-foreground mb-6 sm:mb-8 max-w-xs">
-                                            Ask me about properties, system features, reports, or anything related to the PHOJAA95 platform.
+                                            {welcomeDescription}
                                         </p>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 w-full">
-                                            {[
-                                                { text: "Show me property stats", icon: "📊" },
-                                                { text: "How do I add a new property?", icon: "🏠" },
-                                                { text: "What's my role?", icon: "👤" },
-                                                { text: "Navigate to reports", icon: "🧭" },
-                                            ].map((suggestion, idx) => (
+                                            {suggestions.map((suggestion, idx) => (
                                                 <motion.div
                                                     key={suggestion.text}
                                                     initial={{ opacity: 0, y: 10 }}
@@ -697,16 +739,15 @@ export default function ChatbotPanel({
                                     <MessageBubble key={msg.id} message={msg} />
                                 ))}
 
-                                {/* Streaming message */}
-                                {isStreaming && (
+                                {isWaitingReply && (
                                     <MessageBubble
                                         message={{
                                             id: -1,
                                             role: "assistant",
-                                            content: streamingContent,
+                                            content: "",
                                             createdAt: new Date().toISOString(),
                                         }}
-                                        isStreaming
+                                        isWaiting
                                     />
                                 )}
 
@@ -714,7 +755,7 @@ export default function ChatbotPanel({
                             </div>
                         </ScrollArea>
 
-                        <ChatInput onSend={handleSend} isLoading={isStreaming || sendMessage.isPending} />
+                        <ChatInput onSend={handleSend} isLoading={isWaitingReply || sendMessage.isPending} />
                     </div>
                 </div>
             </SheetContent>

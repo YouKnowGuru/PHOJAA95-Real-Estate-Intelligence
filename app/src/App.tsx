@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import { OniLoader } from "./components/ui/oni-loader";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
+import { getHomeRouteForRole } from "@/lib/role-routing";
 
 // Lazy load heavy pages to reduce initial bundle size
 const PropertyDetail = lazy(() => import("./pages/PropertyDetail"));
@@ -25,6 +26,14 @@ const PropertyTypes = lazy(() => import("./pages/PropertyTypes"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Billing = lazy(() => import("./pages/Billing"));
 const DocumentLibrary = lazy(() => import("./pages/DocumentLibrary"));
+
+// Software Development Module page
+const SoftwareDevPage = lazy(() => import("./pages/software-dev/SoftwareDevPage"));
+
+// Architecture Management Module
+const ArchitecturePage = lazy(() => import("./pages/architecture/ArchitecturePage"));
+const ArchitecturePortalPage = lazy(() => import("./pages/architecture/ArchitecturePortalPage"));
+const VerifyArchitectureCertificatePage = lazy(() => import("./pages/architecture/VerifyCertificatePage"));
 
 function PageLoader() {
   return (
@@ -45,8 +54,8 @@ function LazyRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode; requireAdmin?: boolean }) {
-  const { isAuthenticated, isLoading, isAdmin } = useAuth();
+function ProtectedRoute({ children, requireAdmin = false, requireDeveloper = false, requireArchitectureStaff = false }: { children: React.ReactNode; requireAdmin?: boolean; requireDeveloper?: boolean; requireArchitectureStaff?: boolean }) {
+  const { user, isAuthenticated, isLoading, isAdmin, isDeveloper, isArchitectureStaff } = useAuth();
   const [showLoader, setShowLoader] = useState(true);
 
   useEffect(() => {
@@ -65,10 +74,29 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
   }
 
   if (requireAdmin && !isAdmin) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={getHomeRouteForRole(user?.role)} replace />;
+  }
+
+  if (requireDeveloper && !isDeveloper && !isAdmin) {
+    return <Navigate to={getHomeRouteForRole(user?.role)} replace />;
+  }
+
+  if (requireArchitectureStaff && !isArchitectureStaff && !isAdmin) {
+    return <Navigate to={getHomeRouteForRole(user?.role)} replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;
+}
+
+/** Blocks module-specific staff from real-estate property workflows. */
+function RealEstateStaffRoute({ children }: { children: React.ReactNode }) {
+  const { user, isArchitectureStaff, isDeveloper } = useAuth();
+
+  if (isArchitectureStaff || isDeveloper) {
+    return <Navigate to={getHomeRouteForRole(user?.role)} replace />;
+  }
+
+  return <>{children}</>;
 }
 
 export default function App() {
@@ -88,7 +116,9 @@ export default function App() {
         path="/properties"
         element={
           <ProtectedRoute>
-            <Properties />
+            <RealEstateStaffRoute>
+              <Properties />
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
       />
@@ -96,7 +126,9 @@ export default function App() {
         path="/properties/new"
         element={
           <ProtectedRoute>
-            <LazyRoute><PropertyWizard /></LazyRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><PropertyWizard /></LazyRoute>
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
       />
@@ -104,7 +136,9 @@ export default function App() {
         path="/properties/:id"
         element={
           <ProtectedRoute>
-            <LazyRoute><PropertyDetail /></LazyRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><PropertyDetail /></LazyRoute>
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
       />
@@ -112,9 +146,11 @@ export default function App() {
         path="/properties/:id/wizard"
         element={
           <ProtectedRoute>
-            <Suspense fallback={<PageLoader />}>
-              <PropertyWizard />
-            </Suspense>
+            <RealEstateStaffRoute>
+              <Suspense fallback={<PageLoader />}>
+                <PropertyWizard />
+              </Suspense>
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
       />
@@ -202,7 +238,9 @@ export default function App() {
         path="/billing"
         element={
           <ProtectedRoute>
-            <LazyRoute><Billing /></LazyRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><Billing /></LazyRoute>
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
       />
@@ -210,9 +248,39 @@ export default function App() {
         path="/documents"
         element={
           <ProtectedRoute>
-            <LazyRoute><DocumentLibrary /></LazyRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><DocumentLibrary /></LazyRoute>
+            </RealEstateStaffRoute>
           </ProtectedRoute>
         }
+      />
+      {/* Software Development Module Route */}
+      <Route
+        path="/software-dev"
+        element={
+          <ProtectedRoute requireDeveloper>
+            <LazyRoute><SoftwareDevPage /></LazyRoute>
+          </ProtectedRoute>
+        }
+      />
+      {/* Architecture Management Module Route */}
+      <Route
+        path="/architecture"
+        element={
+          <ProtectedRoute requireArchitectureStaff>
+            <LazyRoute><ArchitecturePage /></LazyRoute>
+          </ProtectedRoute>
+        }
+      />
+      {/* Public Architecture Customer Portal */}
+      <Route
+        path="/portal/architecture/:token"
+        element={<LazyRoute><ArchitecturePortalPage /></LazyRoute>}
+      />
+      {/* Public Certificate Verification */}
+      <Route
+        path="/verify/architecture/:verificationNumber"
+        element={<LazyRoute><VerifyArchitectureCertificatePage /></LazyRoute>}
       />
       <Route path="*" element={<NotFound />} />
     </Routes>

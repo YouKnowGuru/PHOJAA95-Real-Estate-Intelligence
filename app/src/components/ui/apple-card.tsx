@@ -2,12 +2,14 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-interface AppleCardProps extends React.ComponentProps<"div"> {
+interface AppleCardProps {
   hover?: boolean;
   press?: boolean;
   glass?: boolean;
   glow?: boolean;
   delay?: number;
+  className?: string;
+  children?: React.ReactNode;
 }
 
 function AppleCard({

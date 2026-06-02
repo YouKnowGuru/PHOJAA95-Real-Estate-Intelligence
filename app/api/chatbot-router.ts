@@ -13,6 +13,7 @@ import {
     type OpenRouterMessage,
     type OpenRouterTool,
 } from "./services/openrouter";
+import { env } from "./lib/env";
 
 // ─── Schemas ────────────────────────────────────────────────────────
 
@@ -36,30 +37,107 @@ const updateConversationSchema = z.object({
 
 // ─── Role-Based Tool Filtering ────────────────────────────────────────
 
-/** Tools that are ONLY available to admin users */
-const ADMIN_ONLY_TOOLS = new Set([
-    "get_pending_approvals",
-    "get_system_stats",
-    "get_users_list",
-]);
-
-/** Tools available to staff users (subset of all tools) */
-const STAFF_TOOLS = new Set([
+/** Real-estate staff property tools */
+const REAL_ESTATE_STAFF_TOOLS = new Set([
     "search_properties",
     "get_property_detail",
+]);
+
+/** Tools any signed-in user may use */
+const BASE_USER_TOOLS = new Set([
     "get_user_info",
     "get_attendance_summary",
     "get_payroll_info",
     "navigate_to_page",
 ]);
 
+const STAFF_TOOL_NAMES = new Set([...BASE_USER_TOOLS, ...REAL_ESTATE_STAFF_TOOLS]);
+const DEVELOPER_TOOL_NAMES = new Set([...BASE_USER_TOOLS]);
+const ARCHITECTURE_STAFF_TOOL_NAMES = new Set([...BASE_USER_TOOLS]);
+
 /** Filter tools based on user role */
 function getAllowedTools(role: string | undefined): OpenRouterTool[] {
     if (role === "admin") {
         return CHAT_TOOLS;
     }
-    // Staff only gets staff-allowed tools
-    return CHAT_TOOLS.filter((t) => STAFF_TOOLS.has(t.function.name));
+    if (role === "staff") {
+        return CHAT_TOOLS.filter((t) => STAFF_TOOL_NAMES.has(t.function.name));
+    }
+    if (role === "developer") {
+        return CHAT_TOOLS.filter((t) => DEVELOPER_TOOL_NAMES.has(t.function.name));
+    }
+    if (role === "architecture_staff") {
+        return CHAT_TOOLS.filter((t) => ARCHITECTURE_STAFF_TOOL_NAMES.has(t.function.name));
+    }
+    return CHAT_TOOLS.filter((t) => BASE_USER_TOOLS.has(t.function.name));
+}
+
+function isAdminRole(role?: string): boolean {
+    return role === "admin";
+}
+
+function assertOwnUserData(
+    ctx: { unifiedUser?: { id: number; role: string } },
+    targetUserId: number,
+): string | null {
+    if (isAdminRole(ctx.unifiedUser?.role)) return null;
+    if (targetUserId !== ctx.unifiedUser?.id) {
+        return "You can only access your own information.";
+    }
+    return null;
+}
+
+const NAV_PAGE_ROUTES: Record<string, string> = {
+    dashboard: "/",
+    properties: "/properties",
+    "property-types": "/property-types",
+    documents: "/documents",
+    billing: "/billing",
+    approvals: "/approvals",
+    users: "/users",
+    attendance: "/attendance",
+    payroll: "/payroll",
+    reports: "/reports",
+    notifications: "/notifications",
+    "activity-logs": "/activity-logs",
+    profile: "/profile",
+    settings: "/settings",
+    "software-dev": "/software-dev",
+    architecture: "/architecture",
+};
+
+const ADMIN_ONLY_PAGES = new Set([
+    "users", "approvals", "activity-logs", "reports", "property-types",
+]);
+
+const STAFF_ALLOWED_PAGES = new Set([
+    "dashboard", "properties", "documents", "billing", "attendance", "payroll",
+    "notifications", "profile", "settings",
+]);
+
+const DEVELOPER_ALLOWED_PAGES = new Set([
+    "dashboard", "software-dev", "attendance", "payroll", "notifications", "profile", "settings",
+]);
+
+const ARCHITECTURE_ALLOWED_PAGES = new Set([
+    "dashboard", "architecture", "attendance", "payroll", "notifications", "profile", "settings",
+]);
+
+function resolveNavPath(page: string, role?: string): string | null {
+    if (page === "dashboard") {
+        if (role === "developer") return "/software-dev";
+        if (role === "architecture_staff") return "/architecture";
+        return "/";
+    }
+    return NAV_PAGE_ROUTES[page] ?? null;
+}
+
+function isPageAllowedForRole(page: string, role?: string): boolean {
+    if (isAdminRole(role)) return true;
+    if (role === "staff") return STAFF_ALLOWED_PAGES.has(page);
+    if (role === "developer") return DEVELOPER_ALLOWED_PAGES.has(page);
+    if (role === "architecture_staff") return ARCHITECTURE_ALLOWED_PAGES.has(page);
+    return false;
 }
 
 const CHAT_TOOLS: OpenRouterTool[] = [
@@ -175,7 +253,7 @@ const CHAT_TOOLS: OpenRouterTool[] = [
             parameters: {
                 type: "object",
                 properties: {
-                    role: { type: "string", enum: ["admin", "staff"], description: "Filter by role" },
+                    role: { type: "string", enum: ["admin", "staff", "developer", "architecture_staff"], description: "Filter by role" },
                     limit: { type: "number", description: "Maximum results", default: 20 },
                 },
                 required: [],
@@ -193,9 +271,10 @@ const CHAT_TOOLS: OpenRouterTool[] = [
                     page: {
                         type: "string",
                         enum: [
-                            "dashboard", "properties", "property-types", "approvals",
-                            "users", "attendance", "payroll", "activity-logs",
-                            "reports", "notifications", "profile", "settings",
+                            "dashboard", "properties", "property-types", "documents", "billing",
+                            "approvals", "users", "attendance", "payroll", "reports",
+                            "notifications", "activity-logs", "profile", "settings",
+                            "software-dev", "architecture",
                         ],
                         description: "The page to navigate to",
                     },
@@ -236,9 +315,8 @@ async function executeToolCall(
                 const { properties } = await import("../db/schema");
                 const conditions = [];
 
-                // SECURITY: Staff can only search their own properties
-                const isAdmin = ctx.unifiedUser?.role === "admin";
-                if (!isAdmin) {
+                // SECURITY: Real-estate staff can only search their own properties
+                if (ctx.unifiedUser?.role === "staff") {
                     conditions.push(eq(properties.listedById, ctx.unifiedUser!.id));
                 }
 
@@ -291,10 +369,12 @@ async function executeToolCall(
                 const [property] = await db.select().from(properties).where(eq(properties.id, propertyId)).limit(1);
                 if (!property) return JSON.stringify({ error: "Property not found" });
 
-                // Security: Staff can only view their own properties' full details
-                const isAdmin = ctx.unifiedUser?.role === "admin";
-                if (!isAdmin && property.listedById !== ctx.unifiedUser?.id) {
+                const isAdmin = isAdminRole(ctx.unifiedUser?.role);
+                if (ctx.unifiedUser?.role === "staff" && property.listedById !== ctx.unifiedUser?.id) {
                     return JSON.stringify({ error: "You can only view properties assigned to you" });
+                }
+                if (!isAdmin && ctx.unifiedUser?.role !== "staff") {
+                    return JSON.stringify({ error: "Access denied" });
                 }
 
                 // Security: Mask sensitive PII for staff users
@@ -405,10 +485,8 @@ async function executeToolCall(
                 const targetUserId = userId || ctx.unifiedUser?.id;
                 if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
 
-                // Security: Staff can only access their own attendance data
-                if (ctx.unifiedUser?.role === "staff" && targetUserId !== ctx.unifiedUser.id) {
-                    return JSON.stringify({ error: "You can only access your own attendance information" });
-                }
+                const accessError = assertOwnUserData(ctx, targetUserId as number);
+                if (accessError) return JSON.stringify({ error: accessError });
 
                 // attendance.date is stored as string (YYYY-MM-DD), use string comparison
                 const startDateStr = `${targetMonth}-01`;
@@ -453,10 +531,8 @@ async function executeToolCall(
                 const targetUserId = userId || ctx.unifiedUser?.id;
                 if (!targetUserId) return JSON.stringify({ error: "User ID not found" });
 
-                // Security: Staff can only access their own payroll data
-                if (ctx.unifiedUser?.role === "staff" && targetUserId !== ctx.unifiedUser.id) {
-                    return JSON.stringify({ error: "You can only access your own payroll information" });
-                }
+                const accessError = assertOwnUserData(ctx, targetUserId as number);
+                if (accessError) return JSON.stringify({ error: accessError });
 
                 const records = await db.select().from(payroll)
                     .where(eq(payroll.userId, targetUserId as number))
@@ -506,7 +582,7 @@ async function executeToolCall(
                 }).from(localUsers);
 
                 const results = roleFilter
-                    ? await query.where(eq(localUsers.role, roleFilter as "admin" | "staff")).limit(Math.min(limit as number, 50))
+                    ? await query.where(eq(localUsers.role, roleFilter as "admin" | "staff" | "developer" | "architecture_staff")).limit(Math.min(limit as number, 50))
                     : await query.limit(Math.min(limit as number, 50));
 
                 return JSON.stringify({ count: results.length, users: results });
@@ -517,21 +593,22 @@ async function executeToolCall(
 
         case "navigate_to_page": {
             const { page, reason } = args as { page: string; reason?: string };
+            const role = ctx.unifiedUser?.role;
 
-            // SECURITY: Staff cannot be navigated to admin-only pages
-            const ADMIN_PAGES = new Set([
-                "users", "approvals", "activity-logs", "reports", "settings", "property-types",
-            ]);
-            if (ctx.unifiedUser?.role !== "admin" && ADMIN_PAGES.has(page)) {
+            if (!isPageAllowedForRole(page, role)) {
                 return JSON.stringify({
-                    error: `Access denied. The page "${page}" is only accessible to admins.`,
-                    allowedPages: ["dashboard", "properties", "attendance", "payroll", "notifications", "profile"],
+                    error: `Access denied. The page "${page}" is not available for your role.`,
                 });
+            }
+
+            const path = resolveNavPath(page, role);
+            if (!path) {
+                return JSON.stringify({ error: `Unknown page: ${page}` });
             }
 
             return JSON.stringify({
                 action: "navigate",
-                page: `/${page}`,
+                page: path,
                 label: page.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
                 reason: reason || `Navigating to ${page}`,
             });
@@ -621,6 +698,13 @@ export const chatbotRouter = createRouter({
         const userId = opts.ctx.unifiedUser!.id;
         const { conversationId, message, model } = opts.input;
         const selectedModel = model || DEFAULT_MODEL;
+
+        if (!env.openrouterApiKey?.trim()) {
+            throw new TRPCError({
+                code: "PRECONDITION_FAILED",
+                message: "AI assistant is not configured. Please ask an administrator to set OPENROUTER_API_KEY.",
+            });
+        }
 
         // Create or get conversation
         let convId = conversationId;

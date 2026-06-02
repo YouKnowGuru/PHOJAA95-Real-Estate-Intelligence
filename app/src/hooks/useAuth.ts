@@ -107,6 +107,8 @@ export function useAuth() {
   const isAuthenticated = !!user;
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
+  const isDeveloper = user?.role === "developer";
+  const isArchitectureStaff = user?.role === "architecture_staff";
 
   // Session expiration for local auth users
   const sessionExpiresAt = localUser?.sessionExpiresAt;
@@ -117,6 +119,8 @@ export function useAuth() {
     isLoading,
     isAdmin,
     isStaff,
+    isDeveloper,
+    isArchitectureStaff,
     logout,
     refresh: () => utils.invalidate(),
     sessionExpiresAt,

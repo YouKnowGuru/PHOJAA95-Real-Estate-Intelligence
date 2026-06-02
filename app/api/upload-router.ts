@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createRouter, staffQuery, adminQuery } from "./middleware";
-import { resolveDocumentMimeType } from "@contracts/upload";
+import { resolveDocumentMimeType, resolveArchitectureMimeType, isAllowedArchitectureUpload } from "@contracts/upload";
 import { uploadFile, deleteFile, getSignedDownloadUrl, validateFileType, validateFileSize } from "./services/upload";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -13,7 +13,7 @@ export const uploadRouter = createRouter({
         file: z.string(),
         fileName: z.string(),
         mimeType: z.string(),
-        folder: z.enum(["properties", "agreements", "documents", "verification", "final", "profiles", "payslips", "library"]),
+        folder: z.enum(["properties", "agreements", "documents", "verification", "final", "profiles", "payslips", "library", "architecture"]),
         propertyId: z.number().optional(),
         step: z.number().optional(),
       })
@@ -36,10 +36,22 @@ export const uploadRouter = createRouter({
         }
       }
 
-      const resolvedMimeType = resolveDocumentMimeType(fileName, mimeType);
+      const isArchitectureFolder = folder === "architecture";
+      const resolvedMimeType = isArchitectureFolder
+        ? resolveArchitectureMimeType(fileName, mimeType)
+        : resolveDocumentMimeType(fileName, mimeType);
 
-      if (!validateFileType(resolvedMimeType, fileName)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "File type not allowed" });
+      const typeOk = isArchitectureFolder
+        ? isAllowedArchitectureUpload(fileName, resolvedMimeType)
+        : validateFileType(resolvedMimeType, fileName);
+
+      if (!typeOk) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: isArchitectureFolder
+            ? "File type not allowed. Allowed: PDF, Word, images, DWG/DXF, MP4, or ZIP"
+            : "File type not allowed",
+        });
       }
 
       const buffer = Buffer.from(file, "base64");

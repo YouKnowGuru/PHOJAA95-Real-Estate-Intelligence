@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, ne, like, desc, count, and, or } from "drizzle-orm";
+import { eq, ne, like, desc, count, and, or, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import bcrypt from "bcryptjs";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
@@ -12,7 +12,8 @@ export const userRouter = createRouter({
     .input(
       z.object({
         search: z.string().optional(),
-        role: z.enum(["staff", "admin"]).optional(),
+        role: z.enum(["staff", "admin", "developer", "architecture_staff"]).optional(),
+        roles: z.array(z.enum(["staff", "admin", "developer", "architecture_staff"])).optional(),
         status: z.enum(["active", "inactive", "locked"]).optional(),
         page: z.number().default(1),
         limit: z.number().default(20),
@@ -30,7 +31,11 @@ export const userRouter = createRouter({
           )
         );
       }
-      if (input.role) conditions.push(eq(localUsers.role, input.role));
+      if (input.roles?.length) {
+        conditions.push(inArray(localUsers.role, input.roles));
+      } else if (input.role) {
+        conditions.push(eq(localUsers.role, input.role));
+      }
       if (input.status) conditions.push(eq(localUsers.status, input.status));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -102,7 +107,7 @@ export const userRouter = createRouter({
         fullName: z.string().min(2).max(255),
         email: z.string().email(),
         password: passwordSchema,
-        role: z.enum(["staff", "admin"]),
+        role: z.enum(["staff", "admin", "developer", "architecture_staff"]),
         phone: z.string().optional(),
         address: z.string().optional(),
         pfNumber: z.string().optional(),
@@ -131,7 +136,7 @@ export const userRouter = createRouter({
         id: z.number(),
         fullName: z.string().min(2).max(255).optional(),
         email: z.string().email().optional(),
-        role: z.enum(["staff", "admin"]).optional(),
+        role: z.enum(["staff", "admin", "developer", "architecture_staff"]).optional(),
         phone: z.string().optional(),
         address: z.string().optional(),
         profileImage: z.string().optional(),

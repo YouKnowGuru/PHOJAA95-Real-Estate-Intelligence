@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Building2, Eye, EyeOff, LogIn, Lock, Mail, Loader2, Sparkles, Shield, Zap, ArrowLeft, MailCheck } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getHomeRouteForRole } from "@/lib/role-routing";
 import { DEFAULT_SITE_TAGLINE } from "@contracts/constants";
 
 export default function Login() {
@@ -26,10 +27,10 @@ export default function Login() {
   const utils = trpc.useUtils();
 
   const loginMutation = trpc.localAuth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       utils.localAuth.me.invalidate();
       utils.auth.me.invalidate();
-      navigate("/");
+      navigate(getHomeRouteForRole(data.user?.role));
     },
     onError: (err) => { setError(err.message); },
   });

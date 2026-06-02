@@ -32,7 +32,7 @@ export function getDb() {
       schema: fullSchema,
     });
   }
-  return instance;
+  return instance!;
 }
 
 export async function closeDb(): Promise<void> {

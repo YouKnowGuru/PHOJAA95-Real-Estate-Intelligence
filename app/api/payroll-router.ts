@@ -5,6 +5,8 @@ import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { payroll, localUsers } from "@db/schema";
 
+const payrollEligibleRoles = ["staff", "developer", "architecture_staff"] as const;
+
 function parseMoney(value: string): number {
   const parsed = parseFloat(value);
   if (Number.isNaN(parsed) || parsed < 0) {
@@ -29,18 +31,30 @@ export const payrollRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+
+      const [user] = await db
+        .select({ id: localUsers.id, role: localUsers.role })
+        .from(localUsers)
+        .where(eq(localUsers.id, input.userId))
+        .limit(1);
+      if (!user) throw new TRPCError({ code: "BAD_REQUEST", message: "User not found" });
+      if (!payrollEligibleRoles.includes(user.role as (typeof payrollEligibleRoles)[number])) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Payroll can only be created for real estate, architecture, or software staff",
+        });
+      }
       
       // Use provided percentage or fetch user's default PF percentage
       let pfPercent: number;
       if (input.pfPercentage) {
         pfPercent = parseMoney(input.pfPercentage);
       } else {
-        const [user] = await db.select({ pfPercentage: localUsers.pfPercentage })
+        const [userPf] = await db.select({ pfPercentage: localUsers.pfPercentage })
           .from(localUsers)
           .where(eq(localUsers.id, input.userId))
           .limit(1);
-        if (!user) throw new TRPCError({ code: "BAD_REQUEST", message: "User not found" });
-        const rawPf = parseFloat(user.pfPercentage || "0");
+        const rawPf = parseFloat(userPf?.pfPercentage || "0");
         pfPercent = Number.isNaN(rawPf) ? 0 : rawPf;
       }
       const base = parseMoney(input.baseSalary);
@@ -100,6 +114,7 @@ export const payrollRouter = createRouter({
         userId: z.number().optional(),
         month: z.string().optional(),
         status: z.enum(["pending", "paid"]).optional(),
+        role: z.enum(["staff", "developer", "architecture_staff"]).optional(),
         page: z.number().default(1),
         limit: z.number().default(20),
       }).default(() => ({ page: 1, limit: 12 }))
@@ -111,10 +126,15 @@ export const payrollRouter = createRouter({
       if (input.userId) conditions.push(eq(payroll.userId, input.userId));
       if (input.month) conditions.push(eq(payroll.month, input.month));
       if (input.status) conditions.push(eq(payroll.paymentStatus, input.status));
+      if (input.role) conditions.push(eq(localUsers.role, input.role));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-      const totalResult = await db.select({ count: count() }).from(payroll).where(whereClause);
+      const totalResult = await db
+        .select({ count: count() })
+        .from(payroll)
+        .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
+        .where(whereClause);
       const total = totalResult[0]?.count || 0;
 
       const page = input.page || 1;
@@ -138,6 +158,7 @@ export const payrollRouter = createRouter({
           createdAt: payroll.createdAt,
           userName: localUsers.fullName,
           userEmail: localUsers.email,
+          userRole: localUsers.role,
           pfNumber: localUsers.pfNumber,
           employeeId: localUsers.employeeId,
         })

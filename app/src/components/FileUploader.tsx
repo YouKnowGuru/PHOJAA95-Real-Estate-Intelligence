@@ -1,10 +1,14 @@
 import { useState, useCallback, useId } from "react";
 import { Upload, X, FileText, Image, Loader2 } from "lucide-react";
 import {
+  ARCHITECTURE_UPLOAD_ACCEPT,
+  ARCHITECTURE_UPLOAD_HINT,
   DOCUMENT_UPLOAD_ACCEPT,
   DOCUMENT_UPLOAD_HINT,
+  resolveArchitectureMimeType,
   resolveDocumentMimeType,
 } from "@contracts/upload";
+import { trpc } from "@/lib/trpc";
 import { Button } from "./ui/button";
 import { Progress } from "./ui/progress";
 import { SecureFileLink } from "./SecureFileLink";
@@ -17,29 +21,38 @@ interface FileUploaderProps {
   disabled?: boolean;
   label?: string;
   hint?: string;
-  folder?: "properties" | "agreements" | "documents" | "verification" | "final" | "profiles" | "payslips" | "library";
+  folder?: "properties" | "agreements" | "documents" | "verification" | "final" | "profiles" | "payslips" | "library" | "architecture";
+  /** architecture = allow CAD/video; standard = property/library document types only */
+  mode?: "standard" | "architecture";
 }
 
 export function FileUploader({
-  accept = DOCUMENT_UPLOAD_ACCEPT,
-  maxSize = 15 * 1024 * 1024,
+  accept,
+  maxSize = 10 * 1024 * 1024,
   value,
   onChange,
   disabled,
   label,
   hint,
   folder = "documents",
+  mode = "standard",
 }: FileUploaderProps) {
   const inputId = useId();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
+  const uploadMutation = trpc.upload.upload.useMutation();
+
+  const isArchitecture = mode === "architecture" || folder === "architecture";
+  const resolvedAccept = accept ?? (isArchitecture ? ARCHITECTURE_UPLOAD_ACCEPT : DOCUMENT_UPLOAD_ACCEPT);
+  const defaultHint = isArchitecture ? ARCHITECTURE_UPLOAD_HINT : DOCUMENT_UPLOAD_HINT;
 
   const handleFileSelect = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      e.target.value = "";
 
       if (file.size > maxSize) {
         setError(`File size exceeds ${maxSize / 1024 / 1024}MB limit`);
@@ -48,93 +61,47 @@ export function FileUploader({
 
       setUploading(true);
       setError(null);
-      setProgress(0);
+      setProgress(20);
 
       try {
-        const base64 = await new Promise<string>((resolve, reject) => {
+        const fileData = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64 = result.includes(",") ? result.split(",")[1] : result;
+            resolve(base64);
+          };
+          reader.onerror = () => reject(new Error("Failed to read file"));
           reader.readAsDataURL(file);
         });
 
-        const fileData = base64.split(",")[1];
+        setProgress(55);
 
-        setProgress(50);
+        const mimeType = isArchitecture
+          ? resolveArchitectureMimeType(file.name, file.type)
+          : resolveDocumentMimeType(file.name, file.type);
 
-        const response = await fetch("/api/trpc/upload.upload", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            json: {
-              file: fileData,
-              fileName: file.name,
-              mimeType: resolveDocumentMimeType(file.name, file.type),
-              folder,
-            },
-          }),
+        const result = await uploadMutation.mutateAsync({
+          file: fileData,
+          fileName: file.name,
+          mimeType,
+          folder,
         });
 
-        const result = await response.json();
-        
-        // Handle batch response format
-        let url: string | null = null;
-        let uploadMeta: { key: string; fileName: string; mimeType: string; fileSize: number } | undefined;
-        let errorMsg = "Upload failed - check server console";
-        
-        // Helper to extract tRPC error message (v11 format: error.json.message)
-        const getErrorMessage = (error: unknown): string => {
-          if (!error) return "Unknown error";
-          if (typeof error === "string") return error;
-          const err = error as Record<string, unknown>;
-          // tRPC v11: error.json.message
-          const jsonMsg = (err.json as Record<string, unknown>)?.message;
-          if (typeof jsonMsg === "string") return jsonMsg;
-          // Direct message
-          if (typeof err.message === "string") return err.message;
-          // Fallback
-          try {
-            return JSON.stringify(error);
-          } catch {
-            return "Unknown error";
-          }
-        };
-        
-        if (Array.isArray(result)) {
-          const firstResult = result[0];
-          
-          if (firstResult?.result?.data?.json) {
-            const data = firstResult.result.data.json;
-            url = data.url;
-            uploadMeta = { key: data.key, fileName: data.fileName, mimeType: data.mimeType, fileSize: data.fileSize };
-          } else if (firstResult?.error) {
-            errorMsg = getErrorMessage(firstResult.error);
-          } else if (firstResult?.result?.data?.error) {
-            errorMsg = getErrorMessage(firstResult.result.data.error);
-          }
-        } else if (result?.result?.data?.json) {
-          const data = result.result.data.json;
-          url = data.url;
-          uploadMeta = { key: data.key, fileName: data.fileName, mimeType: data.mimeType, fileSize: data.fileSize };
-        } else if (result?.error) {
-          errorMsg = getErrorMessage(result.error);
-        } else if (result?.result?.data?.error) {
-          errorMsg = getErrorMessage(result.result.data.error);
-        }
-        
-        if (url) {
-          setProgress(100);
-          onChange?.(url, uploadMeta);
-        } else {
-          throw new Error(errorMsg);
-        }
+        setProgress(100);
+        onChange?.(result.url, {
+          key: result.key,
+          fileName: result.fileName,
+          mimeType: result.mimeType,
+          fileSize: result.fileSize,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed");
       } finally {
         setUploading(false);
       }
     },
-    [maxSize, onChange, folder]
+    [maxSize, onChange, folder, isArchitecture, uploadMutation]
   );
 
   if (value) {
@@ -156,7 +123,7 @@ export function FileUploader({
             variant="ghost"
             size="icon"
             onClick={() => onChange?.("")}
-            disabled={disabled}
+            disabled={disabled || uploading}
           >
             <X className="h-4 w-4" />
           </Button>
@@ -171,7 +138,7 @@ export function FileUploader({
       <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
         <input
           type="file"
-          accept={accept}
+          accept={resolvedAccept}
           onChange={handleFileSelect}
           disabled={disabled || uploading}
           className="hidden"
@@ -189,7 +156,7 @@ export function FileUploader({
               <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
               <p className="text-sm font-medium">Click to upload</p>
               <p className="text-xs text-muted-foreground">
-                {DOCUMENT_UPLOAD_HINT} up to {maxSize / 1024 / 1024}MB
+                {defaultHint} up to {maxSize / 1024 / 1024}MB
               </p>
             </div>
           )}

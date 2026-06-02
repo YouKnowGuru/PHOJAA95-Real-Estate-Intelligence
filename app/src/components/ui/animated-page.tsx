@@ -2,16 +2,16 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-interface AnimatedPageProps extends React.ComponentProps<"div"> {
+interface AnimatedPageProps {
   children: React.ReactNode;
   delay?: number;
+  className?: string;
 }
 
 export function AnimatedPage({
   children,
   delay = 0,
   className,
-  ...props
 }: AnimatedPageProps) {
   return (
     <motion.div
@@ -24,7 +24,6 @@ export function AnimatedPage({
         ease: [0.16, 1, 0.3, 1],
       }}
       className={cn("space-y-6", className)}
-      {...props}
     >
       {children}
     </motion.div>
@@ -35,7 +34,6 @@ export function AnimatedSection({
   children,
   delay = 0,
   className,
-  ...props
 }: AnimatedPageProps) {
   return (
     <motion.div
@@ -47,7 +45,6 @@ export function AnimatedSection({
         ease: [0.16, 1, 0.3, 1],
       }}
       className={className}
-      {...props}
     >
       {children}
     </motion.div>
@@ -58,8 +55,11 @@ export function StaggerContainer({
   children,
   className,
   staggerDelay = 0.05,
-  ...props
-}: React.ComponentProps<"div"> & { staggerDelay?: number }) {
+}: {
+  children: React.ReactNode;
+  className?: string;
+  staggerDelay?: number;
+}) {
   return (
     <motion.div
       initial="hidden"
@@ -74,7 +74,6 @@ export function StaggerContainer({
         },
       }}
       className={className}
-      {...props}
     >
       {children}
     </motion.div>
@@ -84,8 +83,10 @@ export function StaggerContainer({
 export function StaggerItem({
   children,
   className,
-  ...props
-}: React.ComponentProps<"div">) {
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <motion.div
       variants={{
@@ -100,7 +101,6 @@ export function StaggerItem({
         },
       }}
       className={className}
-      {...props}
     >
       {children}
     </motion.div>

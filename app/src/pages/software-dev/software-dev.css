@@ -1,0 +1,78 @@
+/* Software Development module — responsive layout helpers */
+
+.software-dev-tabs-wrap {
+  position: relative;
+}
+
+.software-dev-tabs {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.software-dev-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.software-dev-tab {
+  scroll-snap-align: start;
+  touch-action: manipulation;
+}
+
+.software-dev-panel {
+  width: 100%;
+  max-width: 100%;
+}
+
+.software-dev-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+  margin: 0 -2px;
+  padding-left: 2px;
+  padding-right: 2px;
+}
+
+.software-dev-actions > * {
+  flex-shrink: 0;
+}
+
+.software-dev-kanban {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 0.5rem;
+  min-height: min(60vh, 640px);
+}
+
+.software-dev-kanban-column {
+  flex: 0 0 min(85vw, 288px);
+  scroll-snap-align: start;
+  min-width: min(85vw, 288px);
+}
+
+.software-dev-chart {
+  width: 100%;
+  min-height: 220px;
+  height: min(300px, 50vw);
+}
+
+@media (min-width: 640px) {
+  .software-dev-chart {
+    height: 300px;
+  }
+}
+
+/* Prevent list cards from stealing pointer / hover on touch */
+.software-dev-panel .entity-card-static {
+  cursor: default;
+}

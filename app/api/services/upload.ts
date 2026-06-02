@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { nanoid } from "nanoid";
-import { isAllowedDocumentMimeType, resolveDocumentMimeType } from "@contracts/upload";
+import { resolveDocumentMimeType, resolveArchitectureMimeType, isAllowedDocumentMimeType, isAllowedArchitectureUpload, shouldSkipMagicBytesCheck } from "@contracts/upload";
 import { UPLOAD_DIR } from "../lib/paths";
 import { logger } from "../lib/logger";
 
@@ -68,10 +68,20 @@ export async function uploadFile(
     throw new Error(`File size exceeds maximum of ${MAX_FILE_SIZE / 1024 / 1024}MB`);
   }
 
-  const resolvedMime = resolveDocumentMimeType(fileName, mimeType);
+  const resolvedMime = folder === "architecture" || folder.startsWith("architecture/")
+    ? resolveArchitectureMimeType(fileName, mimeType)
+    : resolveDocumentMimeType(fileName, mimeType);
 
-  if (!isAllowedDocumentMimeType(resolvedMime)) {
-    throw new Error("File type not allowed. Allowed types: PDF, Word (.doc, .docx), PNG, JPEG");
+  const allowed = folder === "architecture" || folder.startsWith("architecture/")
+    ? isAllowedArchitectureUpload(fileName, resolvedMime)
+    : isAllowedDocumentMimeType(resolvedMime);
+
+  if (!allowed) {
+    throw new Error(
+      folder === "architecture" || folder.startsWith("architecture/")
+        ? "File type not allowed. Allowed: PDF, Word, images, DWG/DXF, MP4, or ZIP"
+        : "File type not allowed. Allowed types: PDF, Word (.doc, .docx), PNG, JPEG"
+    );
   }
 
   // Debug: Check magic bytes before validation
@@ -84,7 +94,7 @@ export async function uploadFile(
     firstChars: file.slice(0, 10).toString("ascii")
   });
 
-  if (!validateMagicBytes(file, resolvedMime)) {
+  if (!shouldSkipMagicBytesCheck(fileName, resolvedMime) && !validateMagicBytes(file, resolvedMime)) {
     throw new Error("File content does not match claimed file type");
   }
 

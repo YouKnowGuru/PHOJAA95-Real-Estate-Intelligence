@@ -21,6 +21,8 @@ export async function ensureSchemaPatches(): Promise<void> {
     "ALTER TABLE `payroll` ADD COLUMN IF NOT EXISTS `deduction_notes` text",
     "ALTER TABLE `properties` ADD COLUMN IF NOT EXISTS `features` json",
     "ALTER TABLE `property_documents` ADD COLUMN IF NOT EXISTS `remaining_payment_amount` decimal(15,2)",
+    "ALTER TABLE `software_customers` ADD COLUMN IF NOT EXISTS `created_by` bigint unsigned",
+    "ALTER TABLE `software_customers` ADD INDEX IF NOT EXISTS `idx_software_customers_created_by` (`created_by`)",
   ];
 
   for (const statement of columnPatches) {
@@ -56,9 +58,59 @@ export async function ensureSchemaPatches(): Promise<void> {
   }
 
   await ensureDefaultAdminUser(db);
+  await backfillSoftwareCustomerOwners(db);
 
   schemaReady = true;
   logger.info("Database schema patches applied");
+}
+
+async function backfillSoftwareCustomerOwners(db: ReturnType<typeof getDb>): Promise<void> {
+  try {
+    await db.execute(sql`
+      UPDATE software_customers sc
+      INNER JOIN (
+        SELECT sal.entity_id AS customer_id, sal.user_id
+        FROM software_activity_logs sal
+        INNER JOIN (
+          SELECT entity_id, MIN(created_at) AS first_created
+          FROM software_activity_logs
+          WHERE entity_type = 'customer' AND action = 'customer_created'
+          GROUP BY entity_id
+        ) first ON first.entity_id = sal.entity_id AND first.first_created = sal.created_at
+        WHERE sal.entity_type = 'customer' AND sal.action = 'customer_created'
+      ) owners ON owners.customer_id = sc.id
+      SET sc.created_by = owners.user_id
+      WHERE sc.created_by IS NULL AND sc.deleted_at IS NULL
+    `);
+
+    await db.execute(sql`
+      UPDATE software_customers sc
+      INNER JOIN (
+        SELECT customer_id, MIN(created_by) AS created_by
+        FROM software_sales
+        WHERE deleted_at IS NULL AND created_by IS NOT NULL
+        GROUP BY customer_id
+      ) ss ON ss.customer_id = sc.id
+      SET sc.created_by = ss.created_by
+      WHERE sc.created_by IS NULL AND sc.deleted_at IS NULL
+    `);
+
+    await db.execute(sql`
+      UPDATE software_customers sc
+      INNER JOIN (
+        SELECT customer_id, MIN(created_by) AS created_by
+        FROM software_projects
+        WHERE deleted_at IS NULL AND created_by IS NOT NULL
+        GROUP BY customer_id
+      ) sp ON sp.customer_id = sc.id
+      SET sc.created_by = sp.created_by
+      WHERE sc.created_by IS NULL AND sc.deleted_at IS NULL
+    `);
+
+    logger.info("Software customer created_by backfill completed");
+  } catch (err) {
+    logger.warn("Software customer created_by backfill skipped", { error: String(err) });
+  }
 }
 
 async function ensureDefaultAdminUser(db: ReturnType<typeof getDb>): Promise<void> {

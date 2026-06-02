@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "react-router";
+import { getNotificationPath } from "@/lib/notification-nav";
 
 const notificationIcons = {
   info: Info,
@@ -166,15 +167,8 @@ export function NotificationBell({ className }: { className?: string }) {
                       }
                       
                       // Navigation logic
-                      if (notification.entityType === "property" && notification.entityId) {
-                        navigate(`/properties/${notification.entityId}`);
-                      } else if (notification.entityType === "payroll") {
-                        navigate("/payroll");
-                      } else if (notification.type === "approval") {
-                        navigate("/approvals");
-                      } else if (notification.entityType === "attendance") {
-                        navigate("/attendance");
-                      }
+                      const path = getNotificationPath(notification);
+                      if (path) navigate(path);
                       setOpen(false);
                     }}
                   >

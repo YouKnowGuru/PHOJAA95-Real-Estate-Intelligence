@@ -36,7 +36,7 @@ export default function Users() {
     phone: "",
     employeeId: "",
     pfPercentage: "",
-    role: "staff" as "staff" | "admin",
+    role: "staff" as "staff" | "admin" | "developer" | "architecture_staff",
     status: "active" as "active" | "inactive" | "locked",
   });
 
@@ -63,7 +63,7 @@ export default function Users() {
     fullName: "",
     email: "",
     password: "",
-    role: "staff" as "staff" | "admin",
+    role: "staff" as "staff" | "admin" | "developer" | "architecture_staff",
     phone: "",
     address: "",
     pfNumber: "",
@@ -298,11 +298,13 @@ export default function Users() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={formData.role} onValueChange={(v: "staff" | "admin") => setFormData({ ...formData, role: v })}>
+              <Select value={formData.role} onValueChange={(v: "staff" | "admin" | "developer" | "architecture_staff") => setFormData({ ...formData, role: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="staff">Staff</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
+                  <SelectItem value="developer">Software Developer</SelectItem>
+                  <SelectItem value="architecture_staff">Architecture Staff</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -377,11 +379,13 @@ export default function Users() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Role</Label>
-                  <Select value={editForm.role} onValueChange={(v: "staff" | "admin") => setEditForm({ ...editForm, role: v })}>
+                  <Select value={editForm.role} onValueChange={(v: "staff" | "admin" | "developer" | "architecture_staff") => setEditForm({ ...editForm, role: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="staff">Staff</SelectItem>
                       <SelectItem value="admin">Administrator</SelectItem>
+                      <SelectItem value="developer">Software Developer</SelectItem>
+                      <SelectItem value="architecture_staff">Architecture Staff</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

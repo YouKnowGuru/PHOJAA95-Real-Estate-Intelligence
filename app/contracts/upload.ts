@@ -16,6 +16,14 @@ export const DOCUMENT_UPLOAD_ACCEPT =
 
 export const DOCUMENT_UPLOAD_HINT = "PDF, Word (.doc, .docx), PNG, or JPEG";
 
+/** Architecture module: drawings, CAD, renders, video. */
+export const ARCHITECTURE_UPLOAD_ACCEPT =
+  ".pdf,.doc,.docx,.dwg,.dxf,.zip,image/*,video/mp4,.mp4,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+export const ARCHITECTURE_UPLOAD_HINT = "PDF, Word, images, DWG/DXF, MP4, or ZIP";
+
+const ARCHITECTURE_EXTENSIONS = new Set(["dwg", "dxf", "mp4", "zip", "webp", "gif"]);
+
 const EXTENSION_MIME: Record<string, AllowedDocumentMimeType> = {
   pdf: "application/pdf",
   png: "image/png",
@@ -70,6 +78,40 @@ export function documentFileTypeLabel(mimeType: string, fileName: string): strin
 
 export function isAllowedDocumentMimeType(mimeType: string): boolean {
   return ALLOWED_SET.has(mimeType);
+}
+
+export function isAllowedArchitectureUpload(fileName: string, mimeType: string): boolean {
+  if (isAllowedDocumentMimeType(mimeType)) return true;
+  if (mimeType.startsWith("image/")) return true;
+  if (mimeType === "video/mp4") return true;
+  if (mimeType === "application/zip") return true;
+  return ARCHITECTURE_EXTENSIONS.has(fileExtension(fileName));
+}
+
+/** Normalize MIME for architecture uploads (CAD, video, etc.). */
+export function resolveArchitectureMimeType(fileName: string, clientMime: string): string {
+  const docMime = resolveDocumentMimeType(fileName, clientMime);
+  if (isAllowedDocumentMimeType(docMime)) return docMime;
+
+  const ext = fileExtension(fileName);
+  if (ext === "mp4") return "video/mp4";
+  if (ext === "zip") return "application/zip";
+  if (ext === "dwg" || ext === "dxf") return "application/octet-stream";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+
+  const trimmed = clientMime.trim().toLowerCase();
+  if (trimmed.startsWith("image/") || trimmed === "video/mp4" || trimmed === "application/zip") {
+    return trimmed;
+  }
+
+  return docMime || trimmed || "application/octet-stream";
+}
+
+export function shouldSkipMagicBytesCheck(fileName: string, mimeType: string): boolean {
+  if (mimeType === "application/octet-stream") return true;
+  if (mimeType === "video/mp4" || mimeType === "application/zip") return true;
+  return ARCHITECTURE_EXTENSIONS.has(fileExtension(fileName));
 }
 
 export function isWordDocument(mimeType: string, fileName: string): boolean {

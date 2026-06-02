@@ -2,12 +2,13 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
-interface PageHeaderProps extends React.ComponentProps<"div"> {
+interface PageHeaderProps {
   title: React.ReactNode;
   description?: React.ReactNode;
   icon?: React.ReactNode;
   actions?: React.ReactNode;
   delay?: number;
+  className?: string;
 }
 
 export function PageHeader({

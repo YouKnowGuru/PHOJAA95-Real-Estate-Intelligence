@@ -4,10 +4,11 @@ import { motion } from "framer-motion";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "./button";
 
-interface ErrorStateProps extends React.ComponentProps<"div"> {
+interface ErrorStateProps {
   title?: string;
   description?: string;
   onRetry?: () => void;
+  className?: string;
 }
 
 export function ErrorState({

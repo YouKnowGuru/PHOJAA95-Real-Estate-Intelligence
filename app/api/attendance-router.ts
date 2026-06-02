@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -11,6 +11,9 @@ import { attendance, localUsers } from "@db/schema";
 function getBhutanDateStr(date: Date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
 }
+
+/** Roles that check in via attendance (excludes admin). */
+const ATTENDANCE_ELIGIBLE_ROLES = ["staff", "developer", "architecture_staff"] as const;
 
 export const attendanceRouter = createRouter({
   checkIn: staffQuery
@@ -281,19 +284,54 @@ export const attendanceRouter = createRouter({
       const db = getDb();
       const today = getBhutanDateStr();
 
-      const records = await db.select({
-        status: attendance.status,
-        count: count(),
-      })
+      const records = await db
+        .select({
+          status: attendance.status,
+          count: count(),
+        })
         .from(attendance)
         .where(eq(attendance.date, today))
         .groupBy(attendance.status);
 
-      const totalStaff = await db.select({ count: count() }).from(localUsers).where(eq(localUsers.role, "staff"));
+      const totalStaffResult = await db
+        .select({ count: count() })
+        .from(localUsers)
+        .where(
+          and(
+            eq(localUsers.status, "active"),
+            inArray(localUsers.role, [...ATTENDANCE_ELIGIBLE_ROLES]),
+          ),
+        );
+
+      const totalStaff = Number(totalStaffResult[0]?.count ?? 0);
+
+      const breakdown = records.map((row) => ({
+        status: row.status,
+        count: Number(row.count ?? 0),
+      }));
+
+      const statusCount = (status: string) =>
+        breakdown.find((b) => b.status === status)?.count ?? 0;
+
+      const present = statusCount("present");
+      const late = statusCount("late");
+      const absent = statusCount("absent");
+      const halfDay = statusCount("half_day");
+      const recordedToday = breakdown.reduce((sum, row) => sum + row.count, 0);
+      const checkedIn = present + late + halfDay;
+      const notCheckedIn = Math.max(0, totalStaff - recordedToday);
 
       return {
-        breakdown: records,
-        totalStaff: totalStaff[0]?.count || 0,
+        date: today,
+        breakdown,
+        totalStaff,
+        present,
+        late,
+        absent,
+        halfDay,
+        checkedIn,
+        notCheckedIn,
+        recordedToday,
       };
     }),
 });

@@ -27,13 +27,19 @@ import {
   Receipt,
   FolderOpen,
   ChevronRight,
+  Code2,
+  PenTool,
+
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { formatStaffRoleLabel, getHomeRouteForRole } from "@/lib/role-routing";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 
 const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+  { icon: Code2, label: "Software Development", href: "/software-dev" },
+  { icon: PenTool, label: "Architecture", href: "/architecture" },
   { icon: Building2, label: "Properties", href: "/properties" },
   { icon: Building2, label: "Property Types", href: "/property-types" },
   { icon: FolderOpen, label: "Documents", href: "/documents" },
@@ -55,14 +61,61 @@ const staffNavItems = [
   { icon: FolderOpen, label: "Documents", href: "/documents" },
   { icon: Receipt, label: "Billing", href: "/billing" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
-  { icon: Wallet, label: "My Payslips", href: "/payroll" },
+  { icon: Wallet, label: "Payroll", href: "/payroll" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
+const softwareDevNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/software-dev" },
+  { icon: Code2, label: "Software Development", href: "/software-dev" },
+  { icon: Clock, label: "Attendance", href: "/attendance" },
+  { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: UserCircle, label: "Profile", href: "/profile" },
+  { icon: Bell, label: "Notifications", href: "/notifications" },
+  { icon: Settings, label: "Settings", href: "/settings" },
+];
+
+const adminSoftwareDevNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+  { icon: Code2, label: "Software Development", href: "/software-dev" },
+  { icon: PenTool, label: "Architecture", href: "/architecture" },
+  { icon: Building2, label: "Properties", href: "/properties" },
+  { icon: Building2, label: "Property Types", href: "/property-types" },
+  { icon: FolderOpen, label: "Documents", href: "/documents" },
+  { icon: ClipboardList, label: "Approvals", href: "/approvals" },
+  { icon: Receipt, label: "Billing", href: "/billing" },
+  { icon: Users, label: "Staff", href: "/users" },
+  { icon: Clock, label: "Attendance", href: "/attendance" },
+  { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: ScrollText, label: "Activity", href: "/activity-logs" },
+  { icon: BarChart3, label: "Reports", href: "/reports" },
+  { icon: Bell, label: "Notifications", href: "/notifications" },
+  { icon: UserCircle, label: "Profile", href: "/profile" },
+  { icon: Settings, label: "Settings", href: "/settings" },
+];
+
+const architectureStaffNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/architecture" },
+  { icon: PenTool, label: "Architecture", href: "/architecture" },
+  { icon: Clock, label: "Attendance", href: "/attendance" },
+  { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: UserCircle, label: "Profile", href: "/profile" },
+  { icon: Bell, label: "Notifications", href: "/notifications" },
+  { icon: Settings, label: "Settings", href: "/settings" },
+];
+
+function isNavItemActive(pathname: string, hash: string, href: string): boolean {
+  const [path, itemHash] = href.split("#");
+  if (itemHash) {
+    return pathname === path && hash.replace(/^#/, "") === itemHash;
+  }
+  return pathname === href;
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, logout, isAdmin, sessionExpiresAt, refreshSession } = useAuth();
+  const { user, logout, isAdmin, isDeveloper, isArchitectureStaff, sessionExpiresAt, refreshSession } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -129,7 +182,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, [sessionExpiresAt, refreshSession]);
 
-  const navItems = isAdmin ? adminNavItems : staffNavItems;
+  const navItems = isAdmin
+    ? adminSoftwareDevNavItems
+    : isDeveloper
+    ? softwareDevNavItems
+    : isArchitectureStaff
+    ? architectureStaffNavItems
+    : staffNavItems;
 
   const { data: branding } = trpc.settings.getPublicSettings.useQuery(undefined, {
     staleTime: Infinity,
@@ -141,7 +200,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const { data: notifData } = trpc.notification.getUnreadCount.useQuery(undefined, { refetchInterval: 30000, refetchIntervalInBackground: false });
   const { data: adminStats } = trpc.property.dashboardStats.useQuery(undefined, { enabled: isAdmin });
-  const { data: staffStats } = trpc.property.staffDashboardStats.useQuery(undefined, { enabled: !isAdmin });
+  const { data: staffStats } = trpc.property.staffDashboardStats.useQuery(undefined, { enabled: !isAdmin && !isDeveloper && !isArchitectureStaff });
 
   const unreadCount = notifData?.count || 0;
   const pendingApprovalsCount = isAdmin ? adminStats?.pendingApprovals : staffStats?.pendingApprovals;
@@ -179,7 +238,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {/* Logo */}
         <div className="border-b border-border/30 px-5 py-5">
-          <Link to="/" className="flex items-center gap-3">
+          <Link to={getHomeRouteForRole(user?.role)} className="flex items-center gap-3">
             {isValidLogo ? (
               <img 
                 src={siteLogo} 
@@ -207,10 +266,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <nav className="flex-1 overflow-y-auto px-3 py-4 scrollbar-thin">
           <div className="space-y-0.5">
             {navItems.map((item, index) => {
-              const isActive = location.pathname === item.href;
+              const isActive = isNavItemActive(location.pathname, location.hash, item.href);
               return (
                 <motion.div
-                  key={item.href}
+                  key={`${item.label}-${item.href}`}
                   initial={{ opacity: 0, x: -12 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.02, duration: 0.3 }}
@@ -278,7 +337,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </p>
               <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <ShieldCheck className="h-3 w-3" />
-                {isAdmin ? "Administrator" : "Staff"}
+                {formatStaffRoleLabel(user?.role)}
               </p>
             </div>
             <button

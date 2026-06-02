@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import type { RouterOutputs } from "@/lib/trpc";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/useAuth";
+import { formatStaffRoleLabel, PAYROLL_ELIGIBLE_ROLES } from "@/lib/role-routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ export default function PayrollPage() {
   const currentMonth = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" }).substring(0, 7);
   const currentYear = new Date().getFullYear();
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [teamFilter, setTeamFilter] = useState<"all" | "staff" | "architecture_staff" | "developer">("all");
   const [showAdd, setShowAdd] = useState(false);
   type PayrollItem = RouterOutputs["payroll"]["list"]["items"][number];
   const [selectedPayslip, setSelectedPayslip] = useState<PayrollItem | null>(null);
@@ -42,7 +44,10 @@ export default function PayrollPage() {
   });
 
   const { data: payrollList, isLoading: payrollLoading } = trpc.payroll.list.useQuery(
-    { month: selectedMonth },
+    {
+      month: selectedMonth,
+      role: teamFilter === "all" ? undefined : teamFilter,
+    },
     { enabled: isAdmin }
   );
 
@@ -57,7 +62,7 @@ export default function PayrollPage() {
   );
 
   const { data: staffList } = trpc.user.list.useQuery(
-    { role: "staff", limit: 100 },
+    { roles: [...PAYROLL_ELIGIBLE_ROLES], limit: 200, status: "active" },
     { enabled: isAdmin }
   );
 
@@ -308,7 +313,19 @@ export default function PayrollPage() {
         description="Salary management and payment tracking"
         icon={<Wallet className="h-5 w-5" />}
         actions={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {isAdmin && (
+              <select
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value as typeof teamFilter)}
+                className="h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm"
+              >
+                <option value="all">All teams</option>
+                <option value="staff">Real Estate</option>
+                <option value="architecture_staff">Architecture</option>
+                <option value="developer">Software Dev</option>
+              </select>
+            )}
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
@@ -379,7 +396,12 @@ export default function PayrollPage() {
                   <tr key={item.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-medium">{item.userName || "You"}</div>
-                      <div className="flex gap-2 text-[10px] text-muted-foreground">
+                      <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                        {isAdmin && "userRole" in item && item.userRole && (
+                          <Badge variant="outline" className="text-[10px] rounded-md">
+                            {formatStaffRoleLabel(item.userRole as string)}
+                          </Badge>
+                        )}
                         {item.employeeId && <span>ID: {item.employeeId}</span>}
                         {item.pfNumber && <span>PF: {item.pfNumber}</span>}
                       </div>
@@ -483,7 +505,9 @@ export default function PayrollPage() {
                 <SelectTrigger className="rounded-xl border-border/40 bg-background/50"><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
                   {staffList?.items.map((u) => (
-                    <SelectItem key={u.id} value={u.id.toString()}>{u.fullName}</SelectItem>
+                    <SelectItem key={u.id} value={u.id.toString()}>
+                      {u.fullName} ({formatStaffRoleLabel(u.role)})
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>

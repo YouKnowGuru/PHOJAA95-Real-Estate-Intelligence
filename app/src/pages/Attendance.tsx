@@ -61,13 +61,13 @@ export default function AttendancePage() {
     { enabled: isAdmin }
   );
 
-  const { data: dailyStatus } = trpc.attendance.dailyStatus.useQuery(undefined, {
+  const { data: dailyStatus, isLoading: dailyStatusLoading } = trpc.attendance.dailyStatus.useQuery(undefined, {
     enabled: isAdmin,
     refetchInterval: 1000 * 60 * 5,
   });
 
   const { data: staffList } = trpc.user.list.useQuery(
-    { role: "staff", limit: 100 },
+    { roles: ["staff", "developer", "architecture_staff"], status: "active", limit: 200 },
     { enabled: isAdmin && showMarkDialog }
   );
 
@@ -351,40 +351,54 @@ export default function AttendancePage() {
       )}
 
       {/* Admin Live Overview */}
-      {isAdmin && dailyStatus && (
+      {isAdmin && (
         <AnimatedSection delay={0.3}>
           <AppleCard className="border-indigo-200/50 dark:border-indigo-800/30 bg-indigo-50/30 dark:bg-indigo-900/10">
             <AppleCardHeader>
               <AppleCardTitle className="text-sm flex items-center gap-2 text-indigo-700 dark:text-indigo-300">
                 <Clock className="h-4 w-4" />
-                Today's Live Overview ({todayStr})
+                Today's Live Overview ({dailyStatus?.date ?? todayStr})
               </AppleCardTitle>
+              <AppleCardDescription>
+                Active staff across Real Estate, Architecture, and Software Dev
+              </AppleCardDescription>
             </AppleCardHeader>
             <AppleCardContent>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                <div className="space-y-1">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Checked In</p>
-                  <p className="text-xl font-bold text-indigo-600">
-                    {dailyStatus.breakdown.reduce((acc, curr) => acc + (curr.status !== "absent" ? curr.count : 0), 0)} / {dailyStatus.totalStaff}
-                  </p>
+              {dailyStatusLoading ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-14 rounded-lg" />
+                  ))}
                 </div>
-                {["present", "late", "absent", "half_day"].map((status) => {
-                  const count = dailyStatus.breakdown.find((b) => b.status === status)?.count || 0;
-                  return (
-                    <div key={status} className="space-y-1">
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground capitalize">{status.replace("_", " ")}</p>
-                      <p className={`text-xl font-bold ${
-                        status === "present" ? "text-emerald-600" :
-                        status === "late" ? "text-amber-600" :
-                        status === "absent" ? "text-red-600" :
-                        "text-blue-600"
-                      }`}>
-                        {count}
-                      </p>
+              ) : dailyStatus ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Checked In</p>
+                    <p className="text-xl font-bold text-indigo-600">
+                      {dailyStatus.checkedIn} / {dailyStatus.totalStaff}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Not Yet In</p>
+                    <p className="text-xl font-bold text-slate-600 dark:text-slate-300">
+                      {dailyStatus.notCheckedIn}
+                    </p>
+                  </div>
+                  {[
+                    { key: "present", label: "Present", value: dailyStatus.present, color: "text-emerald-600" },
+                    { key: "late", label: "Late", value: dailyStatus.late, color: "text-amber-600" },
+                    { key: "absent", label: "Absent", value: dailyStatus.absent, color: "text-red-600" },
+                    { key: "half_day", label: "Half Day", value: dailyStatus.halfDay, color: "text-blue-600" },
+                  ].map(({ key, label, value, color }) => (
+                    <div key={key} className="space-y-1">
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+                      <p className={`text-xl font-bold ${color}`}>{value}</p>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Unable to load today&apos;s attendance overview.</p>
+              )}
             </AppleCardContent>
           </AppleCard>
         </AnimatedSection>

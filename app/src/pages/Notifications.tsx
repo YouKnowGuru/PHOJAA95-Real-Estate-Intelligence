@@ -26,6 +26,7 @@ import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router";
+import { getNotificationPath } from "@/lib/notification-nav";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
 import { AppleCard, AppleCardContent, AppleCardHeader, AppleCardTitle, AppleCardDescription } from "@/components/ui/apple-card";
@@ -230,15 +231,8 @@ export default function NotificationsPage() {
                               if (!notif.isRead) {
                                 markReadMutation.mutate({ id: notif.id });
                               }
-                              if (notif.entityType === "property" && notif.entityId) {
-                                navigate(`/properties/${notif.entityId}`);
-                              } else if (notif.entityType === "payroll") {
-                                navigate("/payroll");
-                              } else if (notif.type === "approval") {
-                                navigate("/approvals");
-                              } else if (notif.entityType === "attendance") {
-                                navigate("/attendance");
-                              }
+                              const path = getNotificationPath(notif);
+                              if (path) navigate(path);
                             }}
                           >
                             <div className="flex gap-4">

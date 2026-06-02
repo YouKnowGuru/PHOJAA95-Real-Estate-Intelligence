@@ -10,7 +10,7 @@ import { DEFAULT_SITE_TAGLINE } from "../contracts/constants";
 
 const fullSchema = { ...schema, ...relations };
 
-async function propertiesEmpty(db: ReturnType<typeof drizzle>): Promise<boolean> {
+async function propertiesEmpty(db: any): Promise<boolean> {
   const rows = await db.select({ count: sql<number>`count(*)` }).from(schema.properties);
   return Number(rows[0]?.count ?? 0) === 0;
 }
