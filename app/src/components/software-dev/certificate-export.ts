@@ -143,9 +143,14 @@ export function buildCertificateHtml(
 <meta charset="UTF-8"/>
 <title>${title} — ${certNo}</title>
 <style>
-  @page { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 landscape; margin: 0; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 297mm;
+    height: 210mm;
+  }
 
   body {
     font-family: 'Segoe UI', system-ui, sans-serif;
@@ -156,10 +161,11 @@ export function buildCertificateHtml(
   }
 
   .cert-page {
-    width: 277mm;
-    min-height: 190mm;
+    width: 297mm;
+    height: 210mm;
+    max-height: 210mm;
     margin: 0 auto;
-    padding: 10mm;
+    padding: 6mm;
     background: ${BHUTAN.parchment};
     position: relative;
     overflow: hidden;
@@ -177,11 +183,14 @@ export function buildCertificateHtml(
 
   .cert-outer {
     position: relative;
-    min-height: 170mm;
+    height: 100%;
+    max-height: 198mm;
     border: 3px solid ${BHUTAN.gold};
     outline: 1px solid ${BHUTAN.saffron};
     background: ${BHUTAN.white};
     box-shadow: inset 0 0 0 6px ${BHUTAN.parchment}, inset 0 0 0 7px ${BHUTAN.maroon};
+    display: flex;
+    flex-direction: column;
   }
 
   .cert-weave {
@@ -197,7 +206,11 @@ export function buildCertificateHtml(
 
   .cert-inner {
     position: relative;
-    padding: 22px 36px 28px;
+    flex: 1;
+    min-height: 0;
+    padding: 14px 28px 16px;
+    display: flex;
+    flex-direction: column;
   }
 
   .corner {
@@ -215,12 +228,13 @@ export function buildCertificateHtml(
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
-    padding: 18px 22px;
-    margin: -22px -36px 20px;
+    gap: 16px;
+    padding: 12px 18px;
+    margin: -14px -28px 12px;
     background: linear-gradient(135deg, ${BHUTAN.maroonDeep} 0%, ${BHUTAN.maroon} 40%, ${BHUTAN.saffronDark} 100%);
     color: ${BHUTAN.white};
     border-bottom: 3px solid ${BHUTAN.gold};
+    flex-shrink: 0;
   }
 
   .brand-block {
@@ -231,8 +245,8 @@ export function buildCertificateHtml(
   }
 
   .logo-img {
-    width: 64px;
-    height: 64px;
+    width: 52px;
+    height: 52px;
     object-fit: contain;
     border-radius: 12px;
     background: rgba(255,255,255,0.95);
@@ -241,8 +255,8 @@ export function buildCertificateHtml(
   }
 
   .logo-fallback {
-    width: 64px;
-    height: 64px;
+    width: 52px;
+    height: 52px;
     border-radius: 12px;
     background: linear-gradient(145deg, ${BHUTAN.gold}, ${BHUTAN.saffron});
     display: flex;
@@ -256,7 +270,7 @@ export function buildCertificateHtml(
 
   .brand-name {
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 30px;
+    font-size: 24px;
     font-weight: 700;
     letter-spacing: 0.06em;
     line-height: 1.1;
@@ -319,11 +333,11 @@ export function buildCertificateHtml(
     box-shadow: 0 0 0 3px ${BHUTAN.parchment};
   }
 
-  .title-block { text-align: center; margin-bottom: 18px; }
+  .title-block { text-align: center; margin-bottom: 10px; flex-shrink: 0; }
 
   .cert-title {
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 34px;
+    font-size: 26px;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -355,11 +369,12 @@ export function buildCertificateHtml(
   .body {
     text-align: center;
     max-width: 760px;
-    margin: 0 auto 22px;
+    margin: 0 auto 10px;
     font-family: Georgia, 'Times New Roman', serif;
-    font-size: 18px;
-    line-height: 1.65;
+    font-size: 15px;
+    line-height: 1.45;
     color: ${BHUTAN.inkMuted};
+    flex-shrink: 0;
   }
 
   .body .lead {
@@ -372,25 +387,25 @@ export function buildCertificateHtml(
   }
 
   .recipient {
-    font-size: 36px;
+    font-size: 28px;
     font-weight: 700;
     color: ${BHUTAN.ink};
-    margin: 10px 0 6px;
-    line-height: 1.2;
+    margin: 6px 0 4px;
+    line-height: 1.15;
   }
 
   .recipient .company {
     display: block;
-    margin-top: 4px;
-    font-size: 18px;
+    margin-top: 2px;
+    font-size: 15px;
     font-weight: 600;
     color: ${BHUTAN.saffronDark};
     letter-spacing: 0.02em;
   }
 
   .product {
-    margin-top: 12px;
-    font-size: 24px;
+    margin-top: 8px;
+    font-size: 20px;
     font-weight: 700;
     color: ${BHUTAN.maroon};
   }
@@ -416,16 +431,17 @@ export function buildCertificateHtml(
   .meta {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin: 22px 0 20px;
+    gap: 8px;
+    margin: 10px 0 8px;
+    flex-shrink: 0;
   }
 
   .meta-card {
     background: linear-gradient(180deg, ${BHUTAN.white} 0%, ${BHUTAN.parchment} 100%);
     border: 1px solid rgba(201,162,39,0.35);
     border-left: 4px solid ${BHUTAN.saffron};
-    border-radius: 10px;
-    padding: 11px 13px;
+    border-radius: 8px;
+    padding: 8px 10px;
     text-align: left;
   }
 
@@ -439,20 +455,22 @@ export function buildCertificateHtml(
   }
 
   .meta-value {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 600;
     color: ${BHUTAN.ink};
     word-break: break-word;
-    line-height: 1.35;
+    line-height: 1.25;
   }
 
   .footer {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    gap: 24px;
-    padding-top: 16px;
+    gap: 16px;
+    padding-top: 10px;
+    margin-top: auto;
     border-top: 1px solid rgba(201,162,39,0.4);
+    flex-shrink: 0;
   }
 
   .sig-block { min-width: 200px; }
@@ -482,8 +500,8 @@ export function buildCertificateHtml(
   }
 
   .seal {
-    width: 88px;
-    height: 88px;
+    width: 72px;
+    height: 72px;
     border-radius: 50%;
     border: 3px double ${BHUTAN.gold};
     background:
@@ -553,8 +571,32 @@ export function buildCertificateHtml(
   .cert-weave-bottom { margin-top: 0; }
 
   @media print {
+    html, body {
+      width: 297mm;
+      height: 210mm;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
     body { background: ${BHUTAN.white}; }
-    .cert-page { width: auto; min-height: auto; padding: 0; box-shadow: none; }
+    .cert-page {
+      width: 297mm;
+      height: 210mm;
+      max-height: 210mm;
+      min-height: unset;
+      padding: 6mm;
+      margin: 0;
+      box-shadow: none;
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      overflow: hidden;
+    }
+    .cert-outer {
+      max-height: 198mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
   }
 </style>
 </head>
@@ -770,25 +812,58 @@ function drawVerificationSeal(doc: jsPDF, cx: number, cy: number) {
   doc.setFillColor(...cream);
   doc.setDrawColor(...gold);
   doc.setLineWidth(0.6);
-  doc.circle(cx, cy, 14, "FD");
+  doc.circle(cx, cy, 12, "FD");
 
   doc.setDrawColor(...maroon);
   doc.setLineWidth(0.25);
-  doc.circle(cx, cy, 11);
+  doc.circle(cx, cy, 9.5);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6);
+  doc.setFontSize(5.5);
   doc.setTextColor(...maroon);
-  doc.text("VERIFIED", cx, cy - 2, { align: "center" });
-  doc.setFontSize(5);
-  doc.text("AUTHENTIC", cx, cy + 2, { align: "center" });
-  doc.text("CERTIFICATE", cx, cy + 5.5, { align: "center" });
+  doc.text("VERIFIED", cx, cy - 1.5, { align: "center" });
+  doc.setFontSize(4.8);
+  doc.text("AUTHENTIC", cx, cy + 1.5, { align: "center" });
+  doc.text("CERTIFICATE", cx, cy + 4.5, { align: "center" });
+}
+
+function drawCenteredLines(
+  doc: jsPDF,
+  text: string,
+  startY: number,
+  maxWidth: number,
+  lineHeight: number,
+  pageWidth: number,
+  maxLines = 3
+): number {
+  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines);
+  lines.forEach((line, index) => {
+    doc.text(line, pageWidth / 2, startY + index * lineHeight, { align: "center" });
+  });
+  return startY + lines.length * lineHeight;
+}
+
+function drawWrappedLines(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  startY: number,
+  maxWidth: number,
+  lineHeight: number,
+  maxLines = 2
+): number {
+  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines);
+  lines.forEach((line, index) => {
+    doc.text(line, x, startY + index * lineHeight);
+  });
+  return startY + lines.length * lineHeight;
 }
 
 export async function downloadCertificatePdf(cert: CertificateRecord, branding: CertificateBranding) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const contentBottom = pageHeight - 18;
   const siteName = branding.site_name || "PHOJAA95";
   const tagline = branding.site_tagline || "Software Development & Digital Solutions";
   const title = getCertificateTitle(cert.certificateType);
@@ -811,83 +886,88 @@ export async function downloadCertificatePdf(cert: CertificateRecord, branding: 
   drawCornerAccent(doc, pageWidth - 16, pageHeight - 16, true, true);
 
   doc.setFillColor(...maroonDeep);
-  doc.rect(16, 16, pageWidth - 32, 22, "F");
+  doc.rect(16, 16, pageWidth - 32, 18, "F");
   doc.setFillColor(...saffron);
-  doc.rect(16, 36, pageWidth - 32, 1.2, "F");
+  doc.rect(16, 34, pageWidth - 32, 1, "F");
 
   let textX = 22;
   const logoImg = await loadSiteLogoImage(branding.site_logo);
   if (logoImg) {
     try {
-      doc.addImage(logoImg, "PNG", 22, 19, 18, 18, undefined, "FAST");
-      textX = 44;
+      doc.addImage(logoImg, "PNG", 22, 18, 15, 15, undefined, "FAST");
+      textX = 40;
     } catch {
       // ignore logo errors
     }
   }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
+  doc.setFontSize(14);
   doc.setTextColor(255, 255, 255);
-  doc.text(siteName.toUpperCase(), textX, 27);
+  doc.text(siteName.toUpperCase(), textX, 25);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(6.5);
   doc.setTextColor(255, 230, 200);
-  doc.text(tagline.toUpperCase(), textX, 32);
+  doc.text(tagline.toUpperCase(), textX, 29.5);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...gold);
-  doc.text("Kingdom of Bhutan · Druk Yul", pageWidth - 22, 27, { align: "right" });
-  doc.setFontSize(7);
+  doc.text("Kingdom of Bhutan · Druk Yul", pageWidth - 22, 25, { align: "right" });
+  doc.setFontSize(6.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(getCertificateSubtitle(cert.certificateType), pageWidth - 22, 32, { align: "right" });
+  doc.text(getCertificateSubtitle(cert.certificateType), pageWidth - 22, 29.5, { align: "right" });
 
   doc.setDrawColor(...gold);
   doc.setLineWidth(0.3);
-  doc.line(30, 44, pageWidth - 30, 44);
+  doc.line(30, 38, pageWidth - 30, 38);
 
   doc.setFont("times", "bold");
-  doc.setFontSize(22);
+  doc.setFontSize(18);
   doc.setTextColor(...maroonDeep);
-  doc.text(title.toUpperCase(), pageWidth / 2, 54, { align: "center" });
+  let y = drawCenteredLines(doc, title.toUpperCase(), 46, pageWidth - 44, 6.5, pageWidth, 2);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(...inkMuted);
-  doc.text(`Certificate No. ${cert.certificateNumber || "—"}`, pageWidth / 2, 61, { align: "center" });
+  y = drawCenteredLines(doc, `Certificate No. ${cert.certificateNumber || "—"}`, y + 2, pageWidth - 50, 4.5, pageWidth, 1);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
   doc.setTextColor(...inkMuted);
-  doc.text("THIS IS TO CERTIFY THAT", pageWidth / 2, 72, { align: "center" });
+  y = drawCenteredLines(doc, "THIS IS TO CERTIFY THAT", y + 4, pageWidth - 50, 4.5, pageWidth, 1);
 
   doc.setFont("times", "bold");
-  doc.setFontSize(20);
+  doc.setFontSize(17);
   doc.setTextColor(...ink);
   const customerLabel = cert.companyName
     ? `${cert.customerName || "—"} (${cert.companyName})`
     : cert.customerName || "—";
-  doc.text(customerLabel, pageWidth / 2, 82, { align: "center", maxWidth: pageWidth - 50 });
+  y = drawCenteredLines(doc, customerLabel, y + 2, pageWidth - 50, 6, pageWidth, 2);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
   doc.setTextColor(...inkMuted);
-  doc.text(getCertificateAction(cert.certificateType), pageWidth / 2, 92, { align: "center" });
+  y = drawCenteredLines(doc, getCertificateAction(cert.certificateType), y + 2, pageWidth - 44, 4.5, pageWidth, 2);
 
   doc.setFont("times", "bold");
-  doc.setFontSize(14);
+  doc.setFontSize(12);
   doc.setTextColor(...maroon);
   const productLine = `${cert.productName || "—"}${cert.productVersion ? ` v${cert.productVersion}` : ""}`;
-  doc.text(productLine, pageWidth / 2, 100, { align: "center" });
+  y = drawCenteredLines(doc, productLine, y + 2, pageWidth - 44, 5.5, pageWidth, 2);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
+  doc.setFontSize(8.5);
   doc.setTextColor(...ink);
-  doc.text(`delivered on ${issueDate}, in accordance with our agreement and payment terms.`, pageWidth / 2, 108, {
-    align: "center",
-    maxWidth: pageWidth - 40,
-  });
+  y = drawCenteredLines(
+    doc,
+    `delivered on ${issueDate}, in accordance with our agreement and payment terms.`,
+    y + 2,
+    pageWidth - 40,
+    4.5,
+    pageWidth,
+    2
+  );
 
   const cards = [
     ["Type", formatStatusLabel(cert.certificateType || "")],
@@ -898,63 +978,69 @@ export async function downloadCertificatePdf(cert: CertificateRecord, branding: 
     ["Issued By", siteName],
   ];
   const cardW = (pageWidth - 52) / 3;
-  const cardH = 16;
-  const cardY = 116;
+  const cardH = 13;
+  const cardY = Math.min(y + 4, contentBottom - 52);
   cards.forEach((card, i) => {
     const col = i % 3;
     const row = Math.floor(i / 3);
     const x = 22 + col * (cardW + 3);
-    const y = cardY + row * (cardH + 3);
+    const cardTop = cardY + row * (cardH + 2.5);
 
     doc.setFillColor(...white);
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.2);
-    doc.roundedRect(x, y, cardW, cardH, 2, 2, "FD");
+    doc.roundedRect(x, cardTop, cardW, cardH, 2, 2, "FD");
 
     doc.setFillColor(...saffron);
-    doc.rect(x, y, 2.5, cardH, "F");
+    doc.rect(x, cardTop, 2.5, cardH, "F");
 
-    doc.setFontSize(6);
+    doc.setFontSize(5.5);
+    doc.setFont("helvetica", "normal");
     doc.setTextColor(...inkMuted);
-    doc.text(card[0].toUpperCase(), x + 5, y + 5.5);
-    doc.setFontSize(8);
+    doc.text(card[0].toUpperCase(), x + 4.5, cardTop + 4.5);
+    doc.setFontSize(7);
     doc.setTextColor(...ink);
     doc.setFont("helvetica", "bold");
-    doc.text(card[1], x + 5, y + 11.5, { maxWidth: cardW - 8 });
+    drawWrappedLines(doc, card[1], x + 4.5, cardTop + 8.5, cardW - 8, 3.2, 2);
     doc.setFont("helvetica", "normal");
   });
 
+  const footerY = contentBottom - 10;
   doc.setDrawColor(...gold);
   doc.setLineWidth(0.3);
-  doc.line(22, pageHeight - 34, pageWidth - 22, pageHeight - 34);
+  doc.line(22, footerY, pageWidth - 22, footerY);
 
   doc.setDrawColor(...maroon);
   doc.setLineWidth(0.5);
-  doc.line(28, pageHeight - 22, 78, pageHeight - 22);
-  doc.setFontSize(8);
-  doc.setTextColor(...inkMuted);
-  doc.text("Authorized Signatory", 53, pageHeight - 17, { align: "center" });
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(...ink);
-  doc.text(siteName, 53, pageHeight - 12, { align: "center" });
-  doc.setFont("helvetica", "normal");
-
-  drawVerificationSeal(doc, pageWidth / 2, pageHeight - 20);
-
+  doc.line(28, footerY + 12, 78, footerY + 12);
   doc.setFontSize(7);
   doc.setTextColor(...inkMuted);
-  doc.text("VERIFICATION NUMBER", pageWidth - 24, pageHeight - 28, { align: "right" });
+  doc.text("Authorized Signatory", 53, footerY + 16, { align: "center" });
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...ink);
+  doc.text(siteName, 53, footerY + 20, { align: "center" });
+  doc.setFont("helvetica", "normal");
+
+  drawVerificationSeal(doc, pageWidth / 2, footerY + 16);
+
+  doc.setFontSize(6.5);
+  doc.setTextColor(...inkMuted);
+  doc.text("VERIFICATION NUMBER", pageWidth - 24, footerY + 4, { align: "right" });
 
   const verifyCode = cert.verificationNumber || "—";
   doc.setFont("courier", "bold");
-  doc.setFontSize(9);
-  const verifyW = doc.getTextWidth(verifyCode) + 8;
+  doc.setFontSize(8);
+  const verifyW = Math.min(doc.getTextWidth(verifyCode) + 8, 70);
   doc.setFillColor(...cream);
   doc.setDrawColor(...gold);
   doc.setLineWidth(0.2);
-  doc.roundedRect(pageWidth - 24 - verifyW, pageHeight - 30, verifyW, 10, 2, 2, "FD");
+  doc.roundedRect(pageWidth - 24 - verifyW, footerY + 6, verifyW, 8, 2, 2, "FD");
   doc.setTextColor(...maroonDeep);
-  doc.text(verifyCode, pageWidth - 24, pageHeight - 22, { align: "right" });
+  doc.text(verifyCode, pageWidth - 24, footerY + 11.5, { align: "right" });
+
+  while (doc.getNumberOfPages() > 1) {
+    doc.deletePage(doc.getNumberOfPages());
+  }
 
   const fileName = `${cert.certificateNumber || "certificate"}.pdf`;
   doc.save(fileName);
