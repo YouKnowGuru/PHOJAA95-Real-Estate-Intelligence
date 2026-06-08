@@ -432,7 +432,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
   onDelete: (id: number, name: string) => void;
 }) {
   const [imageError, setImageError] = useState(false);
-  const isPending = !property.isSold;
+  const isPending = !property.isSold && property.currentStep === 4;
 
   return (
     <motion.div
