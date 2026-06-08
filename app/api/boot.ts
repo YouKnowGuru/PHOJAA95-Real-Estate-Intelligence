@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { csrf } from "hono/csrf";
 import { bodyLimit } from "hono/body-limit";
 import type { HttpBindings } from "@hono/node-server";
 import { serve } from "@hono/node-server";
@@ -70,6 +71,7 @@ app.use("*", cors({
 }));
 
 // ─── Security headers ───────────────────────────────────────────────
+app.use("*", csrf({ origin: env.appUrl }));
 app.use("*", async (c, next) => {
   await next();
   c.res.headers.set("X-Content-Type-Options", "nosniff");
@@ -111,10 +113,10 @@ app.get("/ready", async (c) => {
       throw new Error("Database connection not initialized");
     }
     await db.execute("SELECT 1");
-    return c.json({ status: "ready", db: "connected" });
+    return c.json({ status: "ok" });
   } catch (err) {
     logger.error("Readiness check failed", { error: String(err) });
-    return c.json({ status: "not_ready", db: "disconnected" }, 503);
+    return c.json({ status: "error" }, 503);
   }
 });
 

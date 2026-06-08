@@ -57,6 +57,13 @@
       "when": 1780400000000,
       "tag": "0007_architecture_module",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1780913899170,
+      "tag": "0008_spotty_zodiak",
+      "breakpoints": true
     }
   ]
 }

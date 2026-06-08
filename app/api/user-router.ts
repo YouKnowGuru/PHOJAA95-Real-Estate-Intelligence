@@ -238,7 +238,7 @@ export const userRouter = createRouter({
         fullName: z.string().min(2).max(255).optional(),
         phone: z.string().max(50).optional(),
         address: z.string().max(500).optional(),
-        profileImage: z.string().optional(),
+        profileImage: z.string().url().refine((u) => u.startsWith("https://"), { message: "Profile image must be an HTTPS URL" }).optional(),
         // SECURITY: Removed pfNumber and employeeId — staff cannot self-update HR fields
         // Only admins can update these via the admin user management endpoint
       })

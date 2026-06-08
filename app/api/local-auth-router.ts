@@ -129,7 +129,7 @@ export const localAuthRouter = createRouter({
         logger.error("Login database connection failed", {
           error: errMsg,
           code: errCode,
-          host: headers.get("host") || "unknown",
+          host: ctx.req.headers.get("host") || "unknown",
         });
 
         throw new TRPCError({
