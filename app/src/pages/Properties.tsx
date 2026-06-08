@@ -51,7 +51,6 @@ import {
   Layers,
   SlidersHorizontal,
   X,
-  AlertTriangle,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { STEP_LABELS } from "@/constants/workflow";
@@ -433,6 +432,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
   onDelete: (id: number, name: string) => void;
 }) {
   const [imageError, setImageError] = useState(false);
+  const isPending = !property.isSold;
 
   return (
     <motion.div
@@ -445,9 +445,23 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
         <motion.div
           whileHover={{ y: -4 }}
           transition={{ duration: 0.2 }}
-          className="group h-full"
+          className="group h-full relative"
         >
-          <div className="h-full rounded-2xl border border-border/40 bg-card overflow-hidden shadow-apple transition-shadow duration-300 hover:shadow-apple-lg">
+          {/* Framer Motion pulsing glow ring — only for unsold/pending properties */}
+          {isPending && (
+            <motion.div
+              className="absolute inset-[-2px] rounded-2xl pointer-events-none"
+              animate={{
+                boxShadow: [
+                  "0 0 0 1.5px rgba(251,191,36,0.55), 0 0 18px 2px rgba(251,191,36,0.18)",
+                  "0 0 0 1.5px rgba(52,211,153,0.65), 0 0 24px 4px rgba(52,211,153,0.22)",
+                  "0 0 0 1.5px rgba(251,191,36,0.55), 0 0 18px 2px rgba(251,191,36,0.18)",
+                ],
+              }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
+          <div className="relative h-full rounded-2xl border border-border/40 bg-card overflow-hidden shadow-apple transition-shadow duration-300 hover:shadow-apple-lg">
             <div className="relative aspect-[4/3] sm:aspect-[16/10] w-full overflow-hidden bg-muted">
               {property.images && property.images.length > 0 && !imageError ? (
                 <img
@@ -469,10 +483,21 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                   {property.approvalStatus?.replace("_", " ")}
                 </Badge>
               </div>
-              {property.isSold && (
+              {property.isSold ? (
                 <div className="absolute top-3 right-3 z-10">
                   <Badge className="bg-red-600 text-white border-0 shadow-sm rounded-full text-[10px]">
                     SOLD
+                  </Badge>
+                </div>
+              ) : (
+                <div className="absolute top-3 right-3 z-10">
+                  <Badge className="bg-amber-500/90 text-white border-0 shadow-md rounded-full text-[10px] flex items-center gap-1 px-2 py-0.5">
+                    <motion.span
+                      className="inline-block h-1.5 w-1.5 rounded-full bg-white"
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                    Pending
                   </Badge>
                 </div>
               )}
