@@ -489,7 +489,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                     SOLD
                   </Badge>
                 </div>
-              ) : (
+              ) : isPending ? (
                 <div className="absolute top-3 right-3 z-10">
                   <Badge className="bg-amber-500/90 text-white border-0 shadow-md rounded-full text-[10px] flex items-center gap-1 px-2 py-0.5">
                     <motion.span
@@ -500,7 +500,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                     Pending
                   </Badge>
                 </div>
-              )}
+              ) : null}
             </div>
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
