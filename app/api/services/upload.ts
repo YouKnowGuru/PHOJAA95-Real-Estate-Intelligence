@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import { createHash } from "crypto";
 import { nanoid } from "nanoid";
 import { resolveDocumentMimeType, resolveArchitectureMimeType, isAllowedDocumentMimeType, isAllowedArchitectureUpload, shouldSkipMagicBytesCheck } from "@contracts/upload";
 import { UPLOAD_DIR } from "../lib/paths";
@@ -56,6 +57,22 @@ export interface UploadResult {
   fileName: string;
   fileSize: number;
   mimeType: string;
+  checksum: string;
+}
+
+function computeSha256(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+async function verifyWrittenFile(filePath: string, originalBuffer: Buffer, expectedChecksum: string): Promise<void> {
+  const writtenFile = await fs.readFile(filePath);
+  if (writtenFile.length !== originalBuffer.length) {
+    throw new Error(`File size mismatch after write: expected ${originalBuffer.length}, got ${writtenFile.length}`);
+  }
+  const writtenChecksum = computeSha256(writtenFile);
+  if (writtenChecksum !== expectedChecksum) {
+    throw new Error(`Checksum mismatch after write: file may be corrupted`);
+  }
 }
 
 export async function uploadFile(
@@ -98,6 +115,8 @@ export async function uploadFile(
     throw new Error("File content does not match claimed file type");
   }
 
+  const checksum = computeSha256(file);
+
   const safeFolder = sanitizePath(folder);
   const safeFileName = sanitizePath(fileName);
   const ext = safeFileName.split(".").pop() || "bin";
@@ -107,20 +126,26 @@ export async function uploadFile(
   const folderPath = path.join(UPLOAD_DIR, safeFolder);
   await fs.mkdir(folderPath, { recursive: true });
 
-  const filePath = path.join(folderPath, `${uuid}.${ext}`);
-  await fs.writeFile(filePath, file);
+  // Atomic write: write to temp file first, then rename
+  const tempFilePath = path.join(folderPath, `.tmp-${uuid}.${ext}`);
+  const finalFilePath = path.join(folderPath, `${uuid}.${ext}`);
 
-  // Verify written file
-  const writtenFile = await fs.readFile(filePath);
-  const writtenIsPdf = writtenFile.length > 4 && writtenFile[0] === 0x25 && writtenFile[1] === 0x50 && writtenFile[2] === 0x44 && writtenFile[3] === 0x46;
-  logger.info("File uploaded and verified", { 
-    key, 
-    filePath, 
-    size: file.length, 
-    writtenSize: writtenFile.length,
-    mimeType: resolvedMime,
-    isPdf: writtenIsPdf
-  });
+  try {
+    await fs.writeFile(tempFilePath, file);
+
+    // Verify written file matches original buffer
+    await verifyWrittenFile(tempFilePath, file, checksum);
+
+    // Atomic rename to final path
+    await fs.rename(tempFilePath, finalFilePath);
+  } catch (err) {
+    // Clean up temp file on failure
+    try { await fs.unlink(tempFilePath); } catch { /* ignore */ }
+    throw err;
+  }
+
+  // Verify final file exists and matches
+  await verifyWrittenFile(finalFilePath, file, checksum);
 
   const publicUrl = `/uploads/${key}`;
 
@@ -131,6 +156,7 @@ export async function uploadFile(
     fileName: safeFileName,
     fileSize: file.length,
     mimeType: resolvedMime,
+    checksum,
   };
 }
 

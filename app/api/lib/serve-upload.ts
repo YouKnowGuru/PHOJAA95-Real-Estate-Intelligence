@@ -1,6 +1,7 @@
 import type { Context, Next } from "hono";
 import fs from "fs";
 import path from "path";
+import { createHash } from "crypto";
 import * as cookie from "cookie";
 import { UPLOAD_DIR } from "./paths";
 import { logger } from "./logger";
@@ -24,6 +25,36 @@ type ResolveResult =
 
 /** Resolve a relative key (e.g. documents/foo.pdf) to an on-disk upload path. */
 export function resolveUploadFilePath(relativePath: string): ResolveResult {
+  const result = resolveUploadFilePathWithIntegrity(relativePath);
+  if (result.ok) {
+    return { ok: true, filePath: result.filePath };
+  }
+  const fail = result as Extract<FileIntegrityResult, { ok: false }>;
+  return { ok: false, reason: fail.reason === "corrupted" || fail.reason === "size_mismatch" ? "not_found" : fail.reason };
+}
+
+function getContentType(filePath: string): string {
+  return MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
+}
+
+function computeSha256(buffer: Buffer): string {
+  return createHash("sha256").update(buffer).digest("hex");
+}
+
+export type FileIntegrityResult =
+  | {
+      ok: true;
+      filePath: string;
+      checksum: string;
+      size: number;
+    }
+  | {
+      ok: false;
+      reason: "forbidden" | "not_found" | "not_file" | "corrupted" | "size_mismatch";
+      details?: string;
+    };
+
+export function resolveUploadFilePathWithIntegrity(relativePath: string, expectedChecksum?: string, expectedSize?: number): FileIntegrityResult {
   const normalized = relativePath.replace(/^\/+/, "").replace(/\\/g, "/");
   if (!normalized || normalized.includes("..")) {
     return { ok: false, reason: "forbidden" };
@@ -46,16 +77,25 @@ export function resolveUploadFilePath(relativePath: string): ResolveResult {
     return { ok: false, reason: "not_file" };
   }
 
-  return { ok: true, filePath };
-}
-
-function getContentType(filePath: string): string {
-  return MIME_TYPES[path.extname(filePath).toLowerCase()] || "application/octet-stream";
-}
-
-export function buildUploadFileResponse(filePath: string): Response {
-  const contentType = getContentType(filePath);
   const file = fs.readFileSync(filePath);
+
+  // Verify size if expected size provided
+  if (expectedSize !== undefined && file.length !== expectedSize) {
+    return { ok: false, reason: "size_mismatch", details: `Expected ${expectedSize} bytes, got ${file.length}` };
+  }
+
+  // Verify checksum if provided
+  const checksum = computeSha256(file);
+  if (expectedChecksum !== undefined && checksum !== expectedChecksum) {
+    return { ok: false, reason: "corrupted", details: `Checksum mismatch: file may be corrupted` };
+  }
+
+  return { ok: true, filePath, checksum, size: file.length };
+}
+
+export function buildUploadFileResponse(filePath: string, fileBuffer?: Buffer, checksum?: string): Response {
+  const contentType = getContentType(filePath);
+  const file = fileBuffer ?? fs.readFileSync(filePath);
 
   // Check if file starts with PDF magic bytes (%PDF-)
   const isPdf = file.length > 4 && file[0] === 0x25 && file[1] === 0x50 && file[2] === 0x44 && file[3] === 0x46;
@@ -65,8 +105,8 @@ export function buildUploadFileResponse(filePath: string): Response {
     contentType,
     size: file.length,
     isPdf,
+    checksum: checksum ?? "not_verified",
     firstBytes: file.slice(0, 10).toString("hex"),
-    firstChars: file.slice(0, 10).toString("ascii")
   });
 
   const headers: Record<string, string> = {
@@ -109,7 +149,7 @@ export function buildUploadFileResponse(filePath: string): Response {
   return new Response(body, { status: 200, headers });
 }
 
-function respondUploadError(c: Context, result: Extract<ResolveResult, { ok: false }>, reqPath: string) {
+function respondUploadError(c: Context, result: Extract<FileIntegrityResult, { ok: false }>, reqPath: string) {
   if (result.reason === "forbidden") {
     logger.warn("Upload path traversal blocked", { reqPath });
     return c.json({ error: "Forbidden" }, 403);
@@ -120,6 +160,14 @@ function respondUploadError(c: Context, result: Extract<ResolveResult, { ok: fal
       "Content-Type": "text/plain",
       "Cache-Control": "no-store",
     });
+  }
+  if (result.reason === "corrupted") {
+    logger.error("Upload file corrupted (checksum mismatch)", { reqPath, details: result.details });
+    return c.json({ error: "File corrupted — checksum mismatch", details: result.details }, 500);
+  }
+  if (result.reason === "size_mismatch") {
+    logger.error("Upload file size mismatch", { reqPath, details: result.details });
+    return c.json({ error: "File size mismatch", details: result.details }, 500);
   }
   return c.text("Not a file", 400);
 }
@@ -186,13 +234,13 @@ export function createUploadMiddleware() {
       // This maintains backward compatibility while keeping auth requirement
     }
 
-    const result = resolveUploadFilePath(relativePath);
+    const result = resolveUploadFilePathWithIntegrity(relativePath);
     if (!result.ok) {
-      return respondUploadError(c, result, reqPath);
+      return respondUploadError(c, result as Extract<FileIntegrityResult, { ok: false }>, reqPath);
     }
 
     try {
-      return buildUploadFileResponse(result.filePath);
+      return buildUploadFileResponse(result.filePath, undefined, result.checksum);
     } catch (err) {
       logger.error("Error serving upload file", { reqPath, error: String(err) });
       return c.text("Error serving file", 500);
@@ -210,17 +258,18 @@ export async function handleApiFileRequest(c: Context) {
   }
 
   const rawKey = c.req.path.replace(/^\/api\/file\//, "");
-  const result = resolveUploadFilePath(rawKey);
+  const result = resolveUploadFilePathWithIntegrity(rawKey);
   if (!result.ok) {
-    if (result.reason === "not_found") {
+    const fail = result as Extract<FileIntegrityResult, { ok: false }>;
+    if (fail.reason === "not_found") {
       logger.warn("API file endpoint: file not found", { key: rawKey });
       return c.json({ error: "File not found" }, 404);
     }
-    return respondUploadError(c, result, c.req.path);
+    return respondUploadError(c, fail, c.req.path);
   }
 
   try {
-    return buildUploadFileResponse(result.filePath);
+    return buildUploadFileResponse(result.filePath, undefined, result.checksum);
   } catch (err) {
     logger.error("API file endpoint error", { key: rawKey, error: String(err) });
     return c.json({ error: "Error serving file" }, 500);
