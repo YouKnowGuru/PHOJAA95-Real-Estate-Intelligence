@@ -1,3 +1,4 @@
+import { deleteFile } from "./services/upload";
 import { z } from "zod";
 import { eq, and, like, desc, sql, or, count, ne, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -957,6 +958,17 @@ export const propertyRouter = createRouter({
           .where(eq(propertyAgreements.propertyId, input.propertyId))
           .limit(1);
 
+        // Delete old files if being replaced
+        if (existing.length > 0) {
+          const old = existing[0];
+          if (old.agreementFile && old.agreementFile !== input.agreementFile) {
+            try { await deleteFile(old.agreementFile); } catch { /* ignore */ }
+          }
+          if (old.paymentScreenshot && old.paymentScreenshot !== input.paymentScreenshot) {
+            try { await deleteFile(old.paymentScreenshot); } catch { /* ignore */ }
+          }
+        }
+
         const values = {
           agreementFile: input.agreementFile,
           paymentScreenshot: input.paymentScreenshot,
@@ -1107,6 +1119,19 @@ export const propertyRouter = createRouter({
         const existing = await tx.select().from(propertyDocuments)
           .where(eq(propertyDocuments.propertyId, propertyId))
           .limit(1);
+
+        // Delete old files if being replaced
+        if (existing.length > 0) {
+          const old = existing[0];
+          const docFields = ["gewogCertification", "internalAgreement", "occupancyCertificate", "plrVerification", "remainingPaymentScreenshot"];
+          for (const field of docFields) {
+            const oldUrl = old[field as keyof typeof old] as string | null;
+            const newUrl = input[field as keyof typeof input] as string | undefined;
+            if (oldUrl && oldUrl !== newUrl) {
+              try { await deleteFile(oldUrl); } catch { /* ignore */ }
+            }
+          }
+        }
 
         if (existing.length > 0) {
           await tx.update(propertyDocuments)
@@ -1362,6 +1387,17 @@ export const propertyRouter = createRouter({
         const existing = await tx.select().from(finalLagthrams)
           .where(eq(finalLagthrams.propertyId, input.propertyId))
           .limit(1);
+
+        // Delete old files if being replaced
+        if (existing.length > 0) {
+          const old = existing[0];
+          if (old.finalDocument && old.finalDocument !== input.finalDocument) {
+            try { await deleteFile(old.finalDocument); } catch { /* ignore */ }
+          }
+          if (old.completionCertificate && old.completionCertificate !== input.completionCertificate) {
+            try { await deleteFile(old.completionCertificate); } catch { /* ignore */ }
+          }
+        }
 
         if (existing.length > 0) {
           await tx.update(finalLagthrams)
