@@ -77,6 +77,7 @@ export const uploadRouter = createRouter({
         fileName: result.fileName,
         fileSize: result.fileSize,
         mimeType: result.mimeType,
+        checksum: result.checksum,
       };
     }),
 
