@@ -59,9 +59,38 @@ export async function ensureSchemaPatches(): Promise<void> {
 
   await ensureDefaultAdminUser(db);
   await backfillSoftwareCustomerOwners(db);
+  await backfillPropertyApprovals(db);
 
   schemaReady = true;
   logger.info("Database schema patches applied");
+}
+
+async function backfillPropertyApprovals(db: ReturnType<typeof getDb>): Promise<void> {
+  try {
+    await db.execute(sql`
+      UPDATE properties 
+      SET currentStep = 2, approvalStatus = 'approved', workflowStatus = 'processing' 
+      WHERE currentStep = 1 AND approvalStatus IN ('submitted', 'pending_review');
+    `);
+    await db.execute(sql`
+      UPDATE properties 
+      SET currentStep = 3, approvalStatus = 'approved' 
+      WHERE currentStep = 2 AND approvalStatus = 'pending_review';
+    `);
+    await db.execute(sql`
+      UPDATE properties 
+      SET currentStep = 4, approvalStatus = 'approved' 
+      WHERE currentStep = 3 AND approvalStatus = 'pending_review';
+    `);
+    await db.execute(sql`
+      UPDATE properties 
+      SET currentStep = 5, approvalStatus = 'approved' 
+      WHERE currentStep = 4 AND approvalStatus = 'pending_review';
+    `);
+    logger.info("Property approvals backfill completed");
+  } catch (err) {
+    logger.warn("Property approvals backfill skipped", { error: String(err) });
+  }
 }
 
 async function backfillSoftwareCustomerOwners(db: ReturnType<typeof getDb>): Promise<void> {

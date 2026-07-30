@@ -225,9 +225,9 @@ export const propertyRouter = createRouter({
           plotNumber: input.plotNumber || null,
           yearOfConstruction: input.yearOfConstruction ? parseInt(input.yearOfConstruction) : null,
           noObjectionLetter: input.noObjectionLetter || null,
-          currentStep: isAdmin ? 2 : 1,
-          approvalStatus: isAdmin ? "approved" : "submitted",
-          workflowStatus: isAdmin ? "processing" : "pending",
+          currentStep: 2,
+          approvalStatus: "approved",
+          workflowStatus: "processing",
           listedById: Number(userId),
           features: input.features ? JSON.stringify(input.features) : null,
         });
@@ -329,36 +329,13 @@ export const propertyRouter = createRouter({
           }
         }
 
-        if (isAdmin) {
-          await tx.insert(approvalHistory).values({
-            propertyId,
-            step: 1,
-            action: "approved",
-            adminId: userId,
-            comments: "Auto-approved by admin",
-          });
-        } else {
-          await tx.insert(approvalHistory).values({
-            propertyId,
-            step: 1,
-            action: "submitted",
-            adminId: userId,
-            comments: "Property information submitted for review",
-          });
-
-          const admins = await tx.select({ id: localUsers.id }).from(localUsers).where(eq(localUsers.role, "admin"));
-          if (admins.length > 0) {
-            const notificationValues = admins.map(admin => ({
-              userId: admin.id,
-              title: "New Property Pending Approval",
-              message: `${userName} submitted a new property "${input.propertyName}". Please review and approve Step 1.`,
-              type: "approval" as const,
-              entityType: "property",
-              entityId: propertyId,
-            }));
-            await tx.insert(notifications).values(notificationValues);
-          }
-        }
+        await tx.insert(approvalHistory).values({
+          propertyId,
+          step: 1,
+          action: "approved",
+          adminId: userId,
+          comments: isAdmin ? "Auto-approved by admin" : "Property created and Step 1 auto-approved",
+        });
 
         return { id: propertyId, ...input };
       });
@@ -641,11 +618,6 @@ export const propertyRouter = createRouter({
       const { id, images, adminNotes, rejectionComments, ...data } = input;
       const db = getDb();
 
-      // Stringify features for MySQL JSON column
-      if (data.features !== undefined) {
-        data.features = data.features ? JSON.stringify(data.features) : null;
-      }
-
       // ── Land Pricing Calculation for Update ───────────────────────────
       function parseDecimalUpd(val: string | undefined, scale: number): string | null {
         if (!val || val.trim() === "") return null;
@@ -653,6 +625,11 @@ export const propertyRouter = createRouter({
         if (isNaN(n) || n < 0) return null;
         return n.toFixed(scale);
       }
+
+      // Capture features JSON before anything else
+      const featuresJson = data.features !== undefined
+        ? (data.features ? JSON.stringify(data.features) : null)
+        : undefined;
 
       // Fetch existing property for comparison
       const existingProp = await db.select({
@@ -673,100 +650,107 @@ export const propertyRouter = createRouter({
       }
       const oldProp = existingProp[0];
 
-      // Check if property type is Land
-      const propType = await db.select({ name: propertyTypes.name })
-        .from(propertyTypes)
-        .where(eq(propertyTypes.id, oldProp.propertyTypeId))
-        .limit(1);
-      const isLandType = propType[0]?.name === "Land";
+      // Fetch property type name for building vs land determination
+      const targetTypeId = data.propertyTypeId ?? oldProp.propertyTypeId;
+      const typeRows = await db.select({ name: propertyTypes.name }).from(propertyTypes).where(eq(propertyTypes.id, targetTypeId)).limit(1);
+      const isLand = typeRows[0]?.name === "Land";
 
       const userId = ctx.unifiedUser!.id;
       const userName = ctx.unifiedUser!.name;
       const isAdmin = ctx.unifiedUser!.role === "admin";
       const isPriceOverride = isAdmin && data.priceOverrideReason && data.priceOverrideReason.trim().length > 0;
 
-      let sellingPriceNum: string;
-      let realEstateFeeNum: string;
-      let newPricePerDecimal: string | null = oldProp.pricePerDecimal;
-      let newLandSizeDecimal: string | null = oldProp.landSizeDecimal;
-      let newNegotiatedPrice: string | null = oldProp.negotiatedPrice;
-      let newDiscountAmount: string | null = oldProp.discountAmount;
-      let finalSellingPriceNum: string | null = oldProp.finalSellingPrice;
+      // Calculate new pricing values (falling back to existing if omitted)
+      const newPricePerDecimal = data.pricePerDecimal !== undefined
+        ? parseDecimalUpd(data.pricePerDecimal, 2)
+        : oldProp.pricePerDecimal;
 
-      // Parse landSizeDecimal for ALL property types
-      newLandSizeDecimal = data.landSizeDecimal !== undefined ? parseDecimalUpd(data.landSizeDecimal, 4) : oldProp.landSizeDecimal;
+      const newLandSizeDecimal = data.landSizeDecimal !== undefined
+        ? parseDecimalUpd(data.landSizeDecimal, 4)
+        : oldProp.landSizeDecimal;
 
-      if (isLandType) {
-        // Parse new pricing values for Land
-        newPricePerDecimal = data.pricePerDecimal !== undefined ? parseDecimalUpd(data.pricePerDecimal, 4) : oldProp.pricePerDecimal;
-        newNegotiatedPrice = data.negotiatedPrice !== undefined ? parseDecimalUpd(data.negotiatedPrice, 2) : oldProp.negotiatedPrice;
-        newDiscountAmount = data.discountAmount !== undefined ? parseDecimalUpd(data.discountAmount, 2) : oldProp.discountAmount;
+      const newNegotiatedPrice = data.negotiatedPrice !== undefined
+        ? parseDecimalUpd(data.negotiatedPrice, 2)
+        : oldProp.negotiatedPrice;
 
-        // Auto-recalculate sellingPrice if land pricing fields changed
-        let computedSellingPrice = data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) : parseFloat(oldProp.sellingPrice || "0");
-        if (newPricePerDecimal && newLandSizeDecimal) {
-          computedSellingPrice = parseFloat(newPricePerDecimal) * parseFloat(newLandSizeDecimal);
+      const newDiscountAmount = data.discountAmount !== undefined
+        ? parseDecimalUpd(data.discountAmount, 2)
+        : oldProp.discountAmount;
+
+      let sellingPriceNum: string = data.sellingPrice ?? oldProp.sellingPrice ?? "0";
+      if (isLand && newPricePerDecimal && newLandSizeDecimal) {
+        const p = parseFloat(newPricePerDecimal);
+        const l = parseFloat(newLandSizeDecimal);
+        if (!isNaN(p) && !isNaN(l) && p > 0 && l > 0) {
+          sellingPriceNum = (p * l).toFixed(2);
         }
-        sellingPriceNum = computedSellingPrice.toFixed(2);
+      }
 
-        // Calculate finalSellingPrice
-        let finalPrice = computedSellingPrice;
-        if (newNegotiatedPrice) {
-          finalPrice = parseFloat(newNegotiatedPrice) - parseFloat(newDiscountAmount || "0");
-        } else if (newDiscountAmount) {
-          finalPrice = computedSellingPrice - parseFloat(newDiscountAmount);
-        }
-        finalSellingPriceNum = finalPrice > 0 ? finalPrice.toFixed(2) : sellingPriceNum;
+      let finalSellingPriceNum: string = sellingPriceNum;
+      const negNum = newNegotiatedPrice ? parseFloat(newNegotiatedPrice) : 0;
+      const discNum = newDiscountAmount ? parseFloat(newDiscountAmount) : 0;
+      const spNum = parseFloat(sellingPriceNum);
 
-        // Commission is 3% of final selling price
+      if (negNum > 0) {
+        finalSellingPriceNum = Math.max(0, negNum - discNum).toFixed(2);
+      } else if (discNum > 0) {
+        finalSellingPriceNum = Math.max(0, spNum - discNum).toFixed(2);
+      }
+
+      let realEstateFeeNum: string = data.realEstateFee ?? oldProp.realEstateFee ?? "0";
+      if (isLand) {
         realEstateFeeNum = (parseFloat(finalSellingPriceNum) * 0.03).toFixed(2);
-      } else {
-        // Non-Land: use manual selling price
-        const sp = data.sellingPrice !== undefined ? parseFloat(data.sellingPrice) : parseFloat(oldProp.sellingPrice || "0");
-        sellingPriceNum = sp.toFixed(2);
-        realEstateFeeNum = (sp * 0.03).toFixed(2);
-        // Clear land-specific pricing fields for non-Land
-        newPricePerDecimal = null;
-        newNegotiatedPrice = null;
-        newDiscountAmount = null;
-        finalSellingPriceNum = null;
       }
 
       // Update data with computed values
-      data.sellingPrice = sellingPriceNum;
-      data.realEstateFee = realEstateFeeNum;
-      data.loanAmount = data.loanAmount !== undefined 
-        ? parseFloat(data.loanAmount).toFixed(2) 
-        : undefined;
-      data.pricePerDecimal = newPricePerDecimal;
-      data.landSizeDecimal = newLandSizeDecimal;
-      data.negotiatedPrice = newNegotiatedPrice;
-      data.discountAmount = newDiscountAmount;
-      data.finalSellingPrice = finalSellingPriceNum;
-      data.thramNumber = data.thramNumber !== undefined ? (data.thramNumber || null) : undefined;
-      data.plotNumber = data.plotNumber !== undefined ? (data.plotNumber || null) : undefined;
-      data.yearOfConstruction = data.yearOfConstruction !== undefined 
-        ? (data.yearOfConstruction ? parseInt(data.yearOfConstruction) : null) 
-        : undefined;
+      const updateData: Record<string, unknown> = {};
+      if (data.propertyName !== undefined) updateData.propertyName = data.propertyName;
+      if (data.propertyTypeId !== undefined) updateData.propertyTypeId = data.propertyTypeId;
+      if (data.address !== undefined) updateData.address = data.address;
+      if (data.latitude !== undefined) updateData.latitude = data.latitude;
+      if (data.longitude !== undefined) updateData.longitude = data.longitude;
+      if (data.ownerName !== undefined) updateData.ownerName = data.ownerName;
+      if (data.ownerCID !== undefined) updateData.ownerCID = data.ownerCID;
+      if (data.ownerPhone !== undefined) updateData.ownerPhone = data.ownerPhone;
+      if (data.ownerAddress !== undefined) updateData.ownerAddress = data.ownerAddress;
+      if (data.buyerName !== undefined) updateData.buyerName = data.buyerName || null;
+      if (data.buyerCID !== undefined) updateData.buyerCID = data.buyerCID || null;
+      if (data.buyerPhone !== undefined) updateData.buyerPhone = data.buyerPhone || null;
+      if (data.buyerAddress !== undefined) updateData.buyerAddress = data.buyerAddress || null;
+      if (sellingPriceNum !== undefined) updateData.sellingPrice = sellingPriceNum;
+      if (realEstateFeeNum !== undefined) updateData.realEstateFee = realEstateFeeNum;
+      if (data.loanAmount !== undefined) updateData.loanAmount = data.loanAmount ? parseFloat(data.loanAmount).toFixed(2) : null;
+      if (newPricePerDecimal !== undefined) updateData.pricePerDecimal = newPricePerDecimal;
+      if (newLandSizeDecimal !== undefined) updateData.landSizeDecimal = newLandSizeDecimal;
+      if (newNegotiatedPrice !== undefined) updateData.negotiatedPrice = newNegotiatedPrice;
+      if (newDiscountAmount !== undefined) updateData.discountAmount = newDiscountAmount;
+      if (finalSellingPriceNum !== undefined) updateData.finalSellingPrice = finalSellingPriceNum;
+      if (data.thramNumber !== undefined) updateData.thramNumber = data.thramNumber || null;
+      if (data.plotNumber !== undefined) updateData.plotNumber = data.plotNumber || null;
+      if (data.yearOfConstruction !== undefined) updateData.yearOfConstruction = data.yearOfConstruction ? parseInt(data.yearOfConstruction) : null;
+      if (data.noObjectionLetter !== undefined) updateData.noObjectionLetter = data.noObjectionLetter || null;
+      if (featuresJson !== undefined) updateData.features = featuresJson;
+
       if (isPriceOverride) {
-        data.priceOverrideBy = userId.toString();
-        data.priceOverrideAt = new Date().toISOString();
+        updateData.priceOverrideBy = userId;
+        updateData.priceOverrideAt = new Date();
+        updateData.priceOverrideReason = input.priceOverrideReason;
       }
 
       // Validate numeric fields
-      if (data.sellingPrice !== undefined) {
-        const sp = parseFloat(data.sellingPrice);
+      if (updateData.sellingPrice !== undefined) {
+        const sp = parseFloat(updateData.sellingPrice as string);
         if (isNaN(sp) || sp <= 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Selling Price must be a valid positive number." });
         }
-        data.sellingPrice = sp.toFixed(2);
+        updateData.sellingPrice = sp.toFixed(2);
       }
-      if (data.realEstateFee !== undefined) {
-        const fee = parseFloat(data.realEstateFee);
+      if (updateData.realEstateFee !== undefined) {
+        const fee = parseFloat(updateData.realEstateFee as string);
         if (isNaN(fee) || fee < 0) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Commission amount must be a valid non-negative number." });
         }
-        data.realEstateFee = fee.toFixed(2);
+        updateData.realEstateFee = fee.toFixed(2);
       }
 
       // Ownership check BEFORE any side effects
@@ -810,18 +794,18 @@ export const propertyRouter = createRouter({
           // If property was rejected, reset to submitted and clear stale rejection comments
           if (staffProp!.approvalStatus === "rejected") {
             await tx.update(properties)
-              .set({ ...data, approvalStatus: "submitted", rejectionComments: null })
+              .set({ ...updateData, approvalStatus: "submitted", rejectionComments: null })
               .where(eq(properties.id, id));
             return { success: true };
           }
 
           // Staff cannot modify admin-only fields
-          await tx.update(properties).set(data).where(eq(properties.id, id));
+          await tx.update(properties).set(updateData).where(eq(properties.id, id));
           return { success: true };
         }
 
         // Admin update: allow adminNotes and rejectionComments
-        const adminUpdateData: Record<string, unknown> = { ...data };
+        const adminUpdateData: Record<string, unknown> = { ...updateData };
         if (adminNotes !== undefined) adminUpdateData.adminNotes = adminNotes;
         if (rejectionComments !== undefined) adminUpdateData.rejectionComments = rejectionComments;
 
@@ -945,15 +929,6 @@ export const propertyRouter = createRouter({
           throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
         }
 
-        // Step 1 must be approved before staff can work on Step 2
-        if (!isAdmin && prop[0].currentStep < 2) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 1 (Property Information) must be approved by admin before proceeding to Step 2. Please wait for admin approval." });
-        }
-
-        // Block resubmission while Step 2 is pending admin review
-        if (!isAdmin && prop[0].approvalStatus === "pending_review" && prop[0].currentStep === 2) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 2 is already submitted and waiting for admin approval. Please wait for approval before resubmitting." });
-        }
         const existing = await tx.select().from(propertyAgreements)
           .where(eq(propertyAgreements.propertyId, input.propertyId))
           .limit(1);
@@ -974,25 +949,27 @@ export const propertyRouter = createRouter({
           paymentScreenshot: input.paymentScreenshot,
           commissionAmount: input.commissionAmount,
           paymentAmount: input.paymentAmount,
-          approvalStatus: isAdmin ? "approved" as const : "pending" as const,
+          approvalStatus: "approved" as const,
+          approvedBy: userId,
+          approvedAt: new Date(),
         };
 
         if (existing.length > 0) {
           await tx.update(propertyAgreements)
-            .set({ ...values, comments: null, ...(isAdmin ? { approvedBy: userId, approvedAt: new Date() } : {}) })
+            .set({ ...values, comments: null })
             .where(eq(propertyAgreements.propertyId, input.propertyId));
         } else {
           await tx.insert(propertyAgreements).values({
             propertyId: input.propertyId,
             ...values,
-            ...(isAdmin ? { approvedBy: userId, approvedAt: new Date() } : {}),
           });
         }
 
         await tx.update(properties)
           .set({
-            currentStep: isAdmin ? 3 : 2,
-            approvalStatus: isAdmin ? "approved" : "pending_review",
+            currentStep: Math.max(prop[0].currentStep, 3),
+            approvalStatus: "approved",
+            workflowStatus: "processing",
             buyerName: input.buyerName,
             buyerCID: input.buyerCID,
             buyerPhone: input.buyerPhone,
@@ -1000,48 +977,13 @@ export const propertyRouter = createRouter({
           })
           .where(eq(properties.id, input.propertyId));
 
-        if (isAdmin) {
-          await tx.insert(approvalHistory).values({
-            propertyId: input.propertyId,
-            step: 2,
-            action: "approved",
-            adminId: userId,
-            comments: "Auto-approved by admin",
-          });
-
-          // Notify the staff who listed the property
-          if (prop[0].listedById !== userId) {
-            await tx.insert(notifications).values({
-              userId: prop[0].listedById,
-              title: "Step 2 Auto-Approved",
-              message: `Step 2 (Agreement & Payment) for "${prop[0].propertyName}" has been auto-approved by admin.`,
-              type: "success",
-              entityType: "property",
-              entityId: input.propertyId,
-            });
-          }
-        } else {
-          const admins = await tx.select({ id: localUsers.id }).from(localUsers).where(eq(localUsers.role, "admin"));
-          if (admins.length > 0) {
-            const notificationValues = admins.map(admin => ({
-              userId: admin.id,
-              title: "Step 2 Pending Approval",
-              message: `${userName} submitted Agreement & Payment for "${prop[0].propertyName}". Please review and approve.`,
-              type: "approval" as const,
-              entityType: "property",
-              entityId: input.propertyId,
-            }));
-            await tx.insert(notifications).values(notificationValues);
-          }
-
-          await tx.insert(approvalHistory).values({
-            propertyId: input.propertyId,
-            step: 2,
-            action: "submitted",
-            adminId: userId,
-            comments: "Agreement and initial payment submitted",
-          });
-        }
+        await tx.insert(approvalHistory).values({
+          propertyId: input.propertyId,
+          step: 2,
+          action: "approved",
+          adminId: userId,
+          comments: isAdmin ? "Auto-approved by admin" : "Step 2 agreement & payment completed",
+        });
 
         return { success: true };
       });
@@ -1107,15 +1049,6 @@ export const propertyRouter = createRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Remaining payment amount is required. Please enter the amount." });
         }
 
-        // Step 2 must be approved before staff can work on Step 3
-        if (!isAdmin && prop[0].currentStep < 3) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 2 (Agreement & Payment) must be approved by admin before proceeding to Step 3. Please wait for admin approval." });
-        }
-
-        // Block resubmission while Step 3 is pending admin review
-        if (!isAdmin && prop[0].approvalStatus === "pending_review" && prop[0].currentStep === 3) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 3 is already submitted and waiting for admin approval. Please wait for approval before resubmitting." });
-        }
         const existing = await tx.select().from(propertyDocuments)
           .where(eq(propertyDocuments.propertyId, propertyId))
           .limit(1);
@@ -1137,9 +1070,10 @@ export const propertyRouter = createRouter({
           await tx.update(propertyDocuments)
             .set({
               ...values,
-              approvalStatus: isAdmin ? "approved" : "pending",
+              approvalStatus: "approved",
+              approvedBy: userId,
+              approvedAt: new Date(),
               comments: null,
-              ...(isAdmin ? { approvedBy: userId, approvedAt: new Date() } : {}),
             })
             .where(eq(propertyDocuments.propertyId, propertyId));
         } else {
@@ -1147,59 +1081,26 @@ export const propertyRouter = createRouter({
             propertyId,
             ...values,
             uploadedBy: userId,
-            approvalStatus: isAdmin ? "approved" : "pending",
-            ...(isAdmin ? { approvedBy: userId, approvedAt: new Date() } : {}),
+            approvalStatus: "approved",
+            approvedBy: userId,
+            approvedAt: new Date(),
           });
         }
 
         await tx.update(properties)
           .set({
-            currentStep: isAdmin ? 4 : 3,
-            approvalStatus: isAdmin ? "approved" : "pending_review",
+            currentStep: Math.max(prop[0].currentStep, 4),
+            approvalStatus: "approved",
           })
           .where(eq(properties.id, propertyId));
 
-        if (isAdmin) {
-          await tx.insert(approvalHistory).values({
-            propertyId,
-            step: 3,
-            action: "approved",
-            adminId: userId,
-            comments: "Auto-approved by admin",
-          });
-
-          if (prop[0].listedById !== userId) {
-            await tx.insert(notifications).values({
-              userId: prop[0].listedById,
-              title: "Step 3 Auto-Approved",
-              message: `Step 3 (Property Documents) for "${prop[0].propertyName}" has been auto-approved by admin.`,
-              type: "success",
-              entityType: "property",
-              entityId: propertyId,
-            });
-          }
-        } else {
-          const admins = await tx.select({ id: localUsers.id }).from(localUsers).where(eq(localUsers.role, "admin"));
-          if (admins.length > 0) {
-            const notificationValues = admins.map(admin => ({
-              userId: admin.id,
-              title: "Step 3 Pending Approval",
-              message: `${userName} submitted Property Documents for "${prop[0].propertyName}". Please review and approve.`,
-              type: "approval" as const,
-              entityType: "property",
-              entityId: propertyId,
-            }));
-            await tx.insert(notifications).values(notificationValues);
-          }
-
-          await tx.insert(approvalHistory).values({
-            propertyId,
-            step: 3,
-            action: "submitted",
-            adminId: userId,
-            comments: requiresBuildingDocs ? "Property documents (building type) submitted for review" : "Property documents (land type) submitted for review",
-          });
-        }
+        await tx.insert(approvalHistory).values({
+          propertyId,
+          step: 3,
+          action: "approved",
+          adminId: userId,
+          comments: isAdmin ? "Auto-approved by admin" : "Step 3 property documents completed",
+        });
 
         return { success: true };
       });
@@ -1219,7 +1120,12 @@ export const propertyRouter = createRouter({
       const userName = ctx.unifiedUser!.name;
       const isAdmin = ctx.unifiedUser!.role === "admin";
 
-      const values = {
+      const values: {
+        lagthramStatus: "pending" | "processing" | "completed";
+        loanStatus: "pending" | "processing" | "completed";
+        lagthramCompletedAt?: Date;
+        loanCompletedAt?: Date;
+      } = {
         lagthramStatus: input.lagthramStatus,
         loanStatus: input.loanStatus,
       };
@@ -1238,15 +1144,6 @@ export const propertyRouter = createRouter({
           throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
         }
 
-        // Step 3 must be approved before staff can work on Step 4
-        if (!isAdmin && prop[0].currentStep < 4) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 3 (Property Documents) must be approved by admin before proceeding to Step 4. Please wait for admin approval." });
-        }
-
-        // Block resubmission while Step 4 is pending admin review
-        if (!isAdmin && prop[0].approvalStatus === "pending_review" && prop[0].currentStep === 4) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 4 is already submitted and waiting for admin approval. Please wait for approval before resubmitting." });
-        }
         const existing = await tx.select().from(verificationProcesses)
           .where(eq(verificationProcesses.propertyId, input.propertyId))
           .limit(1);
@@ -1262,63 +1159,23 @@ export const propertyRouter = createRouter({
           });
         }
 
-        // ONLY trigger approval when BOTH are completed
         if (isBothCompleted) {
-          if (isAdmin) {
-            await tx.update(verificationProcesses)
-              .set({ approvedBy: userId, approvedAt: new Date() })
-              .where(eq(verificationProcesses.propertyId, input.propertyId));
+          await tx.update(verificationProcesses)
+            .set({ approvedBy: userId, approvedAt: new Date() })
+            .where(eq(verificationProcesses.propertyId, input.propertyId));
 
-            await tx.update(properties)
-              .set({ currentStep: 5, approvalStatus: "approved", updatedAt: new Date() })
-              .where(eq(properties.id, input.propertyId));
+          await tx.update(properties)
+            .set({ currentStep: Math.max(prop[0].currentStep, 5), approvalStatus: "approved", updatedAt: new Date() })
+            .where(eq(properties.id, input.propertyId));
 
-            await tx.insert(approvalHistory).values({
-              propertyId: input.propertyId,
-              step: 4,
-              action: "approved",
-              adminId: userId,
-              comments: "Auto-approved by admin",
-            });
-
-            if (prop[0].listedById !== userId) {
-              await tx.insert(notifications).values({
-                userId: prop[0].listedById,
-                title: "Step 4 Auto-Approved",
-                message: `Step 4 (Verification Process) for "${prop[0].propertyName}" has been auto-approved by admin.`,
-                type: "success",
-                entityType: "property",
-                entityId: input.propertyId,
-              });
-            }
-          } else {
-            await tx.update(properties)
-              .set({ currentStep: 4, approvalStatus: "pending_review", updatedAt: new Date() })
-              .where(eq(properties.id, input.propertyId));
-
-            const admins = await tx.select({ id: localUsers.id }).from(localUsers).where(eq(localUsers.role, "admin"));
-            if (admins.length > 0) {
-              const notificationValues = admins.map(admin => ({
-                userId: admin.id,
-                title: "Step 4 Verification Ready",
-                message: `${userName} completed all verifications for "${prop[0].propertyName}". Please review and finalize Step 4.`,
-                type: "approval" as const,
-                entityType: "property",
-                entityId: input.propertyId,
-              }));
-              await tx.insert(notifications).values(notificationValues);
-            }
-
-            await tx.insert(approvalHistory).values({
-              propertyId: input.propertyId,
-              step: 4,
-              action: "submitted",
-              adminId: userId,
-              comments: "Verification completed. Waiting for admin approval to finalize Step 4.",
-            });
-          }
+          await tx.insert(approvalHistory).values({
+            propertyId: input.propertyId,
+            step: 4,
+            action: "approved",
+            adminId: userId,
+            comments: isAdmin ? "Auto-approved by admin" : "Step 4 verification completed",
+          });
         } else {
-          // Just a progress update
           await tx.insert(approvalHistory).values({
             propertyId: input.propertyId,
             step: 4,
@@ -1349,7 +1206,7 @@ export const propertyRouter = createRouter({
       const values = {
         finalDocument: input.finalDocument,
         completionCertificate: input.completionCertificate,
-        approvalStatus: isAdmin ? "approved" as const : "pending" as const,
+        approvalStatus: isAdmin ? ("approved" as const) : ("pending" as const),
       };
 
       return await db.transaction(async (tx) => {
@@ -1365,25 +1222,11 @@ export const propertyRouter = createRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Final Lagthram Document is required. Please upload the document." });
         }
 
-        // Step 4 must be approved before staff can work on Step 5
-        if (!isAdmin && prop[0].currentStep < 5) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 4 (Verification Process) must be approved by admin before proceeding to Step 5. Please wait for admin approval." });
-        }
-
         // Block resubmission while Step 5 is pending admin review
         if (!isAdmin && prop[0].approvalStatus === "pending_review" && prop[0].currentStep === 5) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Step 5 is already submitted and waiting for admin approval. Please wait for approval before resubmitting." });
         }
 
-        // Require verification process was approved by admin
-        const verification = await tx.select().from(verificationProcesses)
-          .where(eq(verificationProcesses.propertyId, input.propertyId))
-          .limit(1);
-
-        const canProceedToStep5 = verification[0] && verification[0].approvedAt !== null;
-        if (!isAdmin && !canProceedToStep5) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Step 4 (Verification Process) must be approved by admin before proceeding to Step 5. Please wait for admin approval." });
-        }
         const existing = await tx.select().from(finalLagthrams)
           .where(eq(finalLagthrams.propertyId, input.propertyId))
           .limit(1);
@@ -1468,7 +1311,7 @@ export const propertyRouter = createRouter({
             step: 5,
             action: "submitted",
             adminId: userId,
-            comments: "Final lagthram and completion documents submitted",
+            comments: "Final lagthram and completion documents submitted for admin approval",
           });
         }
 
@@ -2061,7 +1904,8 @@ export const propertyRouter = createRouter({
       }
 
       if (input.status) {
-        conditions.push(eq(properties.workflowStatus, input.status));
+        const statusVal = input.status as "approved" | "rejected" | "completed" | "cancelled" | "pending" | "processing";
+        conditions.push(eq(properties.workflowStatus, statusVal));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -2195,7 +2039,8 @@ export const propertyRouter = createRouter({
       }
 
       if (input?.status) {
-        conditions.push(eq(properties.workflowStatus, input.status));
+        const statusVal = input.status as "approved" | "rejected" | "completed" | "cancelled" | "pending" | "processing";
+        conditions.push(eq(properties.workflowStatus, statusVal));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -2212,6 +2057,7 @@ export const propertyRouter = createRouter({
           ownerName: properties.ownerName,
           buyerName: properties.buyerName,
           sellingPrice: properties.sellingPrice,
+          finalSellingPrice: properties.finalSellingPrice,
           realEstateFee: properties.realEstateFee,
           currentStep: properties.currentStep,
           approvalStatus: properties.approvalStatus,

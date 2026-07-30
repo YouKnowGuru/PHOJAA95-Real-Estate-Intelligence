@@ -95,7 +95,6 @@ export default function PropertyWizard() {
   });
 
   const [isPriceOverride, setIsPriceOverride] = useState(false);
-  const [showPricingSummary, setShowPricingSummary] = useState(true);
 
   // Determine if selected property type is Land
   const selectedPropertyType = propertyTypes?.find(pt => pt.id === parseInt(step1Data.propertyTypeId));
@@ -265,7 +264,7 @@ export default function PropertyWizard() {
 
   const createMutation = trpc.property.create.useMutation({
     onSuccess: (data) => {
-      toast.success(isAdmin ? "Property created and Step 1 auto-approved!" : "Property created and submitted for admin approval!");
+      toast.success("Property created and Step 1 completed!");
       navigate(`/properties/${data.id}/wizard?step=2`);
     },
     onError: (err) => toast.error(err.message),
@@ -273,7 +272,7 @@ export default function PropertyWizard() {
 
   const submitStep2Mutation = trpc.property.submitStep2.useMutation({
     onSuccess: () => {
-      toast.success(isAdmin ? "Step 2 completed and auto-approved!" : "Step 2 submitted for approval");
+      toast.success("Step 2 saved successfully!");
       utils.property.getFullWorkflow.invalidate({ id: propertyId });
       utils.property.list.invalidate();
       navigate(`/properties/${propertyId}/wizard?step=3`);
@@ -283,7 +282,7 @@ export default function PropertyWizard() {
 
   const submitStep3Mutation = trpc.property.submitStep3.useMutation({
     onSuccess: () => {
-      toast.success(isAdmin ? "Step 3 completed and auto-approved!" : "Step 3 submitted for approval");
+      toast.success("Step 3 documents saved successfully!");
       utils.property.getFullWorkflow.invalidate({ id: propertyId });
       utils.property.list.invalidate();
       navigate(`/properties/${propertyId}/wizard?step=4`);
@@ -295,7 +294,7 @@ export default function PropertyWizard() {
     onSuccess: () => {
       const isBothCompleted = step4Data.lagthramStatus === "completed" && step4Data.loanStatus === "completed";
       if (isBothCompleted) {
-        toast.success(isAdmin ? "Verification completed and auto-approved!" : "Verification completed and submitted for admin approval");
+        toast.success("Verification completed!");
         utils.property.getFullWorkflow.invalidate({ id: propertyId });
         utils.property.list.invalidate();
         navigate(`/properties/${propertyId}/wizard?step=5`);
@@ -310,7 +309,7 @@ export default function PropertyWizard() {
 
   const submitStep5Mutation = trpc.property.submitStep5.useMutation({
     onSuccess: () => {
-      toast.success(isAdmin ? "Property completed and finalized!" : "Step 5 submitted for approval");
+      toast.success(isAdmin ? "Property completed and finalized!" : "Step 5 submitted for admin approval!");
       utils.property.getFullWorkflow.invalidate({ id: propertyId });
       utils.property.list.invalidate();
       navigate(`/properties/${propertyId}`);
@@ -417,7 +416,7 @@ export default function PropertyWizard() {
       return;
     }
 
-    createMutation.mutate(buildStep1Payload());
+    createMutation.mutate(buildStep1Payload() as any);
   };
 
   const handleStep2Submit = (e: React.FormEvent) => {
@@ -1216,19 +1215,13 @@ export default function PropertyWizard() {
                 <Button
                   type="submit"
                   className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
-                  disabled={submitStep2Mutation.isPending || (!isAdmin && existingProperty?.agreement?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review")}
+                  disabled={submitStep2Mutation.isPending}
                 >
                   {submitStep2Mutation.isPending
                     ? "Submitting..."
-                    : isAdmin
-                      ? (existingProperty?.agreement ? "Update & Submit" : "Submit")
-                      : existingProperty?.agreement?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review"
-                        ? "Pending Approval"
-                        : existingProperty?.agreement?.approvalStatus === "rejected"
-                          ? "Resubmit for Approval"
-                          : existingProperty?.agreement
-                            ? "Update & Resubmit"
-                            : "Submit for Approval"}
+                    : existingProperty?.agreement
+                      ? "Update & Save"
+                      : "Save & Proceed"}
                   <Send className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -1404,19 +1397,13 @@ export default function PropertyWizard() {
                 <Button
                   type="submit"
                   className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
-                  disabled={submitStep3Mutation.isPending || (!isAdmin && existingProperty?.documents?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review")}
+                  disabled={submitStep3Mutation.isPending}
                 >
                   {submitStep3Mutation.isPending
                     ? "Submitting..."
-                    : isAdmin
-                      ? (existingProperty?.documents ? "Update & Submit" : "Submit")
-                      : existingProperty?.documents?.approvalStatus === "pending" && existingProperty?.property?.approvalStatus === "pending_review"
-                        ? "Pending Approval"
-                        : existingProperty?.documents?.approvalStatus === "rejected"
-                          ? "Resubmit for Approval"
-                          : existingProperty?.documents
-                            ? "Update & Resubmit"
-                            : "Submit for Approval"}
+                    : existingProperty?.documents
+                      ? "Update & Save"
+                      : "Save & Proceed"}
                   <Send className="ml-2 h-4 w-4" />
                 </Button>
               </div>
@@ -1510,19 +1497,13 @@ export default function PropertyWizard() {
                 <Button
                   type="submit"
                   className="bg-gradient-to-r from-primary to-primary/80 text-white shadow-lg shadow-primary/20 w-full sm:w-auto"
-                  disabled={submitStep4Mutation.isPending || (!isAdmin && existingProperty?.property?.approvalStatus === "pending_review" && existingProperty?.property?.currentStep === 4)}
+                  disabled={submitStep4Mutation.isPending}
                 >
                   {submitStep4Mutation.isPending
                     ? "Updating..."
-                    : isAdmin
-                      ? (step4Data.lagthramStatus === "completed" && step4Data.loanStatus === "completed" ? "Submit & Auto-Approve" : "Update Progress")
-                      : existingProperty?.property?.approvalStatus === "pending_review" && existingProperty?.property?.currentStep === 4
-                        ? "Pending Approval"
-                        : existingProperty?.property?.approvalStatus === "rejected" && existingProperty?.property?.currentStep === 4
-                          ? "Resubmit for Approval"
-                          : (step4Data.lagthramStatus === "completed" && step4Data.loanStatus === "completed"
-                              ? "Submit for Approval"
-                              : "Update Progress")}
+                    : step4Data.lagthramStatus === "completed" && step4Data.loanStatus === "completed"
+                      ? "Complete Verification"
+                      : "Update Progress"}
                   <Send className="ml-2 h-4 w-4" />
                 </Button>
               </div>
