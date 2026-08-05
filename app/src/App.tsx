@@ -30,6 +30,9 @@ const DocumentLibrary = lazy(() => import("./pages/DocumentLibrary"));
 // Software Development Module page
 const SoftwareDevPage = lazy(() => import("./pages/software-dev/SoftwareDevPage"));
 
+// Work Progress Reports
+const WorkProgressReports = lazy(() => import("./pages/WorkProgressReports"));
+
 // Architecture Management Module
 const ArchitecturePage = lazy(() => import("./pages/architecture/ArchitecturePage"));
 const ArchitecturePortalPage = lazy(() => import("./pages/architecture/ArchitecturePortalPage"));
@@ -260,6 +263,15 @@ export default function App() {
         element={
           <ProtectedRoute requireDeveloper>
             <LazyRoute><SoftwareDevPage /></LazyRoute>
+          </ProtectedRoute>
+        }
+      />
+      {/* Work Progress Reports — all authenticated staff */}
+      <Route
+        path="/work-progress"
+        element={
+          <ProtectedRoute>
+            <LazyRoute><WorkProgressReports /></LazyRoute>
           </ProtectedRoute>
         }
       />

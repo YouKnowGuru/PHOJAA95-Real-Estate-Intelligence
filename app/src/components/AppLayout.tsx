@@ -29,7 +29,7 @@ import {
   ChevronRight,
   Code2,
   PenTool,
-
+  FileText,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { formatStaffRoleLabel, getHomeRouteForRole } from "@/lib/role-routing";
@@ -50,6 +50,7 @@ const adminNavItems = [
   { icon: Wallet, label: "Payroll", href: "/payroll" },
   { icon: ScrollText, label: "Activity", href: "/activity-logs" },
   { icon: BarChart3, label: "Reports", href: "/reports" },
+  { icon: FileText, label: "Progress Reports", href: "/work-progress" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
   { icon: Settings, label: "Settings", href: "/settings" },
@@ -62,6 +63,7 @@ const staffNavItems = [
   { icon: Receipt, label: "Billing", href: "/billing" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: FileText, label: "Progress Reports", href: "/work-progress" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: Settings, label: "Settings", href: "/settings" },
@@ -72,35 +74,19 @@ const softwareDevNavItems = [
   { icon: Code2, label: "Software Development", href: "/software-dev" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: FileText, label: "Progress Reports", href: "/work-progress" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 
-const adminSoftwareDevNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-  { icon: Code2, label: "Software Development", href: "/software-dev" },
-  { icon: PenTool, label: "Architecture", href: "/architecture" },
-  { icon: Building2, label: "Properties", href: "/properties" },
-  { icon: Building2, label: "Property Types", href: "/property-types" },
-  { icon: FolderOpen, label: "Documents", href: "/documents" },
-  { icon: ClipboardList, label: "Approvals", href: "/approvals" },
-  { icon: Receipt, label: "Billing", href: "/billing" },
-  { icon: Users, label: "Staff", href: "/users" },
-  { icon: Clock, label: "Attendance", href: "/attendance" },
-  { icon: Wallet, label: "Payroll", href: "/payroll" },
-  { icon: ScrollText, label: "Activity", href: "/activity-logs" },
-  { icon: BarChart3, label: "Reports", href: "/reports" },
-  { icon: Bell, label: "Notifications", href: "/notifications" },
-  { icon: UserCircle, label: "Profile", href: "/profile" },
-  { icon: Settings, label: "Settings", href: "/settings" },
-];
 
 const architectureStaffNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/architecture" },
   { icon: PenTool, label: "Architecture", href: "/architecture" },
   { icon: Clock, label: "Attendance", href: "/attendance" },
   { icon: Wallet, label: "Payroll", href: "/payroll" },
+  { icon: FileText, label: "Progress Reports", href: "/work-progress" },
   { icon: UserCircle, label: "Profile", href: "/profile" },
   { icon: Bell, label: "Notifications", href: "/notifications" },
   { icon: Settings, label: "Settings", href: "/settings" },
@@ -183,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [sessionExpiresAt, refreshSession]);
 
   const navItems = isAdmin
-    ? adminSoftwareDevNavItems
+    ? adminNavItems
     : isDeveloper
     ? softwareDevNavItems
     : isArchitectureStaff

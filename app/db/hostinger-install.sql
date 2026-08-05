@@ -1,4 +1,4 @@
-﻿-- PHOJAA95 full schema for empty Hostinger MySQL database
+-- PHOJAA95 full schema for empty Hostinger MySQL database
 -- Run in phpMyAdmin on database u880151399_PhojaaSystem
 
 
@@ -419,3 +419,32 @@ CREATE INDEX `idx_price_history_property` ON `property_price_history` (`property
 CREATE INDEX `idx_price_history_created` ON `property_price_history` (`created_at`);--> statement-breakpoint
 ALTER TABLE `properties` ADD CONSTRAINT `properties_price_override_by_local_users_id_fk` FOREIGN KEY (`price_override_by`) REFERENCES `local_users`(`id`) ON DELETE set null ON UPDATE no action;ALTER TABLE `properties` ADD `thram_number` varchar(100);--> statement-breakpoint
 ALTER TABLE `properties` ADD `plot_number` varchar(100);
+
+-- === Work Progress Reports Table ===
+CREATE TABLE IF NOT EXISTS `work_progress_reports` (
+  `id` int AUTO_INCREMENT NOT NULL,
+  `report_number` varchar(30) NOT NULL UNIQUE,
+  `staff_id` bigint unsigned NOT NULL,
+  `staff_name` varchar(255) NOT NULL,
+  `project` varchar(255) NOT NULL,
+  `feature` varchar(255) NOT NULL,
+  `report_date` varchar(10) NOT NULL,
+  `status` enum('draft','submitted','reviewed','approved') NOT NULL DEFAULT 'draft',
+  `feature_overview` text,
+  `objectives` json,
+  `scope_of_work` json,
+  `completed_items` json,
+  `in_progress_items` json,
+  `timeline` json,
+  `admin_notes` text,
+  `reviewed_by` bigint unsigned,
+  `reviewed_by_name` varchar(255),
+  `reviewed_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT `work_progress_reports_id` PRIMARY KEY(`id`),
+  INDEX `idx_wpr_staff` (`staff_id`),
+  INDEX `idx_wpr_status` (`status`),
+  INDEX `idx_wpr_date` (`report_date`),
+  INDEX `idx_wpr_number` (`report_number`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

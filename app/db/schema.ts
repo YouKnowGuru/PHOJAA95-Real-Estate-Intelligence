@@ -1272,3 +1272,35 @@ export const architectureActivityLogs = mysqlTable("architecture_activity_logs",
 ]);
 
 export type ArchitectureActivityLog = typeof architectureActivityLogs.$inferSelect;
+
+// ─── WORK PROGRESS REPORTS ───────────────────────────────────────────
+export const workProgressReports = mysqlTable("work_progress_reports", {
+  id: serial("id").primaryKey(),
+  reportNumber: varchar("report_number", { length: 30 }).notNull().unique(),
+  staffId: bigint("staff_id", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "restrict" }),
+  staffName: varchar("staff_name", { length: 255 }).notNull(),
+  project: varchar("project", { length: 255 }).notNull(),
+  feature: varchar("feature", { length: 255 }).notNull(),
+  reportDate: varchar("report_date", { length: 10 }).notNull(),
+  status: mysqlEnum("status", ["draft", "submitted", "reviewed", "approved"]).default("draft").notNull(),
+  featureOverview: text("feature_overview"),
+  objectives: json("objectives").$type<string[]>().default([]),
+  scopeOfWork: json("scope_of_work").$type<{ module: string; description: string }[]>().default([]),
+  completedItems: json("completed_items").$type<string[]>().default([]),
+  inProgressItems: json("in_progress_items").$type<string[]>().default([]),
+  timeline: json("timeline").$type<{ phase: string; targetCompletion: string; status: "completed" | "pending" | "in_progress" }[]>().default([]),
+  adminNotes: text("admin_notes"),
+  reviewedBy: bigint("reviewed_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  reviewedByName: varchar("reviewed_by_name", { length: 255 }),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_wpr_staff").on(table.staffId),
+  index("idx_wpr_status").on(table.status),
+  index("idx_wpr_date").on(table.reportDate),
+  index("idx_wpr_number").on(table.reportNumber),
+]);
+
+export type WorkProgressReport = typeof workProgressReports.$inferSelect;
+export type InsertWorkProgressReport = typeof workProgressReports.$inferInsert;

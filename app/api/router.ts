@@ -33,6 +33,7 @@ import { architectureInvoiceRouter, architectureCertificateRouter } from "./arch
 import { architectureDashboardRouter, architectureDocumentRouter } from "./architecture-dashboard-router";
 import { architectureReportRouter } from "./architecture-report-router";
 import { architecturePortalRouter } from "./architecture-portal-router";
+import { workProgressRouter } from "./work-progress-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -74,6 +75,7 @@ export const appRouter = createRouter({
   architectureReport: architectureReportRouter,
   architectureDocument: architectureDocumentRouter,
   architecturePortal: architecturePortalRouter,
+  workProgress: workProgressRouter,
 });
 
 export type AppRouter = typeof appRouter;
