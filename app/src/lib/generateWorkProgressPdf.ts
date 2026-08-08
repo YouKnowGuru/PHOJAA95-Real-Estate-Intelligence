@@ -231,14 +231,16 @@ export async function generateWorkProgressPdf(
   doc.rect(0, 0, PAGE_W, 3, "F");
 
   // ── HEADER AREA ──────────────────────────────────────────────────────
-  // Left dark block for logo / emblem frame
+  // Left dark block for logo / emblem frame (narrower to avoid title overlap)
+  const headerBlockW = 42;
+  const headerBlockH = 36;
   doc.setFillColor(...COLORS.darkNavy);
-  doc.rect(0, 3, 46, 38, "F");
+  doc.rect(0, 3, headerBlockW, headerBlockH, "F");
 
   if (logoObj) {
     try {
-      // Elegant white container inside the dark navy header block with gold border
-      const frameX = 5, frameY = 7, frameW = 36, frameH = 30;
+      // White container inside the dark navy header block with gold border
+      const frameX = 4, frameY = 6, frameW = headerBlockW - 8, frameH = headerBlockH - 6;
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(frameX, frameY, frameW, frameH, 2, 2, "F");
       doc.setDrawColor(...COLORS.gold);
@@ -246,18 +248,18 @@ export async function generateWorkProgressPdf(
       doc.roundedRect(frameX, frameY, frameW, frameH, 2, 2, "S");
 
       // ── Aspect-ratio-correct logo placement (contain mode) ──
-      // Compute fit within a padded inner area so the logo is never stretched
       const pad = 3;
       const innerW = frameW - pad * 2;
       const innerH = frameH - pad * 2;
-      const imgAspect = logoObj.width / logoObj.height;
+      // Guard against zero/NaN dimensions
+      const w = Math.max(logoObj.width, 1);
+      const h = Math.max(logoObj.height, 1);
+      const imgAspect = w / h;
       let imgW: number, imgH: number;
       if (imgAspect > innerW / innerH) {
-        // Image is wider than frame — fit to width
         imgW = innerW;
         imgH = innerW / imgAspect;
       } else {
-        // Image is taller than frame — fit to height
         imgH = innerH;
         imgW = innerH * imgAspect;
       }
@@ -271,89 +273,84 @@ export async function generateWorkProgressPdf(
     drawDefaultLogoSeal(doc, siteName);
   }
 
-  // Title area
+  // ── Title area (starts well clear of the logo block) ─────────────────
+  const titleX = headerBlockW + 8; // 8mm gap from navy block edge
+  const titleAreaW = PAGE_W - MARGIN - titleX; // available width for title text
+
   doc.setTextColor(...COLORS.darkNavy);
-  doc.setFontSize(18);
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("WORK PROGRESS REPORT", 52, 15);
+  doc.text("WORK PROGRESS REPORT", titleX, 13);
 
   // Subtitle / Company name
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.midGray);
-  doc.text(siteName.toUpperCase(), 52, 19.5);
+  doc.text(siteName.toUpperCase(), titleX, 17.5);
 
   // Thin gold underline
   doc.setFillColor(...COLORS.gold);
-  doc.rect(52, 21.5, CONTENT_W - 38, 0.6, "F");
+  doc.rect(titleX, 19.5, titleAreaW - 30, 0.5, "F");
 
-  // ── STATUS BADGE PILL ──────────────────────────────────────────────
+  // ── STATUS BADGE PILL (top-right, clear of title) ───────────────────
   const statusText = report.status.charAt(0).toUpperCase() + report.status.slice(1);
   const sColor = reportStatusColor(report.status);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  const badgeW = doc.getTextWidth(statusText) + 8;
+  doc.setFontSize(6.5);
+  const badgeW = doc.getTextWidth(statusText) + 7;
   const badgeX = PAGE_W - MARGIN - badgeW;
+  const badgeY = 10;
   doc.setFillColor(...sColor);
-  doc.roundedRect(badgeX, 13, badgeW, 5.5, 1.5, 1.5, "F");
+  doc.roundedRect(badgeX, badgeY, badgeW, 5, 1.5, 1.5, "F");
   doc.setTextColor(255, 255, 255);
-  doc.text(statusText, badgeX + 4, 16.7);
+  doc.text(statusText, badgeX + 3.5, badgeY + 3.6);
 
-  // Report number next to badge
+  // Report number below the gold underline
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...COLORS.midGray);
-  doc.text(`Report No: ${report.reportNumber}`, 52, 25.5);
+  doc.text(`Report No: ${report.reportNumber}`, titleX, 23.5);
 
-  // ── METADATA CARD GRID ────────────────────────────────────────────────
-  const metaY = 28;
-  const col1x = 52, col2x = 126;
-
-  // Card background
-  doc.setFillColor(...COLORS.lightGray);
-  doc.roundedRect(50, metaY, CONTENT_W - 36, 12, 1.5, 1.5, "F");
-  doc.setDrawColor(...COLORS.borderGray);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(50, metaY, CONTENT_W - 36, 12, 1.5, 1.5, "S");
-
-  doc.setFontSize(8);
-
-  // Left metadata column
-  const leftMeta = [
-    ["Project:", report.project],
-    ["Feature:", report.feature],
-  ];
-  leftMeta.forEach(([label, val], i) => {
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(...COLORS.midGray);
-    doc.text(label, col1x, metaY + 4 + i * 4.2);
-    doc.setFont("helvetica", "normal");
-    doc.setTextColor(...COLORS.textDark);
-    const truncVal = val.length > 30 ? val.slice(0, 30) + "..." : val;
-    doc.text(truncVal, col1x + 19, metaY + 4 + i * 4.2);
-  });
-
-  // Right metadata column
+  // Prepared by + report date (compact, in the header area below underline)
   doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
   doc.setTextColor(...COLORS.midGray);
-  doc.text("Prepared By:", col2x, metaY + 4);
+  doc.text("Prepared By:", titleX, 27.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.textDark);
-  doc.text(report.staffName, col2x + 22, metaY + 4);
+  doc.text(String(report.staffName).slice(0, 28), titleX + 18, 27.5);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...COLORS.midGray);
-  doc.text("Report Date:", col2x, metaY + 8.2);
+  doc.text("Date:", titleX + 70, 27.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.textDark);
-  doc.text(report.reportDate || "—", col2x + 22, metaY + 8.2);
+  doc.text(report.reportDate || "—", titleX + 80, 27.5);
+
+  // Project + Feature (inline, right of logo — no overlapping card)
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.5);
+  doc.setTextColor(...COLORS.midGray);
+  doc.text("Project:", titleX, 31.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.textDark);
+  const projVal = report.project.length > 38 ? report.project.slice(0, 38) + "..." : report.project;
+  doc.text(projVal, titleX + 14, 31.5);
+
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.midGray);
+  doc.text("Feature:", titleX + 90, 31.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...COLORS.textDark);
+  const featVal = report.feature.length > 38 ? report.feature.slice(0, 38) + "..." : report.feature;
+  doc.text(featVal, titleX + 102, 31.5);
 
   // Main divider line
   doc.setDrawColor(...COLORS.darkNavy);
   doc.setLineWidth(0.4);
-  doc.line(MARGIN, 43, PAGE_W - MARGIN, 43);
+  doc.line(MARGIN, 38, PAGE_W - MARGIN, 38);
 
-  let y = 48;
+  let y = 42;
 
   // ── SECTION 1: FEATURE OVERVIEW ───────────────────────────────────────
   y = addSection(doc, "1. FEATURE OVERVIEW", y);
