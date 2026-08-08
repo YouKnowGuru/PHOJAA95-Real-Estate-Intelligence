@@ -9,7 +9,7 @@ export const activityLogRouter = createRouter({
     .input(
       z.object({
         action: z.string(),
-        entityType: z.enum(["property", "user", "attendance", "payroll", "setting"]).optional(),
+        entityType: z.enum(["property", "user", "attendance", "payroll", "setting", "work_progress_report"]).optional(),
         entityId: z.number().optional(),
         metadata: z.record(z.string(), z.any()).optional(),
         ipAddress: z.string().optional(),
@@ -38,7 +38,7 @@ export const activityLogRouter = createRouter({
       z.object({
         userId: z.number().optional(),
         action: z.enum(["created", "updated", "deleted", "approved", "rejected", "login", "logout"]).optional(),
-        entityType: z.enum(["property", "user", "attendance", "payroll", "setting"]).optional(),
+        entityType: z.enum(["property", "user", "attendance", "payroll", "setting", "work_progress_report"]).optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
         page: z.number().min(1).default(1),

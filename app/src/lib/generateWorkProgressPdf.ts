@@ -63,7 +63,8 @@ function reportStatusColor(s: string): [number, number, number] {
   }
 }
 
-function safeArray<T>(val: any): T[] {
+/** Normalize JSON/array columns that may arrive as a string or null. Exported for reuse. */
+export function safeArray<T>(val: any): T[] {
   if (!val) return [];
   if (Array.isArray(val)) return val;
   if (typeof val === "string") {

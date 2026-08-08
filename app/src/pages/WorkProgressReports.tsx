@@ -1,14 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { generateWorkProgressPdf } from "@/lib/generateWorkProgressPdf";
+import { generateWorkProgressPdf, safeArray } from "@/lib/generateWorkProgressPdf";
+import { exportWorkProgressListAsCsv } from "@/lib/generateWorkProgressCsv";
+import { useDebounce } from "@/lib/optimization";
 import type { WorkProgressReport } from "@db/schema";
 import {
   FileText, Plus, Download, Eye, Edit3, Trash2, Send,
   CheckCircle2, Clock, AlertCircle, Search, Filter,
-  X, Save, ClipboardList, CheckCheck, Loader2,
+  X, Save, ClipboardList, CheckCheck, Loader2, FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,7 +50,7 @@ interface ReportFormData {
 const EMPTY_FORM: ReportFormData = {
   project: "",
   feature: "",
-  reportDate: new Date().toISOString().split("T")[0],
+  reportDate: "", // set at render time via getToday()
   featureOverview: "",
   objectives: [""],
   scopeOfWork: [{ module: "", description: "" }],
@@ -56,6 +58,10 @@ const EMPTY_FORM: ReportFormData = {
   inProgressItems: [""],
   timeline: [{ phase: "", targetCompletion: "", status: "pending" }],
 };
+
+function getToday(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 // ─── Status helpers ───────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: ReportStatus }) {
@@ -172,20 +178,6 @@ function TimelineEditor({ items, onChange }: { items: TimelineItem[]; onChange: 
   );
 }
 
-function safeArray<T>(val: any): T[] {
-  if (!val) return [];
-  if (Array.isArray(val)) return val;
-  if (typeof val === "string") {
-    try {
-      const parsed = JSON.parse(val);
-      if (Array.isArray(parsed)) return parsed;
-    } catch {
-      return [];
-    }
-  }
-  return [];
-}
-
 // ─── Report Form Modal ────────────────────────────────────────────────────
 function ReportFormModal({
   open, onClose, editReport,
@@ -195,40 +187,66 @@ function ReportFormModal({
   editReport?: WorkProgressReport | null;
 }) {
   const utils = trpc.useUtils();
-  const [form, setForm] = useState<ReportFormData>(() => {
+  const [form, setForm] = useState<ReportFormData>(() => EMPTY_FORM);
+  const submitAfterCreateRef = useRef(false);
+
+  // Reset form whenever the modal opens — populate from editReport, else empty.
+  // (The modal is always mounted, so useState's initializer only ran once at
+  //  mount when editReport was null. This effect fixes the "blank edit form" bug.)
+  useEffect(() => {
+    if (!open) return;
+    submitAfterCreateRef.current = false;
     if (editReport) {
       const obj = safeArray<string>(editReport.objectives);
       const sc = safeArray<ScopeItem>(editReport.scopeOfWork);
       const comp = safeArray<string>(editReport.completedItems);
       const inp = safeArray<string>(editReport.inProgressItems);
       const tl = safeArray<TimelineItem>(editReport.timeline);
-
-      return {
+      setForm({
         project: editReport.project,
         feature: editReport.feature,
-        reportDate: editReport.reportDate || new Date().toISOString().split("T")[0],
+        reportDate: editReport.reportDate || getToday(),
         featureOverview: editReport.featureOverview ?? "",
         objectives: obj.length ? obj : [""],
         scopeOfWork: sc.length ? sc : [{ module: "", description: "" }],
         completedItems: comp.length ? comp : [""],
         inProgressItems: inp.length ? inp : [""],
         timeline: tl.length ? tl : [{ phase: "", targetCompletion: "", status: "pending" }],
-      };
+      });
+    } else {
+      setForm({ ...EMPTY_FORM, reportDate: getToday() });
     }
-    return EMPTY_FORM;
-  });
+  }, [open, editReport]);
 
   const setField = <K extends keyof ReportFormData>(key: K, val: ReportFormData[K]) =>
     setForm(f => ({ ...f, [key]: val }));
 
   const cleanList = (arr: string[]) => arr.map(s => s.trim()).filter(Boolean);
   const cleanScope = (arr: ScopeItem[]) => arr.filter(s => s.module.trim() && s.description.trim());
-  const cleanTimeline = (arr: TimelineItem[]) => arr.filter(t => t.phase.trim() && t.targetCompletion.trim());
+  // Only require phase — targetCompletion may legitimately be blank (was silently dropping rows)
+  const cleanTimeline = (arr: TimelineItem[]) => arr.filter(t => t.phase.trim());
 
   const createMutation = trpc.workProgress.create.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // If "Save & Submit" was requested, chain into submit using the new id
+      if (submitAfterCreateRef.current) {
+        submitAfterCreate.mutate({ id: data.id });
+        return;
+      }
       toast.success("Report saved as draft");
       utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  // Used internally by "Save & Submit" — create then submit
+  const submitAfterCreate = trpc.workProgress.submit.useMutation({
+    onSuccess: () => {
+      toast.success("Report saved and submitted for review");
+      utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
       onClose();
     },
     onError: (e) => toast.error(e.message),
@@ -238,20 +256,34 @@ function ReportFormModal({
     onSuccess: () => {
       toast.success("Report updated");
       utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
       utils.workProgress.getById.invalidate({ id: editReport!.id });
       onClose();
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  // Used internally by "Save & Submit" on an existing draft/submitted report
+  const submitAfterUpdate = trpc.workProgress.submit.useMutation({
+    onSuccess: () => {
+      toast.success("Report updated and submitted for review");
+      utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
+      utils.workProgress.getById.invalidate({ id: editReport!.id });
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
-  const handleSave = () => {
-    if (!form.project.trim()) return toast.error("Project name is required");
-    if (!form.feature.trim()) return toast.error("Feature name is required");
-    if (!form.reportDate) return toast.error("Report date is required");
+  const isSaving = createMutation.isPending || updateMutation.isPending
+    || submitAfterCreate.isPending || submitAfterUpdate.isPending;
 
-    const payload = {
+  const buildPayload = () => {
+    if (!form.project.trim()) { toast.error("Project name is required"); return null; }
+    if (!form.feature.trim()) { toast.error("Feature name is required"); return null; }
+    if (!form.reportDate) { toast.error("Report date is required"); return null; }
+
+    return {
       project: form.project.trim(),
       feature: form.feature.trim(),
       reportDate: form.reportDate,
@@ -262,13 +294,41 @@ function ReportFormModal({
       inProgressItems: cleanList(form.inProgressItems),
       timeline: cleanTimeline(form.timeline),
     };
+  };
 
+  const handleSave = () => {
+    const payload = buildPayload();
+    if (!payload) return;
     if (editReport) {
       updateMutation.mutate({ id: editReport.id, ...payload });
     } else {
       createMutation.mutate(payload);
     }
   };
+
+  // Save the report, then immediately submit it for admin review
+  const handleSaveAndSubmit = () => {
+    const payload = buildPayload();
+    if (!payload) return;
+    if (editReport) {
+      // Update first, then submit once the update resolves
+      updateMutation.mutate(
+        { id: editReport.id, ...payload },
+        {
+          onSuccess: () => {
+            submitAfterUpdate.mutate({ id: editReport.id });
+          },
+        }
+      );
+    } else {
+      // Set the flag so createMutation submits after the insert resolves
+      submitAfterCreateRef.current = true;
+      createMutation.mutate(payload);
+    }
+  };
+
+  // "Save & Submit" is only meaningful for new or draft/submitted reports
+  const canSaveAndSubmit = !editReport || editReport.status === "draft" || editReport.status === "submitted";
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
@@ -357,6 +417,17 @@ function ReportFormModal({
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {isSaving ? "Saving..." : "Save Draft"}
           </Button>
+          {canSaveAndSubmit && (
+            <Button
+              variant="default"
+              onClick={handleSaveAndSubmit}
+              disabled={isSaving}
+              className="gap-2 min-w-[150px] bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {isSaving ? "Saving..." : "Save & Submit"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -376,7 +447,16 @@ function ReportDetailModal({
 }) {
   const utils = trpc.useUtils();
   const [reviewNotes, setReviewNotes] = useState("");
-  const [reviewStatus, setReviewStatus] = useState<"reviewed" | "approved" | "submitted">("reviewed");
+  const [reviewStatus, setReviewStatus] = useState<"reviewed" | "approved" | "draft">("reviewed");
+
+  // BUG FIX: reset review form state whenever a different report is opened,
+  // otherwise the previous report's decision/notes leak into the next one.
+  useEffect(() => {
+    if (open && reportId !== null) {
+      setReviewNotes("");
+      setReviewStatus("reviewed");
+    }
+  }, [open, reportId]);
 
   const { data: report, isLoading } = trpc.workProgress.getById.useQuery(
     { id: reportId! },
@@ -385,8 +465,11 @@ function ReportDetailModal({
 
   const reviewMutation = trpc.workProgress.review.useMutation({
     onSuccess: () => {
-      toast.success("Report reviewed successfully");
+      toast.success("Review submitted successfully");
       utils.workProgress.listAll.invalidate();
+      utils.workProgress.getAllStats.invalidate();
+      utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
       utils.workProgress.getById.invalidate({ id: reportId! });
       setReviewNotes("");
     },
@@ -559,8 +642,8 @@ function ReportDetailModal({
                 </div>
               )}
 
-              {/* Admin Review Panel */}
-              {isAdmin && report.status !== "approved" && (
+              {/* Admin Review Panel — only for submitted or reviewed reports (not draft/approved) */}
+              {isAdmin && (report.status === "submitted" || report.status === "reviewed") && (
                 <div className="space-y-3 p-4 rounded-xl border-2 border-primary/20 bg-primary/5">
                   <h4 className="text-sm font-bold text-primary">Admin Review</h4>
                   <div className="space-y-1.5">
@@ -570,7 +653,7 @@ function ReportDetailModal({
                       <SelectContent>
                         <SelectItem value="reviewed">Mark as Reviewed</SelectItem>
                         <SelectItem value="approved">Approve</SelectItem>
-                        <SelectItem value="submitted">Send Back</SelectItem>
+                        <SelectItem value="draft">Send Back to Staff</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -649,7 +732,7 @@ function ReportCard({
       </div>
 
       {/* Actions */}
-      {report.status === "draft" && (
+      {(report.status === "draft") && (
         <div className="mt-3 flex items-center gap-2 pt-3 border-t border-border/40">
           <Button size="sm" variant="default" className="gap-1.5 h-7 text-xs" onClick={onSubmit}>
             <Send className="h-3 w-3" /> Submit for Review
@@ -682,10 +765,26 @@ export default function WorkProgressReports() {
   const [viewReportId, setViewReportId] = useState<number | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [submitId, setSubmitId] = useState<number | null>(null);
+  // FEATURE: date-range filter state (staff view)
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  // Debounce search so we don't fire a query per keystroke (bug fix #5)
+  const debouncedSearch = useDebounce(search, 350);
 
   // ── Staff data ──────────────────────────────────────────────────────
   const { data: myData, isLoading: myLoading } = trpc.workProgress.getMyReports.useQuery(
-    { page, limit: 12, status: statusFilter, search },
+    {
+      page, limit: 12, status: statusFilter, search: debouncedSearch,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+    },
+    { enabled: !isAdmin }
+  );
+
+  // Staff stats (server-side, accurate — bug fix #3)
+  const { data: myStats } = trpc.workProgress.getMyStats.useQuery(
+    undefined,
     { enabled: !isAdmin }
   );
 
@@ -693,9 +792,35 @@ export default function WorkProgressReports() {
   const [adminStatus, setAdminStatus] = useState<StatusFilter>("all");
   const [adminSearch, setAdminSearch] = useState("");
   const [adminPage, setAdminPage] = useState(1);
+  const [adminStaffId, setAdminStaffId] = useState<number | "all">("all");
+  // FEATURE: date-range filter state (admin view)
+  const [adminDateFrom, setAdminDateFrom] = useState("");
+  const [adminDateTo, setAdminDateTo] = useState("");
+
+  const debouncedAdminSearch = useDebounce(adminSearch, 350);
 
   const { data: allData, isLoading: allLoading } = trpc.workProgress.listAll.useQuery(
-    { page: adminPage, limit: 15, status: adminStatus, search: adminSearch },
+    {
+      page: adminPage,
+      limit: 15,
+      status: adminStatus,
+      search: debouncedAdminSearch,
+      staffId: adminStaffId === "all" ? undefined : adminStaffId,
+      dateFrom: adminDateFrom || undefined,
+      dateTo: adminDateTo || undefined,
+    },
+    { enabled: isAdmin }
+  );
+
+  // Admin stats (server-side, accurate — bug fix #3)
+  const { data: allStats } = trpc.workProgress.getAllStats.useQuery(
+    undefined,
+    { enabled: isAdmin }
+  );
+
+  // Staff list for admin filter dropdown (feature #9)
+  const { data: staffList } = trpc.workProgress.getStaffList.useQuery(
+    undefined,
     { enabled: isAdmin }
   );
 
@@ -703,6 +828,8 @@ export default function WorkProgressReports() {
     onSuccess: () => {
       toast.success("Report submitted for admin review");
       utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.getMyStats.invalidate();
+      utils.workProgress.getAllStats.invalidate();
       setSubmitId(null);
     },
     onError: e => toast.error(e.message),
@@ -711,7 +838,11 @@ export default function WorkProgressReports() {
   const deleteMutation = trpc.workProgress.delete.useMutation({
     onSuccess: () => {
       toast.success("Report deleted");
+      // Invalidate both staff and admin caches (admin can delete too — feature #10)
       utils.workProgress.getMyReports.invalidate();
+      utils.workProgress.listAll.invalidate();
+      utils.workProgress.getMyStats.invalidate();
+      utils.workProgress.getAllStats.invalidate();
       setDeleteId(null);
     },
     onError: e => toast.error(e.message),
@@ -737,20 +868,45 @@ export default function WorkProgressReports() {
     }
   }, [siteName, siteLogo]);
 
-  // ── Stats bar ────────────────────────────────────────────────────────
-  const reports = isAdmin ? (allData?.reports ?? []) : (myData?.reports ?? []);
-  const total = isAdmin ? (allData?.total ?? 0) : (myData?.total ?? 0);
-  const isLoading = isAdmin ? allLoading : myLoading;
+  // FEATURE: bulk CSV export — fetches ALL matching reports (not just the current page)
+  const { refetch: refetchExportList, isFetching: exportLoading } = trpc.workProgress.exportList.useQuery(
+    {
+      status: adminStatus,
+      search: debouncedAdminSearch || undefined,
+      staffId: adminStaffId === "all" ? undefined : adminStaffId,
+      dateFrom: adminDateFrom || undefined,
+      dateTo: adminDateTo || undefined,
+    },
+    { enabled: false } // manual trigger only
+  );
 
-  const countByStatus = (status: ReportStatus) =>
-    reports.filter(r => r.status === status).length;
+  const handleExportCsv = useCallback(async () => {
+    try {
+      toast.info("Preparing CSV export...");
+      const res = await refetchExportList();
+      const reports = res.data?.reports ?? [];
+      if (reports.length === 0) {
+        toast.error("No reports match the current filters");
+        return;
+      }
+      exportWorkProgressListAsCsv(reports, siteName);
+      toast.success(`Exported ${reports.length} report${reports.length === 1 ? "" : "s"} to CSV`);
+    } catch {
+      toast.error("Failed to export CSV");
+    }
+  }, [refetchExportList, siteName]);
+
+  // ── Stats bar (server-side counts — bug fix #3) ───────────────────────
+  const reports = isAdmin ? (allData?.reports ?? []) : (myData?.reports ?? []);
+  const isLoading = isAdmin ? allLoading : myLoading;
+  const stats = isAdmin ? allStats : myStats;
 
   const STATS = [
-    { label: "Total",     value: total,                       color: "text-foreground" },
-    { label: "Draft",     value: countByStatus("draft"),      color: "text-slate-500" },
-    { label: "Submitted", value: countByStatus("submitted"),  color: "text-amber-600" },
-    { label: "Reviewed",  value: countByStatus("reviewed"),   color: "text-blue-600" },
-    { label: "Approved",  value: countByStatus("approved"),   color: "text-emerald-600" },
+    { label: "Total",     value: stats?.total ?? 0,      color: "text-foreground" },
+    { label: "Draft",     value: stats?.draft ?? 0,      color: "text-slate-500" },
+    { label: "Submitted", value: stats?.submitted ?? 0,  color: "text-amber-600" },
+    { label: "Reviewed",  value: stats?.reviewed ?? 0,   color: "text-blue-600" },
+    { label: "Approved",  value: stats?.approved ?? 0,   color: "text-emerald-600" },
   ];
 
   return (
@@ -817,6 +973,69 @@ export default function WorkProgressReports() {
             <SelectItem value="approved">Approved</SelectItem>
           </SelectContent>
         </Select>
+        {/* Staff filter — admin only (feature #9) */}
+        {isAdmin && (
+          <Select
+            value={String(adminStaffId)}
+            onValueChange={v => {
+              setAdminStaffId(v === "all" ? "all" : Number(v));
+              setAdminPage(1);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-48 gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <SelectValue placeholder="Filter by staff" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Staff</SelectItem>
+              {staffList?.map(s => (
+                <SelectItem key={s.id} value={String(s.id)}>
+                  {s.name || `User #${s.id}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        {/* FEATURE: date-range filter (both staff & admin) */}
+        <div className="flex items-center gap-2">
+          <Input
+            type="date"
+            className="w-full sm:w-40"
+            value={isAdmin ? adminDateFrom : dateFrom}
+            onChange={e => {
+              const v = e.target.value;
+              isAdmin ? setAdminDateFrom(v) : setDateFrom(v);
+              isAdmin ? setAdminPage(1) : setPage(1);
+            }}
+            aria-label="From date"
+          />
+          <span className="text-muted-foreground text-sm shrink-0">to</span>
+          <Input
+            type="date"
+            className="w-full sm:w-40"
+            value={isAdmin ? adminDateTo : dateTo}
+            onChange={e => {
+              const v = e.target.value;
+              isAdmin ? setAdminDateTo(v) : setDateTo(v);
+              isAdmin ? setAdminPage(1) : setPage(1);
+            }}
+            aria-label="To date"
+          />
+          {/* FEATURE: bulk CSV export — admin only */}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={handleExportCsv}
+              disabled={exportLoading}
+              className="gap-2 shrink-0"
+              title="Export all matching reports to CSV"
+            >
+              {exportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />}
+              <span className="hidden sm:inline">Export CSV</span>
+            </Button>
+          )}
+        </div>
       </motion.div>
 
       {/* ── Content ─────────────────────────────────────────────────── */}
@@ -895,6 +1114,13 @@ export default function WorkProgressReports() {
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-7 w-7" title="View & Review" onClick={() => setViewReportId(r.id)}>
                               <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            {/* BUG FIX: admin could edit/delete via backend but had no UI button */}
+                            <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => handleOpenForm(r as WorkProgressReport)}>
+                              <Edit3 className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 hover:text-red-600" title="Delete" onClick={() => setDeleteId(r.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7" title="Download PDF" onClick={() => handleDownload(r as WorkProgressReport)}>
                               <Download className="h-3.5 w-3.5" />
@@ -977,7 +1203,8 @@ export default function WorkProgressReports() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Report?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. The draft report will be permanently deleted.
+              This action cannot be undone. The report will be permanently deleted.
+              {!isAdmin && " Only draft reports can be deleted."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
