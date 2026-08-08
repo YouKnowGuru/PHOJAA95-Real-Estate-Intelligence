@@ -597,10 +597,7 @@ export async function generateWorkProgressPdf(
   }
 
   // ── APPROVAL / SIGN-OFF BLOCK ─────────────────────────────────────────
-  // Need room for the section header (~11mm) + the 22mm approval box = ~33mm,
-  // plus a little buffer. If it doesn't fit, push the whole block to the next page
-  // so the header and box stay together instead of splitting across pages.
-  y = checkPageBreak(doc, y, 40);
+  y = checkPageBreak(doc, y, 28);
 
   // Section header
   y = addSection(doc, "5. APPROVAL", y);
