@@ -253,11 +253,11 @@ function ReportFormModal({
   });
 
   const updateMutation = trpc.workProgress.update.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Report updated");
       utils.workProgress.getMyReports.invalidate();
       utils.workProgress.getMyStats.invalidate();
-      utils.workProgress.getById.invalidate({ id: editReport!.id });
+      utils.workProgress.getById.invalidate({ id: variables.id });
       onClose();
     },
     onError: (e) => toast.error(e.message),
@@ -265,11 +265,11 @@ function ReportFormModal({
 
   // Used internally by "Save & Submit" on an existing draft/submitted report
   const submitAfterUpdate = trpc.workProgress.submit.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       toast.success("Report updated and submitted for review");
       utils.workProgress.getMyReports.invalidate();
       utils.workProgress.getMyStats.invalidate();
-      utils.workProgress.getById.invalidate({ id: editReport!.id });
+      utils.workProgress.getById.invalidate({ id: variables.id });
       onClose();
     },
     onError: (e) => toast.error(e.message),
@@ -311,12 +311,16 @@ function ReportFormModal({
     const payload = buildPayload();
     if (!payload) return;
     if (editReport) {
+      // Capture the id up front — editReport may be null by the time the
+      // chained onSuccess runs (onClose clears it), which previously threw
+      // "Cannot read properties of null (reading 'id')".
+      const id = editReport.id;
       // Update first, then submit once the update resolves
       updateMutation.mutate(
-        { id: editReport.id, ...payload },
+        { id, ...payload },
         {
           onSuccess: () => {
-            submitAfterUpdate.mutate({ id: editReport.id });
+            submitAfterUpdate.mutate({ id });
           },
         }
       );
