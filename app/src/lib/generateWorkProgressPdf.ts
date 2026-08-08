@@ -21,6 +21,12 @@ const PAGE_W = 210;
 const MARGIN = 14;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
+// Set at the start of generateWorkProgressPdf so checkPageBreak can draw
+// continuation-page headers without needing siteName/reportNumber passed
+// into every single call site.
+let _pdfSiteName = "";
+let _pdfReportNumber = "";
+
 function addSection(doc: jsPDF, title: string, y: number): number {
   // Section heading pill with gold left-accent bar
   doc.setFillColor(...COLORS.gold);
@@ -38,11 +44,41 @@ function addSection(doc: jsPDF, title: string, y: number): number {
 }
 
 function checkPageBreak(doc: jsPDF, y: number, needed = 20): number {
-  if (y + needed > 275) {
+  // Page height for A4 portrait = 297mm; footer occupies ~13mm at the bottom
+  if (y + needed > 280) {
     doc.addPage();
-    return 16;
+    // ── Continuation page header (matches page-1 styling) ──────────────
+    drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
+    return 24; // start below the continuation header
   }
   return y;
+}
+
+/** Slim header on every continuation page so content doesn't float naked */
+function drawContinuationHeader(doc: jsPDF, siteName: string, reportNumber: string) {
+  // Top gold accent bar (same as page 1)
+  doc.setFillColor(...COLORS.gold);
+  doc.rect(0, 0, PAGE_W, 2.5, "F");
+
+  // Thin navy strip
+  doc.setFillColor(...COLORS.darkNavy);
+  doc.rect(0, 2.5, PAGE_W, 12, "F");
+
+  // Left: company name
+  doc.setTextColor(...COLORS.white);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.text(siteName.toUpperCase(), MARGIN, 9.5);
+
+  // Right: report number
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(200, 205, 215);
+  doc.text(`Work Progress Report — ${reportNumber}`, PAGE_W - MARGIN, 9.5, { align: "right" });
+
+  // Thin gold underline below the strip
+  doc.setFillColor(...COLORS.gold);
+  doc.rect(MARGIN, 15.5, CONTENT_W, 0.4, "F");
 }
 
 
@@ -182,6 +218,10 @@ export async function generateWorkProgressPdf(
   siteLogoUrl?: string
 ): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+
+  // Store for continuation-page headers
+  _pdfSiteName = siteName;
+  _pdfReportNumber = report.reportNumber;
 
   // Load logo (tries custom site logo first, then standard site assets)
   const logoObj = await loadLogoImage(siteLogoUrl);
@@ -360,7 +400,7 @@ export async function generateWorkProgressPdf(
       startY: y,
       head: [["Module", "Description"]],
       body: scopeItems.map((s) => [s.module, s.description]),
-      margin: { left: MARGIN, right: MARGIN },
+      margin: { left: MARGIN, right: MARGIN, top: 24 },
       headStyles: {
         fillColor: COLORS.darkNavy,
         textColor: COLORS.white,
@@ -375,6 +415,10 @@ export async function generateWorkProgressPdf(
       columnStyles: {
         0: { cellWidth: 48, fontStyle: "bold" },
         1: { cellWidth: CONTENT_W - 48 },
+      },
+      // Draw continuation header on every new page autoTable creates
+      didDrawPage: () => {
+        drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
       },
       theme: "grid",
     });
@@ -490,7 +534,7 @@ export async function generateWorkProgressPdf(
         t.targetCompletion?.trim() || "—",
         statusLabelMap(t.status),
       ]),
-      margin: { left: MARGIN, right: MARGIN },
+      margin: { left: MARGIN, right: MARGIN, top: 24 },
       headStyles: {
         fillColor: COLORS.darkNavy,
         textColor: COLORS.white,
@@ -521,6 +565,10 @@ export async function generateWorkProgressPdf(
             data.cell.styles.textColor = COLORS.midGray;
           }
         }
+      },
+      // Draw continuation header on every new page autoTable creates
+      didDrawPage: () => {
+        drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
       },
       theme: "grid",
     });
