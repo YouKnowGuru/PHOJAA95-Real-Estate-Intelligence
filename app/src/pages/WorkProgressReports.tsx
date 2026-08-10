@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +12,7 @@ import {
   CheckCircle2, Clock, AlertCircle, Search, Filter,
   X, Save, ClipboardList, CheckCheck, Loader2, FileSpreadsheet,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +28,19 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+// ─── Date display helper ───────────────────────────────────────────────────
+/** Formats a YYYY-MM-DD or ISO string as "Aug 10, 2026" without timezone shift */
+function formatDisplayDate(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  // Trim to date-only part to avoid UTC midnight → previous day in negative-offset zones
+  const dateOnly = String(raw).split("T")[0];
+  const [year, month, day] = dateOnly.split("-").map(Number);
+  if (!year || !month || !day) return raw;
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+  });
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────
 type StatusFilter = "all" | "draft" | "submitted" | "reviewed" | "approved";
@@ -495,10 +509,10 @@ function ReportDetailModal({
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-lg">{report?.project ?? "Loading..."}</DialogTitle>
-              <div className="flex items-center gap-2 mt-1">
+              <DialogDescription className="flex items-center gap-2 mt-1">
                 <span className="text-sm text-muted-foreground">{report?.reportNumber}</span>
                 {report && <StatusBadge status={report.status as ReportStatus} />}
-              </div>
+              </DialogDescription>
             </div>
             {report && (
               <Button
@@ -622,7 +636,7 @@ function ReportDetailModal({
                     {timeline.map((t, i) => (
                       <div key={i} className="grid grid-cols-[2fr_1.5fr_1fr] border-t border-border/40 px-3 py-2.5 text-sm items-center">
                         <span className="font-medium">{t.phase}</span>
-                        <span className="text-muted-foreground">{t.targetCompletion}</span>
+                        <span className="text-muted-foreground">{formatDisplayDate(t.targetCompletion)}</span>
                         <span className={`inline-flex items-center gap-1 text-xs font-semibold ${
                           t.status === "completed" ? "text-emerald-600" :
                           t.status === "in_progress" ? "text-amber-600" : "text-slate-500"

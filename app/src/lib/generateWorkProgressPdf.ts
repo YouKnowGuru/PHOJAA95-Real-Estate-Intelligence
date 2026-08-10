@@ -49,7 +49,8 @@ function checkPageBreak(doc: jsPDF, y: number, needed = 20): number {
     doc.addPage();
     // ── Continuation page header (matches page-1 styling) ──────────────
     drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
-    return 24; // start below the continuation header
+    // Header gold underline ends at y≈15.9mm — start content 2mm below it
+    return 18;
   }
   return y;
 }
@@ -152,7 +153,9 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
     let format: "PNG" | "JPEG" | "WEBP" = "PNG";
     if (url.includes("image/jpeg") || url.includes("image/jpg")) format = "JPEG";
     else if (url.includes("image/webp")) format = "WEBP";
-    return { dataUrl: url, format };
+    // Fix #1: Resolve real dimensions so aspect-ratio math in the caller never gets NaN
+    const dims = await getImageDimensions(url);
+    return { dataUrl: url, format, width: dims.width, height: dims.height };
   }
 
   if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -161,7 +164,7 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
   }
 
   // Strategy 1: HTML Image Element + Canvas
-  const canvasPromise = new Promise<{ dataUrl: string; format: "PNG" | "JPEG" | "WEBP" } | null>((resolve) => {
+  const canvasPromise = new Promise<LogoImage | null>((resolve) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
@@ -231,16 +234,17 @@ export async function generateWorkProgressPdf(
   doc.rect(0, 0, PAGE_W, 3, "F");
 
   // ── HEADER AREA ──────────────────────────────────────────────────────
-  // Left dark block for logo / emblem frame (narrower to avoid title overlap)
-  const headerBlockW = 42;
-  const headerBlockH = 36;
+  // Left dark block for logo / emblem frame. KEEPS CLEAR of the divider so
+  // the divider line never cuts through the navy block.
+  const headerBlockW = 40;
+  const headerBlockH = 26; // y=3..29 — well above the divider line
   doc.setFillColor(...COLORS.darkNavy);
   doc.rect(0, 3, headerBlockW, headerBlockH, "F");
 
   if (logoObj) {
     try {
       // White container inside the dark navy header block with gold border
-      const frameX = 4, frameY = 6, frameW = headerBlockW - 8, frameH = headerBlockH - 6;
+      const frameX = 4, frameY = 5, frameW = headerBlockW - 8, frameH = headerBlockH - 4;
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(frameX, frameY, frameW, frameH, 2, 2, "F");
       doc.setDrawColor(...COLORS.gold);
@@ -265,7 +269,7 @@ export async function generateWorkProgressPdf(
       }
       const imgX = frameX + (frameW - imgW) / 2;
       const imgY = frameY + (frameH - imgH) / 2;
-      doc.addImage(logoObj.dataUrl, logoObj.format, imgX, imgY, imgW, imgH, undefined, "FAST");
+      doc.addImage(logoObj.dataUrl, logoObj.format, imgX, imgY, imgW, imgH, undefined, "NONE");
     } catch {
       drawDefaultLogoSeal(doc, siteName);
     }
@@ -288,9 +292,9 @@ export async function generateWorkProgressPdf(
   doc.setTextColor(...COLORS.midGray);
   doc.text(siteName.toUpperCase(), titleX, 17.5);
 
-  // Thin gold underline
+  // Thin gold underline — spans from title start to right margin (Fix #3: removed erroneous -30)
   doc.setFillColor(...COLORS.gold);
-  doc.rect(titleX, 19.5, titleAreaW - 30, 0.5, "F");
+  doc.rect(titleX, 19.5, titleAreaW, 0.5, "F");
 
   // ── STATUS BADGE PILL (top-right, clear of title) ───────────────────
   const statusText = report.status.charAt(0).toUpperCase() + report.status.slice(1);
@@ -463,6 +467,9 @@ export async function generateWorkProgressPdf(
 
     let yCol1 = sectionStartY + 10;
     let yCol2 = sectionStartY + 10;
+    // Fix #5: track which PDF page each column is on so we can re-sync
+    let col1Page = doc.getCurrentPageInfo().pageNumber;
+    let col2Page = doc.getCurrentPageInfo().pageNumber;
 
     // --- Column 1: Completed Items ---
     completed.forEach((item) => {
@@ -470,7 +477,16 @@ export async function generateWorkProgressPdf(
       const lines = doc.splitTextToSize(item, colW - 7);
       const itemHeight = lines.length * 4.3 + 2.5;
 
+      const prevPage = doc.getCurrentPageInfo().pageNumber;
       yCol1 = checkPageBreak(doc, yCol1, itemHeight);
+      const newPage = doc.getCurrentPageInfo().pageNumber;
+      if (newPage !== prevPage) {
+        // Page broke: col1 is now on the new page — advance col2 to match so
+        // both columns stay on the same page going forward.
+        col1Page = newPage;
+        yCol2 = yCol1; // mirror the reset position
+        col2Page = newPage;
+      }
 
       // Green vector checkmark
       doc.setDrawColor(...COLORS.green);
@@ -487,12 +503,24 @@ export async function generateWorkProgressPdf(
     });
 
     // --- Column 2: In Progress Items ---
+    // Ensure col2 starts on the same page as col1's final position
+    if (col2Page !== col1Page) {
+      doc.setPage(col1Page);
+      yCol2 = sectionStartY + 10; // restart col2 at top of the current page's content area
+      col2Page = col1Page;
+    }
+
     inProgress.forEach((item) => {
       if (!item.trim()) return;
       const lines = doc.splitTextToSize(item, colW - 7);
       const itemHeight = lines.length * 4.3 + 2.5;
 
+      const prevPage = doc.getCurrentPageInfo().pageNumber;
       yCol2 = checkPageBreak(doc, yCol2, itemHeight);
+      const newPage = doc.getCurrentPageInfo().pageNumber;
+      if (newPage !== prevPage) {
+        col2Page = newPage;
+      }
 
       // Solid bullet dot
       doc.setFillColor(...COLORS.textDark);
@@ -574,10 +602,11 @@ export async function generateWorkProgressPdf(
 
   // ── ADMIN NOTES ───────────────────────────────────────────────────────
   if (report.adminNotes) {
-    y = checkPageBreak(doc, y, 20);
-    doc.setFillColor(254, 249, 231);
     const noteLines = doc.splitTextToSize(report.adminNotes, CONTENT_W - 8);
-    const noteHeight = noteLines.length * 4.8 + 10;
+    // Fix #6: proper height — 12mm header area + 5mm per line + 6mm bottom padding
+    const noteHeight = noteLines.length * 5 + 18;
+    y = checkPageBreak(doc, y, noteHeight + 6);
+    doc.setFillColor(254, 249, 231);
     doc.roundedRect(MARGIN, y, CONTENT_W, noteHeight, 2, 2, "F");
     doc.setDrawColor(...COLORS.gold);
     doc.setLineWidth(0.5);
@@ -586,10 +615,10 @@ export async function generateWorkProgressPdf(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.amber);
-    doc.text("Admin Notes:", MARGIN + 3, y + 5);
+    doc.text("Admin Notes:", MARGIN + 3, y + 6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(...COLORS.textDark);
-    doc.text(noteLines, MARGIN + 3, y + 10);
+    doc.text(noteLines, MARGIN + 3, y + 12);
     y += noteHeight + 6;
   }
 
@@ -638,10 +667,14 @@ export async function generateWorkProgressPdf(
     doc.setTextColor(...COLORS.textDark);
     doc.text(report.reviewedByName, rightX, y + 11);
     if (report.reviewedAt) {
+      // Fix #8: avoid UTC midnight off-by-one-day issue in local timezones
+      // Use the raw string directly (already formatted as YYYY-MM-DD or ISO),
+      // truncating at T to strip the time component safely.
+      const reviewedDateStr = String(report.reviewedAt).split("T")[0];
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
       doc.setTextColor(...COLORS.midGray);
-      doc.text(`Date: ${new Date(report.reviewedAt).toLocaleDateString()}`, rightX, y + 14.5);
+      doc.text(`Date: ${reviewedDateStr}`, rightX, y + 14.5);
     }
   } else {
     doc.setFont("helvetica", "normal");
@@ -717,29 +750,30 @@ export async function generateWorkProgressPdf(
 
 /** Fallback brand seal when image logo isn't provided */
 function drawDefaultLogoSeal(doc: jsPDF, siteName: string) {
+  const cx = 20, cy = 19; // centered in the 40x26 navy block (y=3..29)
   // Outer gold ring
   doc.setFillColor(...COLORS.gold);
-  doc.circle(23, 22, 14, "F");
+  doc.circle(cx, cy, 11, "F");
 
   // Inner navy circle
   doc.setFillColor(...COLORS.darkNavy);
-  doc.circle(23, 22, 12, "F");
+  doc.circle(cx, cy, 9, "F");
 
   // Thin gold inner ring for elegance
   doc.setDrawColor(...COLORS.gold);
   doc.setLineWidth(0.3);
-  doc.circle(23, 22, 10.5, "S");
+  doc.circle(cx, cy, 7.5, "S");
 
   // Brand initials (first 2 chars of site name)
   const initials = siteName.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2) || "PH";
   doc.setTextColor(...COLORS.gold);
-  doc.setFontSize(16);
+  doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text(initials, 23, 21, { align: "center" });
+  doc.text(initials, cx, cy, { align: "center" });
 
   // Subtitle
   doc.setTextColor(...COLORS.white);
-  doc.setFontSize(4.5);
+  doc.setFontSize(3.8);
   doc.setFont("helvetica", "normal");
-  doc.text("OFFICIAL REPORT", 23, 26, { align: "center" });
+  doc.text("OFFICIAL REPORT", cx, cy + 5, { align: "center" });
 }
