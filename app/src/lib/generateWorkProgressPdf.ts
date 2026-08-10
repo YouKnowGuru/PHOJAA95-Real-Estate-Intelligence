@@ -21,11 +21,6 @@ const PAGE_W = 210;
 const MARGIN = 14;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-// Set at the start of generateWorkProgressPdf so checkPageBreak can draw
-// continuation-page headers without needing siteName/reportNumber passed
-// into every single call site.
-let _pdfSiteName = "";
-let _pdfReportNumber = "";
 
 function addSection(doc: jsPDF, title: string, y: number): number {
   // Section heading pill with gold left-accent bar
@@ -220,9 +215,6 @@ export async function generateWorkProgressPdf(
 ): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
 
-  // Store for continuation-page headers
-  _pdfSiteName = siteName;
-  _pdfReportNumber = report.reportNumber;
 
   // Load logo (tries custom site logo first, then standard site assets)
   const logoObj = await loadLogoImage(siteLogoUrl);
