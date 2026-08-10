@@ -44,13 +44,11 @@ function addSection(doc: jsPDF, title: string, y: number): number {
 }
 
 function checkPageBreak(doc: jsPDF, y: number, needed = 20): number {
-  // Page height for A4 portrait = 297mm; footer occupies ~13mm at the bottom
-  if (y + needed > 280) {
+  // Page height for A4 portrait = 297mm; footer occupies ~13mm at the bottom (starts at ~284mm)
+  if (y + needed > 275) {
     doc.addPage();
-    // ── Continuation page header (matches page-1 styling) ──────────────
-    drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
-    // Header gold underline ends at y≈15.9mm — start content 2mm below it
-    return 18;
+    // Header gold underline ends at y≈15.9mm — start content at y=24 for a clean ~5.5mm gap
+    return 24;
   }
   return y;
 }
@@ -401,7 +399,7 @@ export async function generateWorkProgressPdf(
       startY: y,
       head: [["Module", "Description"]],
       body: scopeItems.map((s) => [s.module, s.description]),
-      margin: { left: MARGIN, right: MARGIN, top: 24 },
+      margin: { left: MARGIN, right: MARGIN, top: 22, bottom: 18 },
       headStyles: {
         fillColor: COLORS.darkNavy,
         textColor: COLORS.white,
@@ -416,10 +414,6 @@ export async function generateWorkProgressPdf(
       columnStyles: {
         0: { cellWidth: 48, fontStyle: "bold" },
         1: { cellWidth: CONTENT_W - 48 },
-      },
-      // Draw continuation header on every new page autoTable creates
-      didDrawPage: () => {
-        drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
       },
       theme: "grid",
     });
@@ -559,7 +553,7 @@ export async function generateWorkProgressPdf(
         t.targetCompletion?.trim() || "—",
         statusLabelMap(t.status),
       ]),
-      margin: { left: MARGIN, right: MARGIN, top: 24 },
+      margin: { left: MARGIN, right: MARGIN, top: 22, bottom: 18 },
       headStyles: {
         fillColor: COLORS.darkNavy,
         textColor: COLORS.white,
@@ -590,10 +584,6 @@ export async function generateWorkProgressPdf(
             data.cell.styles.textColor = COLORS.midGray;
           }
         }
-      },
-      // Draw continuation header on every new page autoTable creates
-      didDrawPage: () => {
-        drawContinuationHeader(doc, _pdfSiteName, _pdfReportNumber);
       },
       theme: "grid",
     });
@@ -709,11 +699,16 @@ export async function generateWorkProgressPdf(
     doc.restoreGraphicsState();
   }
 
-  // ── FOOTER ────────────────────────────────────────────────────────────
+  // ── FOOTER & CONTINUATION HEADERS ────────────────────────────────────
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     const pageH = doc.internal.pageSize.height;
+
+    // Draw continuation header ONLY on page 2 and beyond
+    if (i > 1) {
+      drawContinuationHeader(doc, siteName, report.reportNumber);
+    }
 
     // Golden accent border line above footer
     doc.setFillColor(...COLORS.gold);
