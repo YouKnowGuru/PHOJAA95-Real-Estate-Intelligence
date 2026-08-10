@@ -2,86 +2,90 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { WorkProgressReport } from "@db/schema";
 
-// ─── Color Palette (matching PHOJAA95 brand) ──────────────────────────
+// ─── Executive Color Palette (PHOJAA95 Luxury Theme) ────────────────
 const COLORS = {
-  darkNavy: [26, 35, 60] as [number, number, number],
-  gold: [183, 148, 56] as [number, number, number],
-  lightGold: [243, 232, 195] as [number, number, number],
-  green: [34, 139, 34] as [number, number, number],
-  lightGray: [248, 250, 252] as [number, number, number],
-  midGray: [120, 130, 145] as [number, number, number],
-  borderGray: [226, 232, 240] as [number, number, number],
-  textDark: [30, 35, 45] as [number, number, number],
-  white: [255, 255, 255] as [number, number, number],
-  amber: [217, 119, 6] as [number, number, number],
-  red: [220, 38, 38] as [number, number, number],
+  darkNavy:     [26, 35, 60]    as [number, number, number],
+  navyHeader:   [18, 25, 45]    as [number, number, number],
+  gold:         [183, 148, 56]  as [number, number, number],
+  goldLight:    [243, 232, 195] as [number, number, number],
+  goldAccent:   [212, 175, 55]  as [number, number, number],
+  green:        [16, 122, 58]   as [number, number, number],
+  greenBg:      [240, 253, 244] as [number, number, number],
+  greenBorder:  [187, 247, 208] as [number, number, number],
+  amber:        [217, 119, 6]   as [number, number, number],
+  amberBg:      [255, 251, 235] as [number, number, number],
+  amberBorder:  [253, 230, 138] as [number, number, number],
+  slateBg:      [248, 250, 252] as [number, number, number],
+  slateBorder:  [226, 232, 240] as [number, number, number],
+  slateText:    [100, 116, 139] as [number, number, number],
+  textDark:     [30, 41, 59]    as [number, number, number],
+  textMuted:    [71, 85, 105]   as [number, number, number],
+  white:        [255, 255, 255] as [number, number, number],
+  blue:         [29, 78, 216]   as [number, number, number],
 };
 
 const PAGE_W = 210;
 const MARGIN = 14;
 const CONTENT_W = PAGE_W - MARGIN * 2;
 
-
 function addSection(doc: jsPDF, title: string, y: number): number {
-  // Section heading pill with gold left-accent bar
+  // Gold left accent bar
   doc.setFillColor(...COLORS.gold);
-  doc.rect(MARGIN, y, 3, 7.5, "F");
+  doc.rect(MARGIN, y, 3, 8, "F");
 
+  // Executive Navy header bar
   doc.setFillColor(...COLORS.darkNavy);
-  doc.roundedRect(MARGIN + 3, y, CONTENT_W - 3, 7.5, 1, 1, "F");
+  doc.roundedRect(MARGIN + 3, y, CONTENT_W - 3, 8, 1, 1, "F");
 
   doc.setTextColor(...COLORS.white);
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setFont("helvetica", "bold");
-  doc.text(title, MARGIN + 7, y + 5.2);
+  doc.text(title, MARGIN + 8, y + 5.5);
   doc.setTextColor(...COLORS.textDark);
-  return y + 11;
+  return y + 12;
 }
 
 function checkPageBreak(doc: jsPDF, y: number, needed = 20): number {
-  // Page height for A4 portrait = 297mm; footer occupies ~13mm at the bottom (starts at ~284mm)
   if (y + needed > 275) {
     doc.addPage();
-    // Header gold underline ends at y≈15.9mm — start content at y=24 for a clean ~5.5mm gap
-    return 24;
+    return 24; // Start content at y=24 on continuation pages
   }
   return y;
 }
 
-/** Slim header on every continuation page so content doesn't float naked */
+/** Slim continuation header rendered on Page 2+ in post-processing */
 function drawContinuationHeader(doc: jsPDF, siteName: string, reportNumber: string) {
-  // Top gold accent bar (same as page 1)
+  // Top gold accent line
   doc.setFillColor(...COLORS.gold);
   doc.rect(0, 0, PAGE_W, 2.5, "F");
 
-  // Thin navy strip
+  // Navy strip
   doc.setFillColor(...COLORS.darkNavy);
-  doc.rect(0, 2.5, PAGE_W, 12, "F");
+  doc.rect(0, 2.5, PAGE_W, 12.5, "F");
 
-  // Left: company name
+  // Left: Brand
   doc.setTextColor(...COLORS.white);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text(siteName.toUpperCase(), MARGIN, 9.5);
+  doc.setFontSize(8.5);
+  doc.text(siteName.toUpperCase(), MARGIN, 10);
 
-  // Right: report number
+  // Right: Report metadata
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(200, 205, 215);
-  doc.text(`Work Progress Report — ${reportNumber}`, PAGE_W - MARGIN, 9.5, { align: "right" });
+  doc.setFontSize(7.5);
+  doc.setTextColor(215, 222, 235);
+  doc.text(`Work Progress Report — ${reportNumber}`, PAGE_W - MARGIN, 10, { align: "right" });
 
-  // Thin gold underline below the strip
+  // Gold underline
   doc.setFillColor(...COLORS.gold);
-  doc.rect(MARGIN, 15.5, CONTENT_W, 0.4, "F");
+  doc.rect(MARGIN, 15, CONTENT_W, 0.5, "F");
 }
 
-
-function reportStatusColor(s: string): [number, number, number] {
+function reportStatusColor(s: string): { bg: [number, number, number]; text: [number, number, number] } {
   switch (s) {
-    case "approved":   return COLORS.green;
-    case "reviewed":   return COLORS.gold;
-    case "submitted":  return COLORS.amber;
-    default:           return COLORS.midGray;
+    case "approved":   return { bg: [220, 252, 231], text: COLORS.green };
+    case "reviewed":   return { bg: [254, 243, 199], text: COLORS.gold };
+    case "submitted":  return { bg: [254, 243, 199], text: COLORS.amber };
+    default:           return { bg: [241, 245, 249], text: COLORS.slateText };
   }
 }
 
@@ -107,15 +111,12 @@ type LogoImage = {
   height: number;
 };
 
-/** Robust logo loader: tries custom site logo, then standard site assets (/loader.png, /pwa-512x512.png) */
+/** Robust logo loader: tries custom site logo, then standard site assets */
 async function loadLogoImage(siteLogoUrl?: string): Promise<LogoImage | null> {
   const candidates: string[] = [];
-
   if (siteLogoUrl && typeof siteLogoUrl === "string" && siteLogoUrl.trim()) {
     candidates.push(siteLogoUrl.trim());
   }
-
-  // Standard fallback assets from /public
   candidates.push("/loader.png");
   candidates.push("/pwa-512x512.png");
   candidates.push("/pwa-192x192.png");
@@ -124,11 +125,9 @@ async function loadLogoImage(siteLogoUrl?: string): Promise<LogoImage | null> {
     const loaded = await tryLoadImage(candidate);
     if (loaded) return loaded;
   }
-
   return null;
 }
 
-/** Get natural dimensions from a data URL (needed for aspect-ratio-correct placement) */
 function getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -146,7 +145,6 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
     let format: "PNG" | "JPEG" | "WEBP" = "PNG";
     if (url.includes("image/jpeg") || url.includes("image/jpg")) format = "JPEG";
     else if (url.includes("image/webp")) format = "WEBP";
-    // Fix #1: Resolve real dimensions so aspect-ratio math in the caller never gets NaN
     const dims = await getImageDimensions(url);
     return { dataUrl: url, format, width: dims.width, height: dims.height };
   }
@@ -156,7 +154,6 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
     url = window.location.origin + url;
   }
 
-  // Strategy 1: HTML Image Element + Canvas
   const canvasPromise = new Promise<LogoImage | null>((resolve) => {
     const img = new Image();
     img.crossOrigin = "Anonymous";
@@ -181,7 +178,6 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
   const canvasResult = await canvasPromise;
   if (canvasResult) return canvasResult;
 
-  // Strategy 2: Fetch API + FileReader fallback
   try {
     const res = await fetch(url);
     if (!res.ok) return null;
@@ -208,6 +204,7 @@ async function tryLoadImage(rawUrl: string): Promise<LogoImage | null> {
   }
 }
 
+// ─── MAIN PDF GENERATOR ───────────────────────────────────────────────
 export async function generateWorkProgressPdf(
   report: WorkProgressReport,
   siteName = "PHOJAA95",
@@ -215,8 +212,6 @@ export async function generateWorkProgressPdf(
 ): Promise<void> {
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
 
-
-  // Load logo (tries custom site logo first, then standard site assets)
   const logoObj = await loadLogoImage(siteLogoUrl);
 
   // ── TOP ACCENT BAR ───────────────────────────────────────────────────
@@ -224,16 +219,15 @@ export async function generateWorkProgressPdf(
   doc.rect(0, 0, PAGE_W, 3, "F");
 
   // ── HEADER AREA ──────────────────────────────────────────────────────
-  // Left dark block for logo / emblem frame. KEEPS CLEAR of the divider so
-  // the divider line never cuts through the navy block.
-  const headerBlockW = 40;
-  const headerBlockH = 26; // y=3..29 — well above the divider line
-  doc.setFillColor(...COLORS.darkNavy);
+  // Left Dark Navy Logo Block (0..42mm)
+  const headerBlockW = 42;
+  const headerBlockH = 28;
+  doc.setFillColor(...COLORS.navyHeader);
   doc.rect(0, 3, headerBlockW, headerBlockH, "F");
 
   if (logoObj) {
     try {
-      // White container inside the dark navy header block with gold border
+      // White rounded emblem frame with gold stroke
       const frameX = 4, frameY = 5, frameW = headerBlockW - 8, frameH = headerBlockH - 4;
       doc.setFillColor(255, 255, 255);
       doc.roundedRect(frameX, frameY, frameW, frameH, 2, 2, "F");
@@ -241,11 +235,10 @@ export async function generateWorkProgressPdf(
       doc.setLineWidth(0.4);
       doc.roundedRect(frameX, frameY, frameW, frameH, 2, 2, "S");
 
-      // ── Aspect-ratio-correct logo placement (contain mode) ──
+      // Aspect-ratio-correct logo placement
       const pad = 3;
       const innerW = frameW - pad * 2;
       const innerH = frameH - pad * 2;
-      // Guard against zero/NaN dimensions
       const w = Math.max(logoObj.width, 1);
       const h = Math.max(logoObj.height, 1);
       const imgAspect = w / h;
@@ -267,118 +260,150 @@ export async function generateWorkProgressPdf(
     drawDefaultLogoSeal(doc, siteName);
   }
 
-  // ── Title area (starts well clear of the logo block) ─────────────────
-  const titleX = headerBlockW + 8; // 8mm gap from navy block edge
-  const titleAreaW = PAGE_W - MARGIN - titleX; // available width for title text
+  // Right Header Info Block (starts at x=50mm)
+  const titleX = 50;
+  const infoW = PAGE_W - MARGIN - titleX;
 
+  // Title: "WORK PROGRESS REPORT"
   doc.setTextColor(...COLORS.darkNavy);
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.setFont("helvetica", "bold");
-  doc.text("WORK PROGRESS REPORT", titleX, 13);
+  doc.text("WORK PROGRESS REPORT", titleX, 12);
 
   // Subtitle / Company name
-  doc.setFontSize(8.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.midGray);
-  doc.text(siteName.toUpperCase(), titleX, 17.5);
-
-  // Thin gold underline — spans from title start to right margin (Fix #3: removed erroneous -30)
-  doc.setFillColor(...COLORS.gold);
-  doc.rect(titleX, 19.5, titleAreaW, 0.5, "F");
-
-  // ── STATUS BADGE PILL (top-right, clear of title) ───────────────────
-  const statusText = report.status.charAt(0).toUpperCase() + report.status.slice(1);
-  const sColor = reportStatusColor(report.status);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  const badgeW = doc.getTextWidth(statusText) + 7;
-  const badgeX = PAGE_W - MARGIN - badgeW;
-  const badgeY = 10;
-  doc.setFillColor(...sColor);
-  doc.roundedRect(badgeX, badgeY, badgeW, 5, 1.5, 1.5, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.text(statusText, badgeX + 3.5, badgeY + 3.6);
+  doc.setTextColor(...COLORS.gold);
+  doc.text(siteName.toUpperCase(), titleX, 16.5);
 
-  // Report number below the gold underline
-  doc.setFont("helvetica", "normal");
+  // Status Badge Pill (Top-Right)
+  const statusStr = report.status.charAt(0).toUpperCase() + report.status.slice(1);
+  const st = reportStatusColor(report.status);
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(7);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text(`Report No: ${report.reportNumber}`, titleX, 23.5);
+  const badgeW = doc.getTextWidth(statusStr) + 8;
+  const badgeX = PAGE_W - MARGIN - badgeW;
+  const badgeY = 7.5;
+  doc.setFillColor(...st.bg);
+  doc.roundedRect(badgeX, badgeY, badgeW, 5.5, 1.5, 1.5, "F");
+  doc.setDrawColor(...st.text);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(badgeX, badgeY, badgeW, 5.5, 1.5, 1.5, "S");
+  doc.setTextColor(...st.text);
+  doc.text(statusStr, badgeX + 4, badgeY + 4);
 
-  // Prepared by + report date (compact, in the header area below underline)
+  // Gold horizontal line under title
+  doc.setFillColor(...COLORS.gold);
+  doc.rect(titleX, 18.5, infoW, 0.4, "F");
+
+  // Executive Metadata Key-Value Box (starts at y=20mm)
+  const metaBoxY = 20;
+  const metaBoxH = 14;
+  doc.setFillColor(...COLORS.slateBg);
+  doc.roundedRect(titleX, metaBoxY, infoW, metaBoxH, 1.5, 1.5, "F");
+  doc.setDrawColor(...COLORS.slateBorder);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(titleX, metaBoxY, infoW, metaBoxH, 1.5, 1.5, "S");
+
+  // Left accent line on metadata box
+  doc.setFillColor(...COLORS.gold);
+  doc.rect(titleX, metaBoxY, 1.5, metaBoxH, "F");
+
+  // Grid Row 1: Report No & Date
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.5);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Prepared By:", titleX, 27.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("REPORT NO:", titleX + 4, metaBoxY + 4.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.textDark);
-  doc.text(String(report.staffName).slice(0, 28), titleX + 18, 27.5);
+  doc.text(report.reportNumber, titleX + 22, metaBoxY + 4.5);
 
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Date:", titleX + 70, 27.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("DATE:", titleX + 85, metaBoxY + 4.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.textDark);
-  doc.text(report.reportDate || "—", titleX + 80, 27.5);
+  doc.text(report.reportDate || "—", titleX + 96, metaBoxY + 4.5);
 
-  // Project + Feature (inline, right of logo — no overlapping card)
+  // Grid Row 2: Project & Feature
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Project:", titleX, 31.5);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...COLORS.textDark);
-  const projVal = report.project.length > 38 ? report.project.slice(0, 38) + "..." : report.project;
-  doc.text(projVal, titleX + 14, 31.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("PROJECT:", titleX + 4, metaBoxY + 9.5);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...COLORS.darkNavy);
+  const projText = report.project.length > 34 ? report.project.slice(0, 34) + "..." : report.project;
+  doc.text(projText, titleX + 22, metaBoxY + 9.5);
 
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Feature:", titleX + 90, 31.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("FEATURE:", titleX + 85, metaBoxY + 9.5);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...COLORS.textDark);
-  const featVal = report.feature.length > 38 ? report.feature.slice(0, 38) + "..." : report.feature;
-  doc.text(featVal, titleX + 102, 31.5);
+  const featText = report.feature.length > 32 ? report.feature.slice(0, 32) + "..." : report.feature;
+  doc.text(featText, titleX + 96, metaBoxY + 9.5);
 
-  // Main divider line
+  // Main divider line across content width
   doc.setDrawColor(...COLORS.darkNavy);
   doc.setLineWidth(0.4);
-  doc.line(MARGIN, 38, PAGE_W - MARGIN, 38);
+  doc.line(MARGIN, 37, PAGE_W - MARGIN, 37);
 
-  let y = 42;
+  let y = 41;
 
   // ── SECTION 1: FEATURE OVERVIEW ───────────────────────────────────────
   y = addSection(doc, "1. FEATURE OVERVIEW", y);
 
   if (report.featureOverview) {
+    const lines = doc.splitTextToSize(report.featureOverview, CONTENT_W - 8);
+    const ovHeight = lines.length * 4.4 + 6;
+
+    y = checkPageBreak(doc, y, ovHeight);
+
+    // Light overview card with left gold bar
+    doc.setFillColor(...COLORS.slateBg);
+    doc.roundedRect(MARGIN, y, CONTENT_W, ovHeight, 1.5, 1.5, "F");
+    doc.setDrawColor(...COLORS.slateBorder);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(MARGIN, y, CONTENT_W, ovHeight, 1.5, 1.5, "S");
+
+    doc.setFillColor(...COLORS.gold);
+    doc.rect(MARGIN, y, 1.5, ovHeight, "F");
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.textDark);
-    const lines = doc.splitTextToSize(report.featureOverview, CONTENT_W - 4);
-    y = checkPageBreak(doc, y, lines.length * 5 + 6);
-    doc.text(lines, MARGIN + 2, y);
-    y += lines.length * 4.6 + 4;
+    doc.text(lines, MARGIN + 5, y + 4.8);
+    y += ovHeight + 6;
   }
 
   // Objectives sub-section
   const objectives = safeArray<string>(report.objectives);
   if (objectives.length > 0) {
-    y = checkPageBreak(doc, y, 12);
+    y = checkPageBreak(doc, y, 14);
+
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.darkNavy);
-    doc.text("Objectives", MARGIN + 2, y);
-    y += 4.5;
+    doc.text("Key Objectives", MARGIN + 1, y);
+    y += 5;
 
     objectives.forEach((obj) => {
-      y = checkPageBreak(doc, y, 7);
+      if (!obj.trim()) return;
+      const wrapped = doc.splitTextToSize(obj, CONTENT_W - 10);
+      const itemH = wrapped.length * 4.2 + 3;
+
+      y = checkPageBreak(doc, y, itemH);
+
+      // Gold accent bullet tag
+      doc.setFillColor(...COLORS.gold);
+      doc.circle(MARGIN + 3, y + 1.2, 1.2, "F");
+
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(...COLORS.textDark);
-      const wrapped = doc.splitTextToSize(`• ${obj}`, CONTENT_W - 8);
-      doc.text(wrapped, MARGIN + 5, y);
-      y += wrapped.length * 4.2 + 1;
+      doc.text(wrapped, MARGIN + 7, y + 2);
+      y += itemH;
     });
-    y += 2;
+    y += 4;
   }
 
   // ── SECTION 2: SCOPE OF WORK ─────────────────────────────────────────
@@ -389,23 +414,25 @@ export async function generateWorkProgressPdf(
 
     autoTable(doc, {
       startY: y,
-      head: [["Module", "Description"]],
+      head: [["Module / Component", "Scope Description"]],
       body: scopeItems.map((s) => [s.module, s.description]),
       margin: { left: MARGIN, right: MARGIN, top: 22, bottom: 18 },
       headStyles: {
-        fillColor: COLORS.darkNavy,
+        fillColor: COLORS.navyHeader,
         textColor: COLORS.white,
         fontStyle: "bold",
-        fontSize: 8,
+        fontSize: 8.5,
+        cellPadding: 3.5,
       },
       bodyStyles: {
         fontSize: 8,
         textColor: COLORS.textDark,
+        cellPadding: 3,
       },
-      alternateRowStyles: { fillColor: COLORS.lightGray },
+      alternateRowStyles: { fillColor: COLORS.slateBg },
       columnStyles: {
-        0: { cellWidth: 48, fontStyle: "bold" },
-        1: { cellWidth: CONTENT_W - 48 },
+        0: { cellWidth: 52, fontStyle: "bold", textColor: COLORS.darkNavy },
+        1: { cellWidth: CONTENT_W - 52 },
       },
       theme: "grid",
     });
@@ -417,43 +444,56 @@ export async function generateWorkProgressPdf(
   const inProgress = safeArray<string>(report.inProgressItems);
 
   if (completed.length > 0 || inProgress.length > 0) {
-    y = checkPageBreak(doc, y, 25);
+    y = checkPageBreak(doc, y, 30);
     y = addSection(doc, "3. PROGRESS SUMMARY", y);
 
-    const colW = (CONTENT_W - 8) / 2;
+    const colW = (CONTENT_W - 6) / 2;
     const col1X = MARGIN;
-    const col2X = MARGIN + colW + 8;
+    const col2X = MARGIN + colW + 6;
     const sectionStartY = y;
 
     // --- Column Headers ---
-    // Completed Header (Left) with count badge
+    // Left: Completed Header Card
+    const compCount = completed.filter(i => i.trim()).length;
+    doc.setFillColor(...COLORS.greenBg);
+    doc.roundedRect(col1X, sectionStartY, colW, 7, 1, 1, "F");
+    doc.setDrawColor(...COLORS.greenBorder);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(col1X, sectionStartY, colW, 7, 1, 1, "S");
+
     doc.setFillColor(...COLORS.green);
-    doc.circle(col1X + 3.5, sectionStartY + 3, 2.5, "F");
+    doc.circle(col1X + 4, sectionStartY + 3.5, 2.2, "F");
     doc.setDrawColor(255, 255, 255);
     doc.setLineWidth(0.5);
-    doc.line(col1X + 2.2, sectionStartY + 3, col1X + 3.1, sectionStartY + 3.9);
-    doc.line(col1X + 3.1, sectionStartY + 3.9, col1X + 4.6, sectionStartY + 2.1);
+    doc.line(col1X + 2.8, sectionStartY + 3.5, col1X + 3.6, sectionStartY + 4.3);
+    doc.line(col1X + 3.6, sectionStartY + 4.3, col1X + 5.2, sectionStartY + 2.6);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
+    doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.green);
-    doc.text(`Completed (${completed.filter(i => i.trim()).length})`, col1X + 8, sectionStartY + 4);
+    doc.text(`Completed (${compCount})`, col1X + 8, sectionStartY + 4.8);
 
-    // In Progress Header (Right) with count badge
-    doc.setDrawColor(...COLORS.darkNavy);
-    doc.setFillColor(...COLORS.darkNavy);
+    // Right: In Progress Header Card
+    const inpCount = inProgress.filter(i => i.trim()).length;
+    doc.setFillColor(...COLORS.amberBg);
+    doc.roundedRect(col2X, sectionStartY, colW, 7, 1, 1, "F");
+    doc.setDrawColor(...COLORS.amberBorder);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(col2X, sectionStartY, colW, 7, 1, 1, "S");
+
+    doc.setDrawColor(...COLORS.amber);
+    doc.setFillColor(...COLORS.amber);
     doc.setLineWidth(0.6);
-    doc.circle(col2X + 3.5, sectionStartY + 3, 2.5, "S");
-    doc.circle(col2X + 3.5, sectionStartY + 3, 1, "F");
+    doc.circle(col2X + 4, sectionStartY + 3.5, 2.2, "S");
+    doc.circle(col2X + 4, sectionStartY + 3.5, 0.9, "F");
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9.5);
-    doc.setTextColor(...COLORS.darkNavy);
-    doc.text(`In Progress (${inProgress.filter(i => i.trim()).length})`, col2X + 8, sectionStartY + 4);
+    doc.setFontSize(8.5);
+    doc.setTextColor(...COLORS.amber);
+    doc.text(`In Progress (${inpCount})`, col2X + 8, sectionStartY + 4.8);
 
     let yCol1 = sectionStartY + 10;
     let yCol2 = sectionStartY + 10;
-    // Fix #5: track which PDF page each column is on so we can re-sync
     let col1Page = doc.getCurrentPageInfo().pageNumber;
     let col2Page = doc.getCurrentPageInfo().pageNumber;
 
@@ -461,45 +501,42 @@ export async function generateWorkProgressPdf(
     completed.forEach((item) => {
       if (!item.trim()) return;
       const lines = doc.splitTextToSize(item, colW - 7);
-      const itemHeight = lines.length * 4.3 + 2.5;
+      const itemHeight = lines.length * 4.2 + 2.5;
 
       const prevPage = doc.getCurrentPageInfo().pageNumber;
       yCol1 = checkPageBreak(doc, yCol1, itemHeight);
       const newPage = doc.getCurrentPageInfo().pageNumber;
       if (newPage !== prevPage) {
-        // Page broke: col1 is now on the new page — advance col2 to match so
-        // both columns stay on the same page going forward.
         col1Page = newPage;
-        yCol2 = yCol1; // mirror the reset position
+        yCol2 = yCol1;
         col2Page = newPage;
       }
 
       // Green vector checkmark
       doc.setDrawColor(...COLORS.green);
       doc.setLineWidth(0.6);
-      doc.line(col1X + 0.8, yCol1 - 1.2, col1X + 2.0, yCol1 - 0.2);
-      doc.line(col1X + 2.0, yCol1 - 0.2, col1X + 3.8, yCol1 - 2.5);
+      doc.line(col1X + 1, yCol1 + 0.8, col1X + 2.2, yCol1 + 1.8);
+      doc.line(col1X + 2.2, yCol1 + 1.8, col1X + 4, yCol1 - 0.5);
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(...COLORS.textDark);
-      doc.text(lines, col1X + 6, yCol1 - 1);
+      doc.text(lines, col1X + 6, yCol1 + 1.5);
 
       yCol1 += itemHeight;
     });
 
     // --- Column 2: In Progress Items ---
-    // Ensure col2 starts on the same page as col1's final position
     if (col2Page !== col1Page) {
       doc.setPage(col1Page);
-      yCol2 = sectionStartY + 10; // restart col2 at top of the current page's content area
+      yCol2 = sectionStartY + 10;
       col2Page = col1Page;
     }
 
     inProgress.forEach((item) => {
       if (!item.trim()) return;
       const lines = doc.splitTextToSize(item, colW - 7);
-      const itemHeight = lines.length * 4.3 + 2.5;
+      const itemHeight = lines.length * 4.2 + 2.5;
 
       const prevPage = doc.getCurrentPageInfo().pageNumber;
       yCol2 = checkPageBreak(doc, yCol2, itemHeight);
@@ -508,19 +545,19 @@ export async function generateWorkProgressPdf(
         col2Page = newPage;
       }
 
-      // Solid bullet dot
-      doc.setFillColor(...COLORS.textDark);
-      doc.circle(col2X + 2, yCol2 - 1.5, 0.8, "F");
+      // Amber bullet dot
+      doc.setFillColor(...COLORS.amber);
+      doc.circle(col2X + 2.5, yCol2 + 0.5, 1, "F");
 
       doc.setFont("helvetica", "normal");
       doc.setFontSize(8);
       doc.setTextColor(...COLORS.textDark);
-      doc.text(lines, col2X + 6, yCol2 - 1);
+      doc.text(lines, col2X + 6, yCol2 + 1.5);
 
       yCol2 += itemHeight;
     });
 
-    y = Math.max(yCol1, yCol2) + 4;
+    y = Math.max(yCol1, yCol2) + 6;
   }
 
   // ── SECTION 4: TIMELINE ───────────────────────────────────────────────
@@ -539,7 +576,7 @@ export async function generateWorkProgressPdf(
 
     autoTable(doc, {
       startY: y,
-      head: [["Phase", "Target Completion", "Status"]],
+      head: [["Project Phase", "Target Completion", "Status"]],
       body: timeline.map((t) => [
         t.phase || "—",
         t.targetCompletion?.trim() || "—",
@@ -547,33 +584,32 @@ export async function generateWorkProgressPdf(
       ]),
       margin: { left: MARGIN, right: MARGIN, top: 22, bottom: 18 },
       headStyles: {
-        fillColor: COLORS.darkNavy,
+        fillColor: COLORS.navyHeader,
         textColor: COLORS.white,
         fontStyle: "bold",
-        fontSize: 8,
+        fontSize: 8.5,
+        cellPadding: 3.5,
       },
       bodyStyles: {
         fontSize: 8,
         textColor: COLORS.textDark,
+        cellPadding: 3,
       },
-      alternateRowStyles: { fillColor: COLORS.lightGray },
+      alternateRowStyles: { fillColor: COLORS.slateBg },
       columnStyles: {
-        0: { cellWidth: CONTENT_W * 0.5, fontStyle: "bold" },
-        1: { cellWidth: CONTENT_W * 0.3 },
-        2: { cellWidth: CONTENT_W * 0.2 },
+        0: { cellWidth: CONTENT_W * 0.5, fontStyle: "bold", textColor: COLORS.darkNavy },
+        1: { cellWidth: CONTENT_W * 0.28 },
+        2: { cellWidth: CONTENT_W * 0.22, fontStyle: "bold" },
       },
-      // Color the Status column text by status value
       didParseCell: (data) => {
         if (data.section === "body" && data.column.index === 2) {
           const row = timeline[data.row.index];
           if (row?.status === "completed") {
             data.cell.styles.textColor = COLORS.green;
-            data.cell.styles.fontStyle = "bold";
           } else if (row?.status === "in_progress") {
             data.cell.styles.textColor = COLORS.amber;
-            data.cell.styles.fontStyle = "bold";
           } else {
-            data.cell.styles.textColor = COLORS.midGray;
+            data.cell.styles.textColor = COLORS.slateText;
           }
         }
       },
@@ -584,94 +620,103 @@ export async function generateWorkProgressPdf(
 
   // ── ADMIN NOTES ───────────────────────────────────────────────────────
   if (report.adminNotes) {
-    const noteLines = doc.splitTextToSize(report.adminNotes, CONTENT_W - 8);
-    // Fix #6: proper height — 12mm header area + 5mm per line + 6mm bottom padding
-    const noteHeight = noteLines.length * 5 + 18;
-    y = checkPageBreak(doc, y, noteHeight + 6);
-    doc.setFillColor(254, 249, 231);
-    doc.roundedRect(MARGIN, y, CONTENT_W, noteHeight, 2, 2, "F");
-    doc.setDrawColor(...COLORS.gold);
-    doc.setLineWidth(0.5);
-    doc.roundedRect(MARGIN, y, CONTENT_W, noteHeight, 2, 2, "S");
+    const noteLines = doc.splitTextToSize(report.adminNotes, CONTENT_W - 10);
+    const noteHeight = noteLines.length * 4.5 + 14;
+
+    y = checkPageBreak(doc, y, noteHeight + 4);
+
+    doc.setFillColor(...COLORS.amberBg);
+    doc.roundedRect(MARGIN, y, CONTENT_W, noteHeight, 1.5, 1.5, "F");
+    doc.setDrawColor(...COLORS.amberBorder);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(MARGIN, y, CONTENT_W, noteHeight, 1.5, 1.5, "S");
+
+    doc.setFillColor(...COLORS.amber);
+    doc.rect(MARGIN, y, 1.5, noteHeight, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.amber);
-    doc.text("Admin Notes:", MARGIN + 3, y + 6);
+    doc.text("Admin Review Feedback:", MARGIN + 5, y + 5.5);
+
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
     doc.setTextColor(...COLORS.textDark);
-    doc.text(noteLines, MARGIN + 3, y + 12);
+    doc.text(noteLines, MARGIN + 5, y + 10.5);
+
     y += noteHeight + 6;
   }
 
   // ── APPROVAL / SIGN-OFF BLOCK ─────────────────────────────────────────
-  y = checkPageBreak(doc, y, 28);
+  y = checkPageBreak(doc, y, 32);
 
-  // Section header
-  y = addSection(doc, "5. APPROVAL", y);
+  y = addSection(doc, "5. APPROVAL & SIGN-OFF", y);
 
-  const apprBoxH = 22;
-  doc.setFillColor(...COLORS.lightGray);
-  doc.roundedRect(MARGIN, y, CONTENT_W, apprBoxH, 2, 2, "F");
-  doc.setDrawColor(...COLORS.borderGray);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(MARGIN, y, CONTENT_W, apprBoxH, 2, 2, "S");
+  const apprBoxH = 24;
+  doc.setFillColor(...COLORS.slateBg);
+  doc.roundedRect(MARGIN, y, CONTENT_W, apprBoxH, 1.5, 1.5, "F");
+  doc.setDrawColor(...COLORS.slateBorder);
+  doc.setLineWidth(0.4);
+  doc.roundedRect(MARGIN, y, CONTENT_W, apprBoxH, 1.5, 1.5, "S");
 
-  // Left: Prepared By
+  // Left Signature Block: Prepared By
+  const leftX = MARGIN + 4;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("PREPARED BY", MARGIN + 4, y + 6);
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("PREPARED BY (STAFF)", leftX, y + 5.5);
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.setTextColor(...COLORS.textDark);
-  doc.text(report.staffName, MARGIN + 4, y + 11);
-  // Signature line
-  doc.setDrawColor(...COLORS.midGray);
+  doc.setTextColor(...COLORS.darkNavy);
+  doc.text(report.staffName, leftX, y + 10.5);
+
+  doc.setDrawColor(...COLORS.slateText);
   doc.setLineWidth(0.3);
-  doc.line(MARGIN + 4, y + 18, MARGIN + 4 + 70, y + 18);
+  doc.line(leftX, y + 18.5, leftX + 72, y + 18.5);
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Signature", MARGIN + 4, y + 20.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("Authorized Staff Signature", leftX, y + 21.5);
 
-  // Right: Reviewed/Approved By
+  // Right Signature Block: Reviewed/Approved By
   const rightX = MARGIN + CONTENT_W / 2 + 4;
+  const reviewLabel = report.status === "approved" ? "APPROVED BY (ADMIN)" : "REVIEWED BY (ADMIN)";
+
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.5);
-  doc.setTextColor(...COLORS.midGray);
-  const reviewLabel = report.status === "approved" ? "APPROVED BY" : report.status === "reviewed" ? "REVIEWED BY" : "REVIEWED BY";
-  doc.text(reviewLabel, rightX, y + 6);
+  doc.setFontSize(7);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text(reviewLabel, rightX, y + 5.5);
 
   if (report.reviewedByName) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.setTextColor(...COLORS.textDark);
-    doc.text(report.reviewedByName, rightX, y + 11);
+    doc.setTextColor(...COLORS.darkNavy);
+    doc.text(report.reviewedByName, rightX, y + 10.5);
+
     if (report.reviewedAt) {
-      // Fix #8: avoid UTC midnight off-by-one-day issue in local timezones
-      // Use the raw string directly (already formatted as YYYY-MM-DD or ISO),
-      // truncating at T to strip the time component safely.
       const reviewedDateStr = String(report.reviewedAt).split("T")[0];
       doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
-      doc.setTextColor(...COLORS.midGray);
-      doc.text(`Date: ${reviewedDateStr}`, rightX, y + 14.5);
+      doc.setTextColor(...COLORS.slateText);
+      doc.text(`Date: ${reviewedDateStr}`, rightX + 45, y + 10.5);
     }
   } else {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(...COLORS.midGray);
-    doc.text("Pending review", rightX, y + 11);
+    doc.setTextColor(...COLORS.slateText);
+    doc.text("Pending Review", rightX, y + 10.5);
   }
-  // Signature line
-  doc.setDrawColor(...COLORS.midGray);
+
+  doc.setDrawColor(...COLORS.slateText);
   doc.setLineWidth(0.3);
-  doc.line(rightX, y + 18, rightX + 70, y + 18);
+  doc.line(rightX, y + 18.5, rightX + 72, y + 18.5);
+
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
-  doc.setTextColor(...COLORS.midGray);
-  doc.text("Signature", rightX, y + 20.5);
+  doc.setTextColor(...COLORS.slateText);
+  doc.text("Management Signature & Date", rightX, y + 21.5);
 
   y += apprBoxH + 6;
 
@@ -680,10 +725,9 @@ export async function generateWorkProgressPdf(
     doc.saveGraphicsState();
     doc.setTextColor(...COLORS.green);
     doc.setFillColor(...COLORS.green);
-    // Semi-transparent diagonal watermark (simulated with light gray-green)
-    doc.setGState((doc as any).GState({ opacity: 0.08 }));
+    doc.setGState((doc as any).GState({ opacity: 0.07 }));
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(60);
+    doc.setFontSize(55);
     doc.text("APPROVED", PAGE_W / 2, 160, {
       align: "center",
       angle: 35,
@@ -697,36 +741,40 @@ export async function generateWorkProgressPdf(
     doc.setPage(i);
     const pageH = doc.internal.pageSize.height;
 
-    // Draw continuation header ONLY on page 2 and beyond
+    // Continuation Header (Page 2+)
     if (i > 1) {
       drawContinuationHeader(doc, siteName, report.reportNumber);
     }
 
-    // Golden accent border line above footer
+    // Gold accent line above footer
     doc.setFillColor(...COLORS.gold);
     doc.rect(0, pageH - 13.5, PAGE_W, 0.5, "F");
 
-    // Dark navy footer bar
-    doc.setFillColor(...COLORS.darkNavy);
+    // Executive Navy Footer Bar
+    doc.setFillColor(...COLORS.navyHeader);
     doc.rect(0, pageH - 13, PAGE_W, 13, "F");
 
     doc.setTextColor(...COLORS.white);
     doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${siteName.toUpperCase()} — OFFICIAL WORK PROGRESS REPORT`, MARGIN, pageH - 7.5);
+
     doc.setFont("helvetica", "normal");
-    doc.text(`${siteName} — Official Work Progress Report (${report.reportNumber})`, MARGIN, pageH - 7);
+    doc.setFontSize(7);
+    doc.setTextColor(215, 222, 235);
     doc.text(
       `Page ${i} of ${totalPages}  |  Generated: ${new Date().toLocaleDateString()}`,
       PAGE_W - MARGIN,
-      pageH - 7,
+      pageH - 7.5,
       { align: "right" }
     );
-    // Confidentiality notice
+
     doc.setFontSize(5.5);
-    doc.setTextColor(180, 185, 195);
+    doc.setTextColor(160, 175, 200);
     doc.text(
-      "This document is confidential and intended solely for authorized personnel. Unauthorized distribution is prohibited.",
+      "CONFIDENTIAL — Intended solely for authorized company personnel. Unauthorized distribution is prohibited.",
       MARGIN,
-      pageH - 3
+      pageH - 3.5
     );
   }
 
@@ -737,30 +785,29 @@ export async function generateWorkProgressPdf(
 
 /** Fallback brand seal when image logo isn't provided */
 function drawDefaultLogoSeal(doc: jsPDF, siteName: string) {
-  const cx = 20, cy = 19; // centered in the 40x26 navy block (y=3..29)
+  const cx = 21, cy = 17;
   // Outer gold ring
   doc.setFillColor(...COLORS.gold);
   doc.circle(cx, cy, 11, "F");
 
   // Inner navy circle
-  doc.setFillColor(...COLORS.darkNavy);
+  doc.setFillColor(...COLORS.navyHeader);
   doc.circle(cx, cy, 9, "F");
 
-  // Thin gold inner ring for elegance
+  // Gold accent inner stroke
   doc.setDrawColor(...COLORS.gold);
-  doc.setLineWidth(0.3);
+  doc.setLineWidth(0.4);
   doc.circle(cx, cy, 7.5, "S");
 
-  // Brand initials (first 2 chars of site name)
+  // Initials
   const initials = siteName.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 2) || "PH";
   doc.setTextColor(...COLORS.gold);
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
-  doc.text(initials, cx, cy, { align: "center" });
+  doc.text(initials, cx, cy + 1, { align: "center" });
 
-  // Subtitle
   doc.setTextColor(...COLORS.white);
-  doc.setFontSize(3.8);
-  doc.setFont("helvetica", "normal");
-  doc.text("OFFICIAL REPORT", cx, cy + 5, { align: "center" });
+  doc.setFontSize(3.5);
+  doc.setFont("helvetica", "bold");
+  doc.text("OFFICIAL", cx, cy + 5, { align: "center" });
 }
