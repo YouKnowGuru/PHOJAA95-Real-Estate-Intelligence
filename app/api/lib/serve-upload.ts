@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import * as cookie from "cookie";
-import { UPLOAD_DIR } from "./paths";
+import { UPLOAD_DIR, getUploadSearchDirs } from "./paths";
 import { logger } from "./logger";
 import { verifyLocalToken } from "../local-auth-router";
 import { verifySessionToken } from "../kimi/session";
@@ -15,8 +15,17 @@ const MIME_TYPES: Record<string, string> = {
   ".jpeg": "image/jpeg",
   ".gif": "image/gif",
   ".webp": "image/webp",
+  ".svg": "image/svg+xml",
   ".doc": "application/msword",
   ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".csv": "text/csv",
+  ".txt": "text/plain",
+  ".dwg": "application/acad",
+  ".dxf": "application/dxf",
+  ".mp4": "video/mp4",
+  ".zip": "application/zip",
 };
 
 type ResolveResult =
@@ -54,30 +63,121 @@ export type FileIntegrityResult =
       details?: string;
     };
 
+/**
+ * Case-insensitive search within directory segments (Linux/Hostinger filesystem helper).
+ */
+function findCaseInsensitiveFile(baseDir: string, relativeSegments: string[]): string | null {
+  let currentDir = baseDir;
+  for (let i = 0; i < relativeSegments.length; i++) {
+    const segment = relativeSegments[i];
+    const isLast = i === relativeSegments.length - 1;
+
+    if (!fs.existsSync(currentDir)) return null;
+
+    // Check direct path first (fast path)
+    const directPath = path.join(currentDir, segment);
+    if (fs.existsSync(directPath)) {
+      if (isLast) {
+        return directPath;
+      }
+      currentDir = directPath;
+      continue;
+    }
+
+    // Read directory entries and search case-insensitively
+    try {
+      const entries = fs.readdirSync(currentDir);
+      const match = entries.find((e) => e.toLowerCase() === segment.toLowerCase());
+      if (!match) return null;
+
+      const matchedPath = path.join(currentDir, match);
+      if (isLast) {
+        return matchedPath;
+      }
+      currentDir = matchedPath;
+    } catch {
+      return null;
+    }
+  }
+  return currentDir;
+}
+
 export function resolveUploadFilePathWithIntegrity(relativePath: string, expectedChecksum?: string, expectedSize?: number): FileIntegrityResult {
-  const normalized = relativePath.replace(/^\/+/, "").replace(/\\/g, "/");
+  let decoded = relativePath;
+  try {
+    decoded = decodeURIComponent(relativePath);
+  } catch {
+    decoded = relativePath;
+  }
+
+  let normalized = decoded
+    .replace(/^\/+/, "")
+    .replace(/\\/g, "/")
+    .replace(/^uploads\//i, ""); // Strip redundant "uploads/" prefix if included
+
   if (!normalized || normalized.includes("..")) {
     return { ok: false, reason: "forbidden" };
   }
 
-  const filePath = path.join(UPLOAD_DIR, normalized);
-  const resolvedFile = path.resolve(filePath);
-  const resolvedUploadDir = path.resolve(UPLOAD_DIR);
-  const uploadPrefix = resolvedUploadDir + path.sep;
-  if (resolvedFile !== resolvedUploadDir && !resolvedFile.startsWith(uploadPrefix)) {
-    return { ok: false, reason: "forbidden" };
+  const relativeSegments = normalized.split("/").filter(Boolean);
+  const searchDirs = getUploadSearchDirs();
+
+  let matchedFilePath: string | null = null;
+
+  for (const uploadDir of searchDirs) {
+    const candidatePath = path.join(uploadDir, normalized);
+    const resolvedCandidate = path.resolve(candidatePath);
+    const resolvedUploadDir = path.resolve(uploadDir);
+    const uploadPrefix = resolvedUploadDir + path.sep;
+
+    // Path traversal check
+    if (resolvedCandidate !== resolvedUploadDir && !resolvedCandidate.startsWith(uploadPrefix)) {
+      continue;
+    }
+
+    // 1. Direct match check
+    if (fs.existsSync(candidatePath)) {
+      try {
+        const stat = fs.statSync(candidatePath);
+        if (stat.isFile()) {
+          matchedFilePath = candidatePath;
+          break;
+        }
+      } catch {
+        // continue search
+      }
+    }
+
+    // 2. Case-insensitive fallback check for Hostinger / Linux
+    const caseMatch = findCaseInsensitiveFile(resolvedUploadDir, relativeSegments);
+    if (caseMatch && fs.existsSync(caseMatch)) {
+      try {
+        const stat = fs.statSync(caseMatch);
+        if (stat.isFile()) {
+          matchedFilePath = caseMatch;
+          break;
+        }
+      } catch {
+        // continue search
+      }
+    }
   }
 
-  if (!fs.existsSync(filePath)) {
+  if (!matchedFilePath) {
+    logger.warn("File not found across all upload search directories", {
+      requested: relativePath,
+      normalized,
+      searchedDirs: searchDirs,
+    });
     return { ok: false, reason: "not_found" };
   }
 
-  const stat = fs.statSync(filePath);
+  const stat = fs.statSync(matchedFilePath);
   if (!stat.isFile()) {
     return { ok: false, reason: "not_file" };
   }
 
-  const file = fs.readFileSync(filePath);
+  const file = fs.readFileSync(matchedFilePath);
 
   // Verify size if expected size provided
   if (expectedSize !== undefined && file.length !== expectedSize) {
@@ -90,7 +190,7 @@ export function resolveUploadFilePathWithIntegrity(relativePath: string, expecte
     return { ok: false, reason: "corrupted", details: `Checksum mismatch: file may be corrupted` };
   }
 
-  return { ok: true, filePath, checksum, size: file.length };
+  return { ok: true, filePath: matchedFilePath, checksum, size: file.length };
 }
 
 export function buildUploadFileResponse(filePath: string, fileBuffer?: Buffer, checksum?: string): Response {

@@ -72,24 +72,39 @@ function resolveDistDir(): string {
 }
 
 /**
- * Find a persistent upload directory OUTSIDE the git-managed project.
- * On Hostinger, this resolves to the domain root (e.g. .../domains/site.com/uploads/)
- * which survives git pulls and rebuilds.
+ * Find a persistent upload directory OUTSIDE or INSIDE the project.
+ * Supports explicit UPLOAD_DIR environment variable for Hostinger/cPanel setups.
  */
 function resolveUploadDir(): string {
-  // Candidate 1: Domain-level uploads folder (Hostinger-safe)
-  // __dirname is typically .../nodejs/app/dist/  → 3 levels up = domain root
-  const domainLevel = path.resolve(__dirname, "..", "..", "..", "uploads");
+  // Candidate 0: Explicit environment variable override
+  if (process.env.UPLOAD_DIR) {
+    const custom = path.resolve(process.env.UPLOAD_DIR);
+    if (!fs.existsSync(custom)) {
+      try {
+        fs.mkdirSync(custom, { recursive: true });
+      } catch (err) {
+        logger.warn("Could not create custom UPLOAD_DIR from env", { custom, error: String(err) });
+      }
+    }
+    logger.info("Using explicit UPLOAD_DIR from environment", { path: custom });
+    return custom;
+  }
 
-  // Candidate 2: Home-level uploads folder
-  const homeLevel = path.resolve(process.cwd(), "..", "..", "uploads");
-
-  // Candidate 3: Inside public/ (dev default)
+  // Candidate 1: Inside public/ folder (closest to web assets)
   const publicLevel = path.resolve(PUBLIC_DIR, "uploads");
 
-  const candidates = [domainLevel, homeLevel];
+  // Candidate 2: Domain-level uploads folder (Hostinger-safe outside git)
+  const domainLevel = path.resolve(__dirname, "..", "..", "..", "uploads");
 
-  // In production, prefer domain-level or home-level (outside git)
+  // Candidate 3: Home-level uploads folder
+  const homeLevel = path.resolve(process.cwd(), "..", "..", "uploads");
+
+  // Candidate 4: Direct cwd/uploads
+  const cwdLevel = path.resolve(process.cwd(), "uploads");
+
+  const candidates = [publicLevel, cwdLevel, domainLevel, homeLevel];
+
+  // Return first existing upload directory that has contents or exists
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
       logger.info("Resolved persistent upload directory", { path: candidate });
@@ -97,27 +112,72 @@ function resolveUploadDir(): string {
     }
   }
 
-  // In production, create domain-level directory so it persists
-  if (process.env.NODE_ENV === "production") {
-    logger.info("Creating persistent upload directory", { path: domainLevel });
-    fs.mkdirSync(domainLevel, { recursive: true });
-    return domainLevel;
-  }
-
-  // Dev fallback: inside public/
-  if (!fs.existsSync(publicLevel)) {
+  // In production, create publicLevel or domainLevel
+  const fallback = process.env.NODE_ENV === "production" ? domainLevel : publicLevel;
+  try {
+    fs.mkdirSync(fallback, { recursive: true });
+    logger.info("Created upload directory", { path: fallback });
+  } catch (err) {
+    logger.warn("Failed to create primary upload directory, falling back to publicLevel", { fallback, error: String(err) });
     fs.mkdirSync(publicLevel, { recursive: true });
+    return publicLevel;
   }
-  return publicLevel;
+  return fallback;
 }
 
 export const PUBLIC_DIR = resolvePublicDir();
 export const DIST_DIR = resolveDistDir();
 export const UPLOAD_DIR = resolveUploadDir();
 
+/**
+ * Returns all potential upload directories to check when resolving files.
+ * This guarantees backwards and cross-environment compatibility on Hostinger
+ * where files might reside in domain root, public_html/uploads, or dist/public/uploads.
+ */
+export function getUploadSearchDirs(): string[] {
+  const dirs = [
+    UPLOAD_DIR,
+    process.env.UPLOAD_DIR ? path.resolve(process.env.UPLOAD_DIR) : null,
+    path.resolve(PUBLIC_DIR, "uploads"),
+    path.resolve(DIST_DIR, "uploads"),
+    path.resolve(process.cwd(), "public", "uploads"),
+    path.resolve(process.cwd(), "app", "public", "uploads"),
+    path.resolve(process.cwd(), "uploads"),
+    path.resolve(process.cwd(), "app", "uploads"),
+    path.resolve(__dirname, "uploads"),
+    path.resolve(__dirname, "..", "uploads"),
+    path.resolve(__dirname, "..", "public", "uploads"),
+    path.resolve(__dirname, "..", "..", "uploads"),
+    path.resolve(__dirname, "..", "..", "public", "uploads"),
+    path.resolve(__dirname, "..", "..", "..", "uploads"),
+    path.resolve(process.cwd(), "..", "uploads"),
+    path.resolve(process.cwd(), "..", "..", "uploads"),
+  ].filter((d): d is string => !!d);
+
+  // Return unique directories that exist on disk
+  const seen = new Set<string>();
+  const validDirs: string[] = [];
+  for (const d of dirs) {
+    const resolved = path.resolve(d);
+    if (!seen.has(resolved) && fs.existsSync(resolved)) {
+      seen.add(resolved);
+      validDirs.push(resolved);
+    }
+  }
+
+  // Always include UPLOAD_DIR even if empty
+  if (!seen.has(path.resolve(UPLOAD_DIR))) {
+    validDirs.unshift(path.resolve(UPLOAD_DIR));
+  }
+
+  return validDirs;
+}
+
 logger.info("Path resolution complete", {
   publicDir: PUBLIC_DIR,
   distDir: DIST_DIR,
   uploadDir: UPLOAD_DIR,
+  uploadSearchDirs: getUploadSearchDirs(),
   env: process.env.NODE_ENV,
 });
+
