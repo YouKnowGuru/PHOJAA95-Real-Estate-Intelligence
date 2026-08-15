@@ -156,6 +156,7 @@ app.get("/api/debug/uploads", async (c) => {
 
   // Also check specific Hostinger-common directories
   const extraCandidates = [
+    path.resolve("/home/u880151399/domains/phojaarealestatemanagement.com/uploads"),
     path.resolve("/home/u880151399/public_html/uploads"),
     path.resolve("/home/u880151399/domains"),
     path.resolve("/home/u880151399/uploads"),
