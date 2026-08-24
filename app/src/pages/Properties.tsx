@@ -253,9 +253,9 @@ export default function Properties() {
 
       {/* Property Grid */}
       {isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[...Array(6)].map((_, i) => (
-            <Skeleton key={i} className="h-64 rounded-2xl" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {[...Array(8)].map((_, i) => (
+            <Skeleton key={i} className="h-52 rounded-xl" />
           ))}
         </div>
       ) : error ? (
@@ -289,7 +289,7 @@ export default function Properties() {
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {data?.items.map((property, index) => (
               <PropertyCard
                 key={property.id}
@@ -461,8 +461,9 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
             />
           )}
-          <div className="relative h-full rounded-2xl border border-border/40 bg-card overflow-hidden shadow-apple transition-shadow duration-300 hover:shadow-apple-lg">
-            <div className="relative aspect-[4/3] sm:aspect-[16/10] w-full overflow-hidden bg-muted">
+          <div className="relative h-full rounded-xl border border-border/40 bg-card overflow-hidden shadow-sm transition-shadow duration-300 hover:shadow-md">
+            {/* Image — compact 16/9 ratio */}
+            <div className="relative aspect-video w-full overflow-hidden bg-muted">
               {property.images && property.images.length > 0 && !imageError ? (
                 <img
                   src={fixCloudinaryUrl(property.images[0].url)}
@@ -472,26 +473,26 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-muted-foreground/20">
-                  <Building2 className="h-10 w-10" />
+                  <Building2 className="h-8 w-8" />
                 </div>
               )}
-              <div className="absolute top-3 left-3 z-10">
+              <div className="absolute top-2 left-2 z-10">
                 <Badge
                   variant="secondary"
-                  className={`text-[10px] font-semibold uppercase shadow-sm rounded-full px-2 py-0.5 ${statusColors[property.approvalStatus] || ""}`}
+                  className={`text-[9px] font-semibold uppercase shadow-sm rounded-full px-1.5 py-0 ${statusColors[property.approvalStatus] || ""}`}
                 >
                   {property.approvalStatus?.replace("_", " ")}
                 </Badge>
               </div>
               {property.isSold ? (
-                <div className="absolute top-3 right-3 z-10">
-                  <Badge className="bg-red-600 text-white border-0 shadow-sm rounded-full text-[10px]">
+                <div className="absolute top-2 right-2 z-10">
+                  <Badge className="bg-red-600 text-white border-0 shadow-sm rounded-full text-[9px] px-1.5 py-0">
                     SOLD
                   </Badge>
                 </div>
               ) : isPending ? (
-                <div className="absolute top-3 right-3 z-10">
-                  <Badge className="bg-amber-500/90 text-white border-0 shadow-md rounded-full text-[10px] flex items-center gap-1 px-2 py-0.5">
+                <div className="absolute top-2 right-2 z-10">
+                  <Badge className="bg-amber-500/90 text-white border-0 shadow-md rounded-full text-[9px] flex items-center gap-1 px-1.5 py-0">
                     <motion.span
                       className="inline-block h-1.5 w-1.5 rounded-full bg-white"
                       animate={{ opacity: [1, 0.3, 1] }}
@@ -502,84 +503,86 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                 </div>
               ) : null}
             </div>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex h-6 px-2 items-center justify-center rounded-lg bg-primary/10">
-                  <span className="text-[10px] font-bold text-primary">
-                    Step {property.currentStep}
-                  </span>
+            {/* Card Body — compact */}
+            <div className="p-3">
+              {/* Step pill + type */}
+              <div className="flex items-center justify-between mb-1.5">
+                <div className="flex h-5 px-1.5 items-center justify-center rounded-md bg-primary/10">
+                  <span className="text-[9px] font-bold text-primary">Step {property.currentStep}</span>
                 </div>
-                <Badge variant="outline" className="text-[10px] rounded-full hidden xs:inline-flex">
+                <span className="text-[9px] text-muted-foreground truncate max-w-[60%] text-right">
                   {STEP_LABELS[property.currentStep] || "Unknown"}
-                </Badge>
+                </span>
               </div>
 
-              <h3 className="text-sm font-semibold text-foreground mb-1 group-hover:text-primary transition-colors line-clamp-1">
+              {/* Title */}
+              <h3 className="text-[13px] font-semibold text-foreground mb-1 group-hover:text-primary transition-colors line-clamp-1 leading-tight">
                 {property.propertyName}
               </h3>
 
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                <Tag className="h-3 w-3 shrink-0" />
-                <span className="truncate">{property.propertyTypeName || "Unknown"}</span>
-              </div>
-
-              <div className="space-y-1.5 mb-3">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <MapPin className="h-3 w-3 shrink-0" />
+              {/* Meta row */}
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground min-w-0">
+                  <Tag className="h-2.5 w-2.5 shrink-0" />
+                  <span className="truncate">{property.propertyTypeName || "—"}</span>
+                </div>
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground min-w-0">
+                  <MapPin className="h-2.5 w-2.5 shrink-0" />
                   <span className="truncate">{property.address}</span>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <User className="h-3 w-3 shrink-0" />
-                  <span className="truncate">{property.ownerName}</span>
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Shield className="h-3 w-3 shrink-0" />
-                  <span>CID: {property.ownerCID}</span>
-                </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-border/30">
-                <div className="flex flex-col min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold truncate">
+              {/* Owner */}
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground mb-2">
+                <User className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">{property.ownerName}</span>
+                <span className="text-border mx-0.5">·</span>
+                <Shield className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">{property.ownerCID}</span>
+              </div>
+
+              {/* Price + Commission footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-border/30">
+                <div className="min-w-0">
+                  <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">
                     {property.propertyTypeName === "Land" && property.finalSellingPrice ? "Final Price" : "Price"}
                   </p>
-                  <p className="text-sm font-bold text-foreground truncate">
-                    Nu. {parseFloat(property.propertyTypeName === "Land" ? (property.finalSellingPrice || property.sellingPrice || "0") : (property.sellingPrice || "0")).toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                  <p className="text-xs font-bold text-foreground truncate">
+                    Nu.{" "}
+                    {parseFloat(
+                      property.propertyTypeName === "Land"
+                        ? (property.finalSellingPrice || property.sellingPrice || "0")
+                        : (property.sellingPrice || "0")
+                    ).toLocaleString("en-BT", { minimumFractionDigits: 2 })}
                   </p>
                   {property.propertyTypeName === "Land" && property.finalSellingPrice && property.finalSellingPrice !== property.sellingPrice && (
-                    <p className="text-[10px] text-muted-foreground line-through">
+                    <p className="text-[9px] text-muted-foreground line-through">
                       Nu. {parseFloat(property.sellingPrice ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
                     </p>
                   )}
                 </div>
-                <div className="text-right flex flex-col items-end min-w-0">
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold truncate">Comm.</p>
-                  <p className="text-sm font-bold text-primary truncate">
-                    Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-between">
-                <span className="xs:hidden text-[10px] text-muted-foreground">
-                  {STEP_LABELS[property.currentStep] || "Unknown"}
-                </span>
-                <div className="flex items-center gap-1.5 ml-auto">
+                <div className="flex items-center gap-1">
+                  <div className="text-right min-w-0">
+                    <p className="text-[9px] text-muted-foreground uppercase tracking-wider font-bold">Comm.</p>
+                    <p className="text-xs font-bold text-primary truncate">
+                      Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
                   {isAdmin && (
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                      className="h-6 w-6 ml-1 text-muted-foreground hover:text-red-500 shrink-0"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         onDelete(property.id, property.propertyName);
                       }}
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   )}
-                  <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                 </div>
               </div>
             </div>

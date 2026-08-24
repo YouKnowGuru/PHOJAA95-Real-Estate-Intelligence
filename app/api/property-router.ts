@@ -763,17 +763,31 @@ export const propertyRouter = createRouter({
       }
 
       return await db.transaction(async (tx) => {
-        // Handle image updates — delete old images from Cloudinary first
+        // Handle image updates — only delete REMOVED images from Cloudinary.
+        //
+        // BUG FIX: Previously this deleted EVERY old image from Cloudinary before
+        // re-inserting the (possibly identical) incoming list. Re-submitting Step 1
+        // of the wizard in edit mode always sends the full image list, so unchanged
+        // images were destroyed on Cloudinary while the DB kept pointing at them —
+        // the URLs 404'd on every device (only the uploader's browser cache still
+        // showed them). Now we only destroy assets whose publicId is NOT present in
+        // the incoming images, i.e. images the user actually removed/replaced.
         if (images) {
           const oldImages = await tx.select({ publicId: propertyImages.publicId })
             .from(propertyImages)
             .where(eq(propertyImages.propertyId, id));
 
-          // Delete old images from Cloudinary (fire-and-forget, don't block on failure)
-          const oldPublicIds = oldImages.map(i => i.publicId).filter(Boolean) as string[];
-          if (oldPublicIds.length > 0) {
+          const incomingPublicIds = new Set(
+            images.map(img => img.publicId).filter((pid): pid is string => !!pid)
+          );
+          const removedPublicIds = oldImages
+            .map(i => i.publicId)
+            .filter((pid): pid is string => !!pid && !incomingPublicIds.has(pid));
+
+          // Delete only removed images from Cloudinary (fire-and-forget, don't block on failure)
+          if (removedPublicIds.length > 0) {
             const { deleteCloudinaryImages } = await import("./services/cloudinary");
-            await deleteCloudinaryImages(oldPublicIds).catch((err: unknown) =>
+            await deleteCloudinaryImages(removedPublicIds).catch((err: unknown) =>
               logger.error("Cloudinary cleanup error", { error: String(err) })
             );
           }
