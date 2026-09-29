@@ -97,7 +97,7 @@ export function ModulePayrollTab({
 
   return (
     <SoftwareTabPanel className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">
             {isAdmin ? `${teamName} Staff Payroll` : "My Payslips"}
@@ -108,29 +108,29 @@ export function ModulePayrollTab({
               : "View your salary records from the company payroll system."}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full lg:w-auto">
           <Input
             type="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="h-9 w-[140px]"
+            className="h-10 sm:h-9 w-full sm:w-[150px]"
           />
           {isAdmin && (
-            <>
-              <Button size="sm" onClick={() => setShowAdd(true)}>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button size="sm" onClick={() => setShowAdd(true)} className="flex-1 sm:flex-initial h-10 sm:h-9">
                 <Plus className="mr-1 h-4 w-4" />
                 Add payroll
               </Button>
-              <Button size="sm" variant="outline" asChild>
+              <Button size="sm" variant="outline" asChild className="flex-1 sm:flex-initial h-10 sm:h-9">
                 <Link to="/payroll">
                   <ExternalLink className="mr-1 h-4 w-4" />
                   Full payroll
                 </Link>
               </Button>
-            </>
+            </div>
           )}
           {!isAdmin && (
-            <Button size="sm" variant="outline" asChild>
+            <Button size="sm" variant="outline" asChild className="w-full sm:w-auto h-10 sm:h-9">
               <Link to="/payroll">Open payslips page</Link>
             </Button>
           )}
@@ -161,7 +161,8 @@ export function ModulePayrollTab({
         </div>
       ) : items && items.length > 0 ? (
         <AppleCard hover={false} className="overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
                 <tr className="border-b border-border/50">
@@ -176,12 +177,19 @@ export function ModulePayrollTab({
                 {items.map((item) => (
                   <tr key={item.id} className="border-b border-border/30 hover:bg-muted/20">
                     {isAdmin && <td className="px-4 py-3 font-medium">{item.userName}</td>}
-                    <td className="px-4 py-3">{item.month}</td>
+                    <td className="px-4 py-3 font-mono text-xs">{item.month}</td>
                     <td className="px-4 py-3 text-right font-semibold">
-                      {parseFloat(item.netSalary).toLocaleString()}
+                      Nu. {parseFloat(item.netSalary).toLocaleString()}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <Badge variant={item.paymentStatus === "paid" ? "default" : "secondary"}>
+                      <Badge
+                        variant={item.paymentStatus === "paid" ? "default" : "secondary"}
+                        className={`capitalize text-[10px] ${
+                          item.paymentStatus === "paid"
+                            ? "bg-emerald-600/10 text-emerald-600 border border-emerald-500/20"
+                            : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                        }`}
+                      >
                         {item.paymentStatus}
                       </Badge>
                     </td>
@@ -192,18 +200,19 @@ export function ModulePayrollTab({
                           size="icon"
                           title="View"
                           onClick={() => setSelectedPayslip(item as PayrollItem)}
+                          className="h-8 w-8 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                         >
-                          <Eye className="h-4 w-4" />
+                          <Eye className="h-4 w-4 text-emerald-500" />
                         </Button>
                         {isAdmin && item.paymentStatus === "pending" && (
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className="h-8 text-xs"
+                            className="h-8 text-xs bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                             onClick={() => markPaidMutation.mutate({ id: item.id })}
                             disabled={markPaidMutation.isPending}
                           >
-                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            <CheckCircle2 className="mr-1 h-3 w-3 text-emerald-600" />
                             Pay
                           </Button>
                         )}
@@ -211,7 +220,7 @@ export function ModulePayrollTab({
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-destructive"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
                             title="Delete"
                             onClick={() => {
                               if (window.confirm("Delete this payroll entry?")) {
@@ -229,6 +238,81 @@ export function ModulePayrollTab({
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="block md:hidden divide-y divide-border/20">
+            {items.map((item) => (
+              <div key={item.id} className="p-4 space-y-3 hover:bg-muted/15 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    {isAdmin && (
+                      <div className="font-semibold text-base text-foreground truncate">
+                        {item.userName}
+                      </div>
+                    )}
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-md font-mono mt-0.5">
+                      {item.month}
+                    </Badge>
+                  </div>
+                  <Badge
+                    variant={item.paymentStatus === "paid" ? "default" : "secondary"}
+                    className={`capitalize text-[10px] px-2.5 py-0.5 rounded-full ${
+                      item.paymentStatus === "paid"
+                        ? "bg-emerald-600/10 text-emerald-600 border border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                    }`}
+                  >
+                    {item.paymentStatus}
+                  </Badge>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/15">
+                  <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Net Payable</span>
+                  <span className="text-base font-bold text-foreground">
+                    Nu. {parseFloat(item.netSalary).toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9 text-xs rounded-xl"
+                    onClick={() => setSelectedPayslip(item as PayrollItem)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                    View
+                  </Button>
+                  {isAdmin && item.paymentStatus === "pending" && (
+                    <Button
+                      size="sm"
+                      className="flex-1 h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm"
+                      onClick={() => markPaidMutation.mutate({ id: item.id })}
+                      disabled={markPaidMutation.isPending}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                      Pay
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 w-9 p-0 text-destructive hover:bg-destructive/10 rounded-xl shrink-0"
+                      onClick={() => {
+                        if (window.confirm("Delete this payroll entry?")) {
+                          deleteMutation.mutate({ id: item.id });
+                        }
+                      }}
+                      title="Delete"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </AppleCard>
       ) : (
         <EmptyState
@@ -243,15 +327,15 @@ export function ModulePayrollTab({
       )}
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/30 shrink-0">
             <DialogTitle>Add {teamName.toLowerCase()} payroll</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             <div className="space-y-2">
               <Label>{teamName} staff *</Label>
               <Select value={payrollForm.userId} onValueChange={(v) => setPayrollForm({ ...payrollForm, userId: v })}>
-                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-xl"><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
                   {teamStaff?.items.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>
@@ -267,6 +351,7 @@ export function ModulePayrollTab({
                 type="month"
                 value={payrollForm.month}
                 onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })}
+                className="h-10 rounded-xl"
               />
             </div>
             <div className="space-y-2">
@@ -275,15 +360,17 @@ export function ModulePayrollTab({
                 type="number"
                 value={payrollForm.baseSalary}
                 onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })}
+                className="h-10 rounded-xl"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Bonus</Label>
                 <Input
                   type="number"
                   value={payrollForm.bonus}
                   onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })}
+                  className="h-10 rounded-xl"
                 />
               </div>
               <div className="space-y-2">
@@ -292,31 +379,33 @@ export function ModulePayrollTab({
                   type="number"
                   value={payrollForm.deduction}
                   onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })}
+                  className="h-10 rounded-xl"
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
-              <Button
-                onClick={() => {
-                  if (!payrollForm.userId || !payrollForm.baseSalary) {
-                    toast.error("Staff and base salary are required");
-                    return;
-                  }
-                  createMutation.mutate({
-                    userId: parseInt(payrollForm.userId, 10),
-                    month: payrollForm.month,
-                    baseSalary: payrollForm.baseSalary,
-                    bonus: payrollForm.bonus,
-                    deduction: payrollForm.deduction,
-                    pfPercentage: payrollForm.pfPercentage || undefined,
-                  });
-                }}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? "Saving..." : "Create"}
-              </Button>
-            </div>
+          </div>
+          <div className="p-4 sm:px-5 sm:py-3 bg-muted/20 border-t border-border/30 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setShowAdd(false)} className="w-full sm:w-auto rounded-xl h-10 sm:h-9">Cancel</Button>
+            <Button
+              className="w-full sm:w-auto rounded-xl h-10 sm:h-9"
+              onClick={() => {
+                if (!payrollForm.userId || !payrollForm.baseSalary) {
+                  toast.error("Staff and base salary are required");
+                  return;
+                }
+                createMutation.mutate({
+                  userId: parseInt(payrollForm.userId, 10),
+                  month: payrollForm.month,
+                  baseSalary: payrollForm.baseSalary,
+                  bonus: payrollForm.bonus,
+                  deduction: payrollForm.deduction,
+                  pfPercentage: payrollForm.pfPercentage || undefined,
+                });
+              }}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? "Saving..." : "Create"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

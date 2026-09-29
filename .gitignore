@@ -63,3 +63,6 @@ test_*.js
 # Test coverage
 coverage/
 .nyc_output/
+
+# Tool/IDE cache
+.freebuff/

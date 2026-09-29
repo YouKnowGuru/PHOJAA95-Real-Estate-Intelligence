@@ -316,12 +316,12 @@ export default function PayrollPage() {
         description="Salary management and payment tracking"
         icon={<Wallet className="h-5 w-5" />}
         actions={
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 w-full sm:w-auto">
             {isAdmin && (
               <select
                 value={teamFilter}
                 onChange={(e) => setTeamFilter(e.target.value as typeof teamFilter)}
-                className="h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm"
+                className="h-10 sm:h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm w-full sm:w-auto font-medium"
               >
                 <option value="all">All teams</option>
                 <option value="staff">Real Estate</option>
@@ -332,14 +332,14 @@ export default function PayrollPage() {
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(e.target.value)}
-              className="h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm"
+              className="h-10 sm:h-9 rounded-xl border border-border/40 bg-background/50 px-3 text-sm w-full sm:w-auto font-medium"
             >
               {monthOptions.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
             {isAdmin && (
-              <Button onClick={() => setShowAdd(true)} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-xl">
+              <Button onClick={() => setShowAdd(true)} className="h-10 sm:h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-xl w-full sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Payroll
               </Button>
@@ -351,23 +351,23 @@ export default function PayrollPage() {
       {/* Summary Cards for Admin */}
       {isAdmin && (
         summary ? (
-          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
             <KPICard title="Total Base" value={`Nu. ${parseFloat(summary.totalBase).toLocaleString()}`} icon={Wallet} color="bg-primary" delay={0} />
             <KPICard title="Total PF" value={`Nu. ${parseFloat(summary.totalPF || "0").toLocaleString()}`} icon={PiggyBank} color="bg-amber-500" delay={0.05} />
             <KPICard title="Total Net" value={`Nu. ${parseFloat(summary.totalNet).toLocaleString()}`} icon={Banknote} color="bg-emerald-500" delay={0.1} />
             <KPICard title="Paid" value={summary.totalPaid} icon={CheckCircle2} color="bg-blue-500" delay={0.15} />
-            <KPICard title="Pending" value={summary.totalPending} icon={AlertCircle} color="bg-red-500" delay={0.2} />
+            <KPICard title="Pending" value={summary.totalPending} icon={AlertCircle} color="bg-red-500" delay={0.2} className="col-span-2 sm:col-span-1 md:col-span-1 lg:col-span-1" />
           </div>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
             {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-28 rounded-2xl" />
+              <Skeleton key={i} className={`h-28 rounded-2xl ${i === 4 ? "col-span-2 sm:col-span-1 md:col-span-1 lg:col-span-1" : ""}`} />
             ))}
           </div>
         )
       )}
 
-      {/* Payroll Table */}
+      {/* Payroll Table & Mobile Cards */}
       {(isAdmin ? payrollLoading : myPayrollLoading) ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
@@ -376,11 +376,14 @@ export default function PayrollPage() {
         </div>
       ) : payrollItems && payrollItems.length > 0 ? (
         <AppleCard hover={false} className="overflow-hidden">
-          <div className="px-5 pt-5 pb-3 border-b border-border/30">
+          <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 border-b border-border/30 flex items-center justify-between">
             <h3 className="text-sm font-semibold">{isAdmin ? "All Payroll Entries" : "My Payslips"}</h3>
+            <span className="text-xs text-muted-foreground">{payrollItems.length} {payrollItems.length === 1 ? "entry" : "entries"}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+
+          {/* Desktop Table View (visible on md+) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm min-w-[780px]">
               <thead>
                 <tr className="border-b border-border/30">
                   <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Staff</th>
@@ -399,7 +402,7 @@ export default function PayrollPage() {
                   <tr key={item.id} className="border-b border-border/20 hover:bg-muted/30 transition-colors">
                     <td className="py-3 px-4">
                       <div className="font-medium">{item.userName || "You"}</div>
-                      <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                      <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground mt-0.5">
                         {isAdmin && (item as PayrollItem).userRole != null && (
                           <Badge variant="outline" className="text-[10px] rounded-md">
                             {formatStaffRoleLabel((item as PayrollItem).userRole as string)}
@@ -409,17 +412,24 @@ export default function PayrollPage() {
                         {item.pfNumber && <span>PF: {item.pfNumber}</span>}
                       </div>
                     </td>
-                    <td className="py-3 px-4">{item.month}</td>
-                    <td className="py-3 px-4 text-right">{parseFloat(item.baseSalary).toLocaleString()}</td>
-                    <td className="py-3 px-4 text-right text-emerald-600">+{parseFloat(item.bonus).toLocaleString()}</td>
-                    <td className="py-3 px-4 text-right text-red-500">-{parseFloat(item.deduction).toLocaleString()}</td>
+                    <td className="py-3 px-4 font-mono text-xs">{item.month}</td>
+                    <td className="py-3 px-4 text-right">Nu. {parseFloat(item.baseSalary).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-emerald-600 font-medium">+{parseFloat(item.bonus).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right text-red-500 font-medium">-{parseFloat(item.deduction).toLocaleString()}</td>
                     <td className="py-3 px-4 text-right text-amber-600">
                       <div>-{parseFloat(item.pfDeduction || "0").toLocaleString()}</div>
                       <div className="text-[10px] text-muted-foreground">({item.pfPercentage || "0"}%)</div>
                     </td>
-                    <td className="py-3 px-4 text-right font-bold">{parseFloat(item.netSalary).toLocaleString()}</td>
+                    <td className="py-3 px-4 text-right font-bold text-foreground">Nu. {parseFloat(item.netSalary).toLocaleString()}</td>
                     <td className="py-3 px-4 text-center">
-                      <Badge variant={item.paymentStatus === "paid" ? "default" : "secondary"} className="text-[10px] rounded-lg">
+                      <Badge
+                        variant={item.paymentStatus === "paid" ? "default" : "secondary"}
+                        className={`text-[10px] rounded-lg capitalize ${
+                          item.paymentStatus === "paid" 
+                            ? "bg-emerald-600/10 text-emerald-600 border border-emerald-500/20" 
+                            : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                        }`}
+                      >
                         {item.paymentStatus}
                       </Badge>
                     </td>
@@ -428,7 +438,7 @@ export default function PayrollPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0 rounded-lg"
+                          className="h-8 w-8 p-0 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                           onClick={() => setSelectedPayslip(item)}
                           title="View Payslip"
                         >
@@ -437,7 +447,7 @@ export default function PayrollPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0 rounded-lg"
+                          className="h-8 w-8 p-0 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950/30"
                           onClick={() => generatePayslipPDF(item)}
                           title="Download PDF"
                         >
@@ -450,11 +460,11 @@ export default function PayrollPage() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-8 rounded-lg text-xs"
+                                className="h-8 rounded-lg text-xs bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800"
                                 onClick={() => markPaidMutation.mutate({ id: item.id })}
                                 disabled={markPaidMutation.isPending}
                               >
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-600" />
                                 Pay
                               </Button>
                             ) : (
@@ -486,6 +496,137 @@ export default function PayrollPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View (visible on < md) */}
+          <div className="block md:hidden divide-y divide-border/20">
+            {payrollItems.map((item) => (
+              <div key={item.id} className="p-4 space-y-3 hover:bg-muted/15 transition-colors">
+                {/* Employee Info Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-base text-foreground truncate">
+                      {item.userName || "You"}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[11px] text-muted-foreground">
+                      {isAdmin && (item as PayrollItem).userRole != null && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 rounded-md">
+                          {formatStaffRoleLabel((item as PayrollItem).userRole as string)}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 rounded-md font-mono">
+                        {item.month}
+                      </Badge>
+                      {item.employeeId && <span className="bg-muted px-1.5 py-0.5 rounded text-[10px]">ID: {item.employeeId}</span>}
+                      {item.pfNumber && <span className="bg-muted px-1.5 py-0.5 rounded text-[10px]">PF: {item.pfNumber}</span>}
+                    </div>
+                  </div>
+                  <Badge
+                    variant={item.paymentStatus === "paid" ? "default" : "secondary"}
+                    className={`shrink-0 capitalize text-[10px] px-2.5 py-0.5 rounded-full ${
+                      item.paymentStatus === "paid"
+                        ? "bg-emerald-600/10 text-emerald-600 border border-emerald-500/20"
+                        : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+                    }`}
+                  >
+                    {item.paymentStatus}
+                  </Badge>
+                </div>
+
+                {/* Net Salary Highlight */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/15">
+                  <div>
+                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider block">Net Payable</span>
+                    <span className="text-base sm:text-lg font-bold text-foreground">
+                      Nu. {parseFloat(item.netSalary).toLocaleString()}
+                    </span>
+                  </div>
+                  {item.paidAt && (
+                    <div className="text-right">
+                      <span className="text-[10px] text-muted-foreground block">Paid Date</span>
+                      <span className="text-xs font-medium text-foreground">
+                        {new Date(item.paidAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Salary Breakdown Mini-Grid */}
+                <div className="grid grid-cols-2 gap-2 text-xs bg-muted/30 rounded-xl p-2.5 border border-border/30">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Base</span>
+                    <span className="font-semibold text-foreground">Nu. {parseFloat(item.baseSalary).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Bonus</span>
+                    <span className="font-semibold text-emerald-600">+{parseFloat(item.bonus).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">Deduction</span>
+                    <span className="font-semibold text-red-500">-{parseFloat(item.deduction).toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground block">PF ({item.pfPercentage || "0"}%)</span>
+                    <span className="font-semibold text-amber-600">-{parseFloat(item.pfDeduction || "0").toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {item.deductionNotes && (
+                  <div className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg px-2.5 py-1.5 border border-border/20">
+                    <span className="font-medium text-foreground">Ded. note:</span> {item.deductionNotes}
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9 text-xs rounded-xl"
+                    onClick={() => setSelectedPayslip(item)}
+                  >
+                    <Eye className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9 text-xs rounded-xl"
+                    onClick={() => generatePayslipPDF(item)}
+                  >
+                    <FileText className="h-3.5 w-3.5 mr-1.5 text-blue-500" />
+                    PDF
+                  </Button>
+                  {isAdmin && item.paymentStatus === "pending" && (
+                    <Button
+                      size="sm"
+                      className="flex-1 h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-sm"
+                      onClick={() => markPaidMutation.mutate({ id: item.id })}
+                      disabled={markPaidMutation.isPending}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                      Pay
+                    </Button>
+                  )}
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl shrink-0"
+                      onClick={() => {
+                        if (window.confirm("Are you sure you want to delete this payroll entry?")) {
+                          deleteMutation.mutate({ id: item.id });
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      title="Delete Entry"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </AppleCard>
       ) : (
         <EmptyState
@@ -497,15 +638,15 @@ export default function PayrollPage() {
 
       {/* Add Payroll Dialog */}
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
+        <DialogContent className="max-w-[calc(100vw-1.5rem)] sm:max-w-md max-h-[90vh] flex flex-col p-0 overflow-hidden rounded-2xl">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-border/30 shrink-0">
             <DialogTitle>Add Payroll Entry</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             <div className="space-y-2">
               <Label>Staff Member *</Label>
               <Select value={payrollForm.userId} onValueChange={(v) => setPayrollForm({ ...payrollForm, userId: v })}>
-                <SelectTrigger className="rounded-xl border-border/40 bg-background/50"><SelectValue placeholder="Select staff" /></SelectTrigger>
+                <SelectTrigger className="rounded-xl border-border/40 bg-background/50 h-10"><SelectValue placeholder="Select staff" /></SelectTrigger>
                 <SelectContent>
                   {staffList?.items.map((u) => (
                     <SelectItem key={u.id} value={u.id.toString()}>
@@ -517,16 +658,16 @@ export default function PayrollPage() {
             </div>
             <div className="space-y-2">
               <Label>Month *</Label>
-              <Input value={payrollForm.month} onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
+              <Input value={payrollForm.month} onChange={(e) => setPayrollForm({ ...payrollForm, month: e.target.value })} className="rounded-xl border-border/40 bg-background/50 h-10" />
             </div>
             <div className="space-y-2">
               <Label>Base Salary (Nu.) *</Label>
-              <Input type="number" value={payrollForm.baseSalary} onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
+              <Input type="number" value={payrollForm.baseSalary} onChange={(e) => setPayrollForm({ ...payrollForm, baseSalary: e.target.value })} className="rounded-xl border-border/40 bg-background/50 h-10" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Bonus</Label>
-                <Input type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
+                <Input type="number" value={payrollForm.bonus} onChange={(e) => setPayrollForm({ ...payrollForm, bonus: e.target.value })} className="rounded-xl border-border/40 bg-background/50 h-10" />
               </div>
               <div className="space-y-2">
                 <Label>PF Percentage (%)</Label>
@@ -539,7 +680,7 @@ export default function PayrollPage() {
                       return staff?.pfPercentage || "0";
                     })()}
                     onChange={(e) => setPayrollForm({ ...payrollForm, pfPercentage: e.target.value })}
-                    className="flex-1 rounded-xl border-border/40 bg-background/50"
+                    className="flex-1 rounded-xl border-border/40 bg-background/50 h-10"
                   />
                   <div className="flex items-center justify-center px-3 rounded-xl bg-muted/40 border border-border/40 min-w-0">
                     <span className="text-[10px] font-bold text-amber-600">
@@ -559,7 +700,7 @@ export default function PayrollPage() {
             </div>
             <div className="space-y-2">
               <Label>Other Deduction</Label>
-              <Input type="number" value={payrollForm.deduction} onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })} className="rounded-xl border-border/40 bg-background/50" />
+              <Input type="number" value={payrollForm.deduction} onChange={(e) => setPayrollForm({ ...payrollForm, deduction: e.target.value })} className="rounded-xl border-border/40 bg-background/50 h-10" />
             </div>
             <div className="space-y-2">
               <Label>Other Deduction Notes</Label>
@@ -571,31 +712,31 @@ export default function PayrollPage() {
                 className="rounded-xl border-border/40 bg-background/50"
               />
             </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowAdd(false)} className="rounded-xl">Cancel</Button>
-              <Button
-                className="bg-primary hover:bg-primary/90 text-white shadow-sm rounded-xl"
-                onClick={() => {
-                  if (!payrollForm.userId || !payrollForm.baseSalary) {
-                    toast.error("Please fill required fields");
-                    return;
-                  }
-                  createMutation.mutate({
-                    userId: parseInt(payrollForm.userId),
-                    month: payrollForm.month,
-                    baseSalary: payrollForm.baseSalary,
-                    bonus: payrollForm.bonus,
-                    deduction: payrollForm.deduction,
-                    pfPercentage: payrollForm.pfPercentage || undefined,
-                    notes: payrollForm.notes,
-                    deductionNotes: payrollForm.deductionNotes,
-                  });
-                }}
-                disabled={createMutation.isPending}
-              >
-                {createMutation.isPending ? "Creating..." : "Create"}
-              </Button>
-            </div>
+          </div>
+          <div className="p-4 sm:px-5 sm:py-3 bg-muted/30 border-t border-border/30 flex flex-col-reverse sm:flex-row justify-end gap-2 shrink-0">
+            <Button variant="outline" onClick={() => setShowAdd(false)} className="rounded-xl h-10 sm:h-9 w-full sm:w-auto">Cancel</Button>
+            <Button
+              className="bg-primary hover:bg-primary/90 text-white shadow-sm rounded-xl h-10 sm:h-9 w-full sm:w-auto"
+              onClick={() => {
+                if (!payrollForm.userId || !payrollForm.baseSalary) {
+                  toast.error("Please fill required fields");
+                  return;
+                }
+                createMutation.mutate({
+                  userId: parseInt(payrollForm.userId),
+                  month: payrollForm.month,
+                  baseSalary: payrollForm.baseSalary,
+                  bonus: payrollForm.bonus,
+                  deduction: payrollForm.deduction,
+                  pfPercentage: payrollForm.pfPercentage || undefined,
+                  notes: payrollForm.notes,
+                  deductionNotes: payrollForm.deductionNotes,
+                });
+              }}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? "Creating..." : "Create"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
