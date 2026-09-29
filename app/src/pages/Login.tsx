@@ -36,8 +36,8 @@ export default function Login() {
   });
 
   const forgotMutation = trpc.localAuth.forgotPassword.useMutation({
-    onSuccess: (data) => { setForgotSuccess(data.message || "Check your email for reset instructions"); setLoading(false); },
-    onError: (err) => { setError(err.message); setLoading(false); },
+    onSuccess: (data) => { setForgotSuccess(data.message || "Check your email for reset instructions"); },
+    onError: (err) => { setError(err.message); },
   });
 
   const handleLogin = (e: React.FormEvent) => {
@@ -50,7 +50,6 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setForgotSuccess("");
-    setLoading(true);
     forgotMutation.mutate({ email: forgotEmail });
   };
 

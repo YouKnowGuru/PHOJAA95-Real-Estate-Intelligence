@@ -3,7 +3,7 @@ import { eq, desc, count, and, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, developerQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { softwareCertificates, softwareSales, softwareProjects, softwareInvoices, softwareCustomers, softwareProducts, localUsers } from "@db/schema";
+import { softwareCertificates, softwareSales, softwareCustomers, softwareProducts, localUsers } from "@db/schema";
 import { logActivity, notifyCreator } from "./software-activity-helper";
 import {
   assertDeveloperRecord,
@@ -43,7 +43,7 @@ export const softwareCertificateRouter = createRouter({
         conditions.push(eq(softwareSales.createdBy, ctx.unifiedUser!.id));
       }
 
-      if (input.type) conditions.push(eq(softwareCertificates.certificateType, input.type));
+      if (input.type) conditions.push(eq(softwareCertificates.certificateType, input.type as "project_completion" | "software_ownership"));
       if (input.customerId) conditions.push(eq(softwareCertificates.customerId, input.customerId));
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -163,7 +163,8 @@ export const softwareCertificateRouter = createRouter({
         companyName: customer[0]?.companyName || "",
         productName: product[0]?.name || "",
         productVersion: product[0]?.version || "1.0.0",
-        completionDate: new Date().toISOString().split("T")[0],
+        // date column is in Date mode, but stores YYYY-MM-DD strings (same runtime result)
+        completionDate: new Date().toISOString().split("T")[0] as unknown as Date,
         warrantyPeriod: product[0]?.warrantyPeriod || 0,
         maintenancePeriod: product[0]?.maintenancePeriod || 0,
         developerName: developer[0]?.fullName || "",

@@ -1,14 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { eq, desc, count, and, isNull, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, count, and, isNull, sql } from "drizzle-orm";
 import { createRouter, adminQuery, architectureStaffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   architectureProjects,
   architectureOrders,
-  architecturePayments,
-  architectureCustomers,
-  architectureCategories,
   localUsers,
 } from "@db/schema";
 import {

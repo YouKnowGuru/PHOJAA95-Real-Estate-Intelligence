@@ -102,9 +102,9 @@ export default function CustomersTab({ isAdmin, canManage }: { isAdmin: boolean;
                 <Button size="sm" variant="secondary" className="gap-1" onClick={() => setViewCustomerId(c.id)}>
                   <Eye className="h-3.5 w-3.5" /> View Details
                 </Button>
-                {c.portalToken && (
+                {(c as { portalToken?: string }).portalToken && (
                   <Button size="sm" variant="outline" onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/portal/architecture/${c.portalToken}`);
+                    navigator.clipboard.writeText(`${window.location.origin}/portal/architecture/${(c as { portalToken?: string }).portalToken}`);
                     toast.success("Portal link copied");
                   }}>Copy Portal</Button>
                 )}

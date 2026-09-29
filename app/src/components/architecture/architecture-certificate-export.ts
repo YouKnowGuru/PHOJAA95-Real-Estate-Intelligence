@@ -7,17 +7,17 @@ import {
 import { formatDisplayDate } from "@/lib/format-date";
 
 export type ArchCertificateRecord = {
-  certificateNumber?: string;
-  customerName?: string;
-  projectName?: string;
-  projectCategory?: string;
-  projectLocation?: string;
-  completionDate?: string | Date;
-  staffName?: string;
-  companyName?: string;
-  verificationNumber?: string;
-  validationUrl?: string;
-  createdAt?: string | Date;
+  certificateNumber?: string | null;
+  customerName?: string | null;
+  projectName?: string | null;
+  projectCategory?: string | null;
+  projectLocation?: string | null;
+  completionDate?: string | Date | null;
+  staffName?: string | null;
+  companyName?: string | null;
+  verificationNumber?: string | null;
+  validationUrl?: string | null;
+  createdAt?: string | Date | null;
 };
 
 /** A4 landscape — 297 × 210 mm */
@@ -858,7 +858,6 @@ async function renderArchitectureCertificatePdf(
   const goldLight = hexToRgb(PAL.goldLight);
   const ink = hexToRgb(PAL.ink);
   const inkMuted = hexToRgb(PAL.inkMuted);
-  const cream = hexToRgb(PAL.cream);
   const white = hexToRgb(PAL.white);
   const parchment = hexToRgb(PAL.parchment);
 

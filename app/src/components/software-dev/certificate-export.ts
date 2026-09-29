@@ -836,7 +836,7 @@ function drawCenteredLines(
   pageWidth: number,
   maxLines = 3
 ): number {
-  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines);
+  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines) as string[];
   lines.forEach((line, index) => {
     doc.text(line, pageWidth / 2, startY + index * lineHeight, { align: "center" });
   });
@@ -852,7 +852,7 @@ function drawWrappedLines(
   lineHeight: number,
   maxLines = 2
 ): number {
-  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines);
+  const lines = doc.splitTextToSize(text, maxWidth).slice(0, maxLines) as string[];
   lines.forEach((line, index) => {
     doc.text(line, x, startY + index * lineHeight);
   });

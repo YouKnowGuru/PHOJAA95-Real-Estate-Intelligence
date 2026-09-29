@@ -124,8 +124,8 @@ export const softwareDashboardRouter = createRouter({
 
     const monthlySales = await db
       .select({
-        month: sql`DATE_FORMAT(${softwareSales.createdAt}, '%Y-%m')`,
-        total: sql`SUM(${softwareSales.grandTotal})`,
+        month: sql<string>`DATE_FORMAT(${softwareSales.createdAt}, '%Y-%m')`,
+        total: sql<string>`SUM(${softwareSales.grandTotal})`,
         count: count(),
       })
       .from(softwareSales)

@@ -10,20 +10,21 @@ import { useState, useEffect } from "react";
 interface PayrollRecord {
   id: number;
   userId: number;
-  userName?: string;
+  userName?: string | null;
   month: string;
   baseSalary: string;
   bonus: string;
   deduction: string;
   netSalary: string;
-  pfDeduction?: string;
-  pfPercentage?: string;
+  pfDeduction?: string | null;
+  pfPercentage?: string | null;
   paymentStatus: "pending" | "paid";
-  paidAt?: Date | string;
-  employeeId?: string;
-  pfNumber?: string;
-  notes?: string;
-  deductionNotes?: string;
+  paidAt?: Date | string | null;
+  employeeId?: string | null;
+  pfNumber?: string | null;
+  notes?: string | null;
+  deductionNotes?: string | null;
+  [key: string]: unknown;
 }
 
 interface PayslipModalProps {

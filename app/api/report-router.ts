@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { eq, and, gte, lte, desc, sql, count } from "drizzle-orm";
-import { TRPCError } from "@trpc/server";
-import { createRouter, adminQuery, staffQuery } from "./middleware";
+import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   properties,
@@ -9,9 +8,6 @@ import {
   localUsers,
   attendance,
   payroll,
-  propertyAgreements,
-  propertyDocuments,
-  finalLagthrams,
 } from "@db/schema";
 import { format } from "date-fns";
 
@@ -25,10 +21,6 @@ function generateCSV(data: Record<string, unknown>[], headers: string[]): string
     }).join(",")
   );
   return [headerRow, ...rows].join("\n");
-}
-
-function generateExcelCSV(data: Record<string, unknown>[], headers: string[]): string {
-  return generateCSV(data, headers);
 }
 
 export const reportRouter = createRouter({

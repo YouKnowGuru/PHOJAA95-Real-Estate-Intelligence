@@ -1,4 +1,4 @@
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle, type MySql2Database } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import { env } from "../lib/env";
 import * as schema from "@db/schema";
@@ -6,8 +6,10 @@ import * as relations from "@db/relations";
 
 const fullSchema = { ...schema, ...relations };
 
+type Db = MySql2Database<typeof fullSchema>;
+
 let pool: mysql.Pool | undefined;
-let instance: ReturnType<typeof drizzle> | undefined;
+let instance: Db | undefined;
 
 function cleanDatabaseUrl(url: string): string {
   return url.replace(/[?&]ssl-mode=[^&]*/, "").replace(/\?&/, "?").replace(/\?$/, "");
@@ -26,7 +28,7 @@ export function getDb() {
       // Security: Add query timeout to prevent resource exhaustion from slow queries
       acquireTimeout: 60000, // 60 seconds to acquire connection from pool
       timeout: 30000, // 30 seconds per query
-    });
+    } as mysql.PoolOptions);
     instance = drizzle(pool, {
       mode: "planetscale",
       schema: fullSchema,

@@ -41,7 +41,7 @@ export default function VerifyArchitectureCertificatePage() {
               <p><strong>Project:</strong> {data.projectName}</p>
               <p><strong>Category:</strong> {data.projectCategory}</p>
               <p><strong>Completion Date:</strong> {formatDisplayDate(data.completionDate)}</p>
-              <p><strong>Architect:</strong> {data.staffName || "—"}</p>
+              <p><strong>Architect:</strong> {(data as { staffName?: string | null }).staffName || "—"}</p>
               <p><strong>Issued By:</strong> {data.companyName}</p>
             </div>
           </>

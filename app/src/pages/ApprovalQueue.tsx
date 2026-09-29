@@ -28,8 +28,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/ui/page-header";
-import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
-import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, AppleCardContent } from "@/components/ui/apple-card";
+import { AnimatedPage } from "@/components/ui/animated-page";
+import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
 import { KPICard } from "@/components/ui/kpi-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";

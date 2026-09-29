@@ -31,7 +31,9 @@ export const uploadRouter = createRouter({
           throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
         }
         const user = ctx.unifiedUser!;
-        if (prop[0].listedById !== user.id && user.role !== "admin") {
+        // Real-estate staff (staff + admin) may upload to ANY property;
+        // developers and architecture staff may not.
+        if (user.role !== "staff" && user.role !== "admin") {
           throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to upload to this property" });
         }
       }
@@ -132,7 +134,8 @@ export const uploadRouter = createRouter({
       }
 
       const user = ctx.unifiedUser!;
-      if (prop[0].listedById !== user.id && user.role !== "admin") {
+      // Real-estate staff (staff + admin) may view documents of ANY property
+      if (user.role !== "staff" && user.role !== "admin") {
         throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to view this property's documents" });
       }
 

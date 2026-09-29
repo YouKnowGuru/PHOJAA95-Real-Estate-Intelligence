@@ -333,7 +333,7 @@ export function ApprovalDialog({
                 <OniLoader size="sm" text="Loading activity..." />
               ) : activityLog && activityLog.length > 0 ? (
                 <div className="max-h-36 space-y-2 overflow-y-auto">
-                  {activityLog.map((log: { id: number; userName?: string; action: string; createdAt: string }) => (
+                  {activityLog.map((log) => (
                     <div key={log.id} className="flex items-start gap-2 text-sm">
                       <Clock className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
                       <div className="min-w-0">

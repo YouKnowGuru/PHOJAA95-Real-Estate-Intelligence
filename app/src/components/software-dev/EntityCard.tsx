@@ -86,10 +86,9 @@ export function EntityCard({
       type === "customer" ||
       (type === "product" && !["approved", "published", "completed"].includes(entity.status)) ||
       (type === "project" && !["completed", "delivered", "cancelled"].includes(entity.status)) ||
+      // "document"/"customer" already returned true above, so only these remain
       (type !== "product" &&
         type !== "project" &&
-        type !== "document" &&
-        type !== "customer" &&
         entity.status === "draft"));
 
   const canApprove =

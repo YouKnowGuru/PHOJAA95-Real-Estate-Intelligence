@@ -87,7 +87,8 @@ async function tryGenerateCertificate(
     projectName: order[0].projectName,
     projectCategory: category[0]?.name || "",
     projectLocation: customer[0]?.address || "",
-    completionDate: new Date().toISOString().split("T")[0],
+    // date column is in Date mode, but stores YYYY-MM-DD strings (same runtime result)
+    completionDate: new Date().toISOString().split("T")[0] as unknown as Date,
     staffName: staff[0]?.fullName || "",
     companyName: "PHOJAA95 Real Estate",
     verificationNumber,
@@ -237,7 +238,8 @@ export const architecturePaymentRouter = createRouter({
         orderId: input.orderId,
         customerId: order[0].customerId,
         paymentType: input.paymentType,
-        paymentDate: input.paymentDate,
+        // date column is in Date mode, but stores YYYY-MM-DD strings (same runtime result)
+        paymentDate: input.paymentDate as unknown as Date,
         paymentMethod: input.paymentMethod,
         referenceNumber: input.referenceNumber,
         amount: input.amount,

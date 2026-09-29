@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Plus, Building2, Trash2, Edit3, PackageOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { PageHeader } from "@/components/ui/page-header";
-import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
+import { AnimatedPage } from "@/components/ui/animated-page";
 import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";

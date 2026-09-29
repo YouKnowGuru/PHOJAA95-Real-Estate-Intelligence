@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import {
   Select,
   SelectContent,
@@ -24,7 +22,6 @@ import {
   Search,
   Printer,
   Download,
-  Building2,
   User,
   TrendingUp,
   DollarSign,
@@ -41,7 +38,6 @@ import {
   FileSpreadsheet,
   FileJson,
   FileType,
-  ArrowUpRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router";
@@ -113,8 +109,6 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
   const statusText = isFullyPaid ? "Fully Paid" : percentPaid >= 50 ? "Partially Paid" : "Payment Pending";
 
   const hasPriceAdjustment = item.finalSellingPrice && parseFloat(item.finalSellingPrice) !== originalPrice;
-  const negotiatedVal = parseFloat(item.negotiatedPrice || "0");
-  const discountVal = parseFloat(item.discountAmount || "0");
 
   const logoHtml = branding.siteLogo
     ? `<img src="${branding.siteLogo}" alt="${branding.siteName}" style="width:40px;height:40px;object-fit:contain;border-radius:8px;" onerror="this.style.display='none'"/>`
@@ -426,181 +420,6 @@ function PaymentSteps({ currentStep }: { currentStep: number }) {
   );
 }
 
-// ─── Featured Hero Card (App Store Style) ─────────────────────────────────
-
-function FeaturedInvoiceCard({ item, branding }: { item: BillingItem; branding: { siteName: string; siteLogo?: string } }) {
-  const effectivePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
-  const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
-  const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : effectivePrice / 2;
-  const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
-  const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, effectivePrice - initialPayment);
-  const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
-
-  const isStep2Approved = item.currentStep >= 3;
-  const isStep3Approved = item.currentStep >= 4;
-
-  const initialReceived = isStep2Approved ? initialPayment : 0;
-  const remainingReceived = isStep3Approved ? remainingPayment : 0;
-  const totalReceived = initialReceived + remainingReceived;
-  const balanceDue = Math.max(0, effectivePrice - totalReceived);
-  const percentPaid = effectivePrice > 0 ? Math.round((totalReceived / effectivePrice) * 100) : 0;
-
-  const invoiceNo = `INV-${String(item.id).padStart(5, "0")}`;
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.96 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="group relative overflow-hidden rounded-3xl border border-border/40 bg-gradient-to-br from-card via-card to-muted/30 backdrop-blur-xl shadow-apple-md hover:shadow-apple-lg transition-all duration-500"
-    >
-      {/* Top gradient bar */}
-      <div className={`h-1.5 w-full ${percentPaid === 100 ? "bg-gradient-to-r from-emerald-400 to-emerald-600" : percentPaid >= 50 ? "bg-gradient-to-r from-amber-400 to-amber-600" : "bg-gradient-to-r from-primary to-primary/70"}`} />
-
-      <div className="p-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4 mb-5">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="relative">
-              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center shrink-0 shadow-sm">
-                <Receipt className="h-7 w-7 text-primary" />
-              </div>
-              <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
-                <Star className="h-3 w-3 text-white fill-white" />
-              </div>
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-primary tracking-widest uppercase">{invoiceNo}</p>
-              <p className="text-lg font-bold text-foreground truncate max-w-[220px] sm:max-w-[320px]">{item.propertyName}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <StatusBadge status={item.workflowStatus} />
-                <span className="text-xs text-muted-foreground">{item.propertyTypeName || "Property"}</span>
-              </div>
-            </div>
-          </div>
-          <Link to={`/properties/${item.id}`}>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/10 shrink-0">
-              <ArrowUpRight className="h-5 w-5" />
-            </Button>
-          </Link>
-        </div>
-
-        {/* Payment Progress */}
-        <div className="mb-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Payment Progress</span>
-            <span className={`text-sm font-bold ${percentPaid === 100 ? "text-emerald-600" : "text-foreground"}`}>{percentPaid}%</span>
-          </div>
-          <Progress value={percentPaid} className="h-2.5 bg-muted/60 rounded-full" />
-          <div className="flex items-center justify-between mt-3">
-            <PaymentSteps currentStep={item.currentStep} />
-            <span className="text-xs font-medium text-muted-foreground">{isStep3Approved ? "Fully Paid" : isStep2Approved ? "Partially Paid" : "Awaiting Payment"}</span>
-          </div>
-        </div>
-
-        {/* Parties */}
-        <div className="grid grid-cols-2 gap-4 mb-5 p-4 rounded-2xl bg-muted/40 dark:bg-muted/20 border border-border/30">
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1.5">Owner / Seller</p>
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <p className="text-sm font-semibold text-foreground truncate">{item.ownerName}</p>
-            </div>
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold mb-1.5">Buyer</p>
-            <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <User className="h-3.5 w-3.5 text-primary" />
-              </div>
-              <p className="text-sm font-semibold text-foreground truncate">{item.buyerName || <span className="text-muted-foreground italic font-normal">Not assigned</span>}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Billing Breakdown */}
-        <div className="space-y-3 mb-5">
-          <BillingRow
-            label="Total Selling Price"
-            value={fmt(String(effectivePrice))}
-            accent="text-foreground font-bold text-base"
-            icon={<DollarSign className="h-5 w-5 text-primary" />}
-            highlight
-          />
-
-          <div className="rounded-2xl bg-muted/30 dark:bg-muted/15 border border-border/30 p-4 space-y-3">
-            <BillingRow
-              label={`Initial Payment ${isStep2Approved ? "✓" : ""}`}
-              sublabel={isStep2Approved ? "Received" : `Pending${hasExactPayment ? "" : " • est. 50%"}`}
-              value={fmt(String(initialPayment))}
-              accent={isStep2Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}
-              icon={<TrendingUp className={`h-4 w-4 ${isStep2Approved ? "text-emerald-500" : "text-muted-foreground/50"}`} />}
-            />
-            <BillingRow
-              label={`Remaining Payment ${isStep3Approved ? "✓" : ""}`}
-              sublabel={isStep3Approved ? "Received" : `Pending${hasExactRemaining ? "" : " • est. 50%"}`}
-              value={fmt(String(remainingPayment))}
-              accent={isStep3Approved ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-amber-600 dark:text-amber-400 font-semibold"}
-              icon={<TrendingUp className={`h-4 w-4 ${isStep3Approved ? "text-emerald-500" : "text-amber-500/60"}`} />}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-emerald-50/80 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 px-4 py-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 mb-1">Total Paid</p>
-              <p className="text-base font-bold text-emerald-700 dark:text-emerald-300">{fmt(String(totalReceived))}</p>
-            </div>
-            <div className={`rounded-xl border px-4 py-3 ${balanceDue > 0 ? "bg-amber-50/80 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40" : "bg-emerald-50/80 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40"}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${balanceDue > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>Balance Due</p>
-              <p className={`text-base font-bold ${balanceDue > 0 ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300"}`}>{fmt(String(balanceDue))}</p>
-            </div>
-          </div>
-
-          <Separator className="opacity-30" />
-
-          <BillingRow
-            label="Agent Commission (3%)"
-            sublabel="Paid by seller to agent"
-            value={`-${fmt(commission)}`}
-            accent="text-red-500 font-semibold"
-            icon={<Building2 className="h-4 w-4 text-red-400" />}
-          />
-
-          <div className="rounded-xl bg-gradient-to-r from-emerald-50/80 via-emerald-50/50 to-emerald-50/30 dark:from-emerald-950/30 dark:via-emerald-950/15 dark:to-emerald-950/5 border border-emerald-200/70 dark:border-emerald-800/50 px-5 py-3.5 flex items-center justify-between">
-            <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Net to Seller</span>
-            <span className="text-lg font-black text-emerald-700 dark:text-emerald-300">{fmt(String(Math.max(0, effectivePrice - commission)))}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-3">
-          <Button
-            size="sm"
-            variant="outline"
-            className="flex-1 gap-2 text-xs h-10 rounded-xl hover:bg-muted transition-colors border-border/50"
-            onClick={() => printInvoice(item, branding)}
-          >
-            <Printer className="h-4 w-4" />
-            Print
-          </Button>
-          <Button
-            size="sm"
-            className="flex-1 gap-2 text-xs h-10 rounded-xl bg-primary hover:bg-primary/90 text-white shadow-sm"
-            onClick={() => downloadInvoice(item, branding)}
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
 // ─── Compact Invoice Card (App Store Grid Style) ──────────────────────────
 
 function CompactInvoiceCard({ item, branding }: { item: BillingItem; branding: { siteName: string; siteLogo?: string } }) {
@@ -711,35 +530,6 @@ function CompactInvoiceCard({ item, branding }: { item: BillingItem; branding: {
   );
 }
 
-function BillingRow({
-  label,
-  sublabel,
-  value,
-  accent,
-  icon,
-  highlight,
-}: {
-  label: string;
-  sublabel?: string;
-  value: string;
-  accent: string;
-  icon?: React.ReactNode;
-  highlight?: boolean;
-}) {
-  return (
-    <div className={`flex items-center justify-between gap-2 ${highlight ? "py-0.5" : ""}`}>
-      <div className="flex items-center gap-2.5 min-w-0">
-        {icon}
-        <div className="min-w-0">
-          <p className={`text-sm ${highlight ? "font-semibold text-foreground" : "text-muted-foreground"}`}>{label}</p>
-          {sublabel && <p className="text-[10px] text-muted-foreground/70">{sublabel}</p>}
-        </div>
-      </div>
-      <p className={`text-xs sm:text-sm shrink-0 truncate max-w-[120px] sm:max-w-none ${accent}`}>{value}</p>
-    </div>
-  );
-}
-
 // ─── KPI Card (App Store Style) ───────────────────────────────────────────
 
 function BillingKPICard({
@@ -757,11 +547,7 @@ function BillingKPICard({
   icon: React.ElementType;
   delay?: number;
 }) {
-  const bgColor = color.replace("bg-", "bg-").replace("500", "50");
-  const darkBgColor = color.replace("bg-", "").replace("500", "950/20");
   const textColor = color.replace("bg-", "text-");
-  const borderColor = color.replace("bg-", "").replace("500", "200/60");
-  const darkBorderColor = color.replace("bg-", "").replace("500", "800/40");
 
   return (
     <AppleCard hover delay={delay} className="overflow-hidden">
@@ -806,7 +592,6 @@ function InvoiceSkeleton() {
 // ─── Main Page ────────────────────────────────────────────────────────────
 
 export default function Billing() {
-  const { isAdmin } = useAuth();
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("all");
@@ -905,7 +690,7 @@ export default function Billing() {
       {/* Page Header */}
       <PageHeader
         title="Billing & Invoices"
-        description={`Full financial breakdown for all ${isAdmin ? "" : "your "}property transactions`}
+        description={`Full financial breakdown for all property transactions`}
         icon={<Receipt className="h-5 w-5" />}
       />
 

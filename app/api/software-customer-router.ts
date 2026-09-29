@@ -168,7 +168,7 @@ export const softwareCustomerRouter = createRouter({
         .limit(1);
 
       if (existing.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
-      await assertSoftwareDeveloperCustomerAccess(db, id, userId, ctx.unifiedUser!.role);
+      await assertSoftwareDeveloperCustomerAccess(db, input.id, userId, ctx.unifiedUser!.role);
 
       if (data.email || data.phone) {
         const dupConditions = [isNull(softwareCustomers.deletedAt)];
@@ -215,7 +215,7 @@ export const softwareCustomerRouter = createRouter({
         .limit(1);
 
       if (existing.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Customer not found" });
-      await assertSoftwareDeveloperCustomerAccess(db, id, userId, ctx.unifiedUser!.role);
+      await assertSoftwareDeveloperCustomerAccess(db, input.id, userId, ctx.unifiedUser!.role);
 
       await db.update(softwareCustomers).set({ deletedAt: new Date() }).where(eq(softwareCustomers.id, input.id));
 

@@ -32,15 +32,6 @@ const RATE_LIMIT_MAX = 10; // max requests per window for general endpoints
 const AUTH_RATE_LIMIT_WINDOW_MS = 15 * 60_000; // 15 minutes
 const AUTH_RATE_LIMIT_MAX = 5; // max 5 auth attempts per 15 minutes
 
-function isPrivateIp(ip: string): boolean {
-  return (
-    ip === "127.0.0.1" ||
-    ip === "::1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(ip)
-  );
-}
 
 function getClientIp(ctx: TrpcContext): string {
   const headers = ctx.req?.headers;

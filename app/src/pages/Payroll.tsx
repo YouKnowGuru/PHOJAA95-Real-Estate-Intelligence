@@ -15,10 +15,9 @@ import { toast } from "sonner";
 import { Plus, CheckCircle2, FileText, Trash2, Eye, Wallet, PiggyBank, Banknote, AlertCircle, PackageOpen } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { motion } from "framer-motion";
 import { PayslipModal } from "@/components/PayrollTable";
 import { PageHeader } from "@/components/ui/page-header";
-import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
+import { AppleCard } from "@/components/ui/apple-card";
 import { KPICard } from "@/components/ui/kpi-card";
 import { EmptyState } from "@/components/ui/empty-state";
 
@@ -31,7 +30,9 @@ export default function PayrollPage() {
   const [teamFilter, setTeamFilter] = useState<"all" | "staff" | "architecture_staff" | "developer">("all");
   const [showAdd, setShowAdd] = useState(false);
   type PayrollItem = RouterOutputs["payroll"]["list"]["items"][number];
-  const [selectedPayslip, setSelectedPayslip] = useState<PayrollItem | null>(null);
+  type MyPayrollItem = RouterOutputs["payroll"]["myPayroll"][number];
+  type AnyPayrollItem = PayrollItem | MyPayrollItem;
+  const [selectedPayslip, setSelectedPayslip] = useState<AnyPayrollItem | null>(null);
   const [payrollForm, setPayrollForm] = useState({
     userId: "",
     month: currentMonth,
@@ -114,7 +115,7 @@ export default function PayrollPage() {
     return `${currentYear}-${String(m).padStart(2, "0")}`;
   });
 
-  const generatePayslipPDF = async (item: PayrollItem) => {
+  const generatePayslipPDF = async (item: AnyPayrollItem) => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -122,12 +123,14 @@ export default function PayrollPage() {
     const siteName = branding?.site_name || "PHOJAA95";
     const siteLogo = branding?.site_logo;
 
-    const primary = [16, 185, 129];
-    const primaryDark = [5, 150, 105];
-    const dark = [15, 23, 42];
-    const gray = [100, 116, 139];
-    const lightGray = [241, 245, 249];
-    const white = [255, 255, 255];
+    const primary: [number, number, number] = [16, 185, 129];
+    const primaryDark: [number, number, number] = [5, 150, 105];
+    const dark: [number, number, number] = [15, 23, 42];
+    const gray: [number, number, number] = [100, 116, 139];
+    const lightGray: [number, number, number] = [241, 245, 249];
+    const white: [number, number, number] = [255, 255, 255];
+    const red: [number, number, number] = [239, 68, 68];
+    const redDark: [number, number, number] = [220, 38, 38];
 
     doc.setFillColor(...primary);
     doc.rect(0, 0, pageWidth, 6, "F");
@@ -218,7 +221,7 @@ export default function PayrollPage() {
     doc.setFont("helvetica", "bold");
     doc.text("Status:", 110, y);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(...(status === "PAID" ? primary : [239, 68, 68]));
+    doc.setTextColor(...(status === "PAID" ? primary : red));
     doc.text(status, 145, y);
     y += 7;
 
@@ -251,19 +254,19 @@ export default function PayrollPage() {
       margin: { left: 14, right: 14 },
       head: [["Description", "Amount (Nu.)"]],
       body: [
-        [{ content: "EARNINGS", styles: { fillColor: [...primary], textColor: white, fontStyle: "bold", fontSize: 8 } }, { content: "", styles: { fillColor: [...primary], textColor: white } }],
+        [{ content: "EARNINGS", styles: { fillColor: primary, textColor: white, fontStyle: "bold", fontSize: 8 } }, { content: "", styles: { fillColor: primary, textColor: white } }],
         ["Base Salary", baseSalary.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
         ["Bonus / Incentives", bonus.toLocaleString("en-IN", { minimumFractionDigits: 2 })],
         [{ content: "Total Earnings", styles: { fontStyle: "bold", textColor: primaryDark } }, { content: totalEarnings.toLocaleString("en-IN", { minimumFractionDigits: 2 }), styles: { fontStyle: "bold", textColor: primaryDark } }],
         [{ content: "", styles: { fillColor: lightGray } }, { content: "", styles: { fillColor: lightGray } }],
-        [{ content: "DEDUCTIONS", styles: { fillColor: [239, 68, 68], textColor: white, fontStyle: "bold", fontSize: 8 } }, { content: "", styles: { fillColor: [239, 68, 68], textColor: white } }],
+        [{ content: "DEDUCTIONS", styles: { fillColor: red, textColor: white, fontStyle: "bold", fontSize: 8 } }, { content: "", styles: { fillColor: red, textColor: white } }],
         [`PF Deduction (${item.pfPercentage || "0"}%)`, `-${pfDeduction.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
         ["Other Deductions", `-${deduction.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`],
         ...(item.deductionNotes ? [[`  Notes: ${item.deductionNotes}`, ""]] : []),
-        [{ content: "Total Deductions", styles: { fontStyle: "bold", textColor: [220, 38, 38] } }, { content: `-${totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, styles: { fontStyle: "bold", textColor: [220, 38, 38] } }],
+        [{ content: "Total Deductions", styles: { fontStyle: "bold", textColor: redDark } }, { content: `-${totalDeductions.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, styles: { fontStyle: "bold", textColor: redDark } }],
       ],
       theme: "grid",
-      headStyles: { fillColor: [...dark], textColor: white, fontSize: 9, fontStyle: "bold" },
+      headStyles: { fillColor: dark, textColor: white, fontSize: 9, fontStyle: "bold" },
       columnStyles: { 0: { cellWidth: 100 }, 1: { halign: "right", cellWidth: 60 } },
       styles: { fontSize: 9, cellPadding: 3, lineColor: lightGray, lineWidth: 0.2 },
       alternateRowStyles: { fillColor: [248, 250, 252] },
@@ -397,9 +400,9 @@ export default function PayrollPage() {
                     <td className="py-3 px-4">
                       <div className="font-medium">{item.userName || "You"}</div>
                       <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-                        {isAdmin && "userRole" in item && item.userRole && (
+                        {isAdmin && (item as PayrollItem).userRole != null && (
                           <Badge variant="outline" className="text-[10px] rounded-md">
-                            {formatStaffRoleLabel(item.userRole as string)}
+                            {formatStaffRoleLabel((item as PayrollItem).userRole as string)}
                           </Badge>
                         )}
                         {item.employeeId && <span>ID: {item.employeeId}</span>}

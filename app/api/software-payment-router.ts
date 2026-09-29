@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { eq, desc, count, and, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, adminQuery, developerQuery, developerOnlyQuery } from "./middleware";
+import { createRouter, developerQuery, developerOnlyQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { softwarePayments, softwareSales, softwareInvoices, softwareCustomers, softwareProjects, softwareCertificates, softwareProducts, localUsers } from "@db/schema";
 import { logActivity, notifyCreator } from "./software-activity-helper";
@@ -238,7 +238,7 @@ export const softwarePaymentRouter = createRouter({
       const newOutstanding = Math.max(0, grandTotal - newTotalPaid);
 
       // Determine payment status
-      let paymentStatus = "partially_paid";
+      let paymentStatus: "paid" | "partially_paid" = "partially_paid";
       let saleStatus = sale[0].status;
       if (newOutstanding <= 0) {
         paymentStatus = "paid";
@@ -258,7 +258,7 @@ export const softwarePaymentRouter = createRouter({
         saleId: input.saleId,
         customerId: sale[0].customerId,
         invoiceId: input.invoiceId,
-        paymentDate: input.paymentDate,
+        paymentDate: input.paymentDate as unknown as Date,
         paymentMethod: input.paymentMethod,
         referenceNumber: input.referenceNumber,
         amount: paymentAmount.toFixed(2),
@@ -289,7 +289,7 @@ export const softwarePaymentRouter = createRouter({
           const invTotal = parseFloat(invoice[0].totalAmount);
           const invPaid = parseFloat(invoice[0].amountPaid || "0") + paymentAmount;
           const invOutstanding = Math.max(0, invTotal - invPaid);
-          let invStatus = "partially_paid";
+          let invStatus: "paid" | "partially_paid" = "partially_paid";
           if (invOutstanding <= 0) invStatus = "paid";
 
           await db

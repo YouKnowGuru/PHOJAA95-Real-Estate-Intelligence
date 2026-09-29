@@ -24,7 +24,6 @@ import {
   User,
   Phone,
   FileText,
-  Image,
   CheckCircle2,
   XCircle,
   ArrowLeft,
@@ -194,7 +193,7 @@ export default function PropertyDetail() {
   const StatusIcon = config.icon;
 
   const canApprove = isAdmin && (property.approvalStatus === "pending_review" || property.approvalStatus === "submitted");
-  const canEdit = !isAdmin && property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
+  const canEdit = property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
 
   // Staff and admin can proceed to next step if current step is approved and not yet completed
   const canProceedToNextStep = property.approvalStatus === "approved" && property.currentStep <= 5 && property.workflowStatus !== "completed";
@@ -925,7 +924,7 @@ export default function PropertyDetail() {
                 <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                   <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Property Features</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    {validEntries.map(([key, value], idx) => (
+                    {validEntries.map(([key, value]) => (
                       <DetailItem key={key} icon={Building2} label={key} value={String(value ?? "")} color="text-primary" />
                     ))}
                   </div>
@@ -1409,7 +1408,7 @@ export default function PropertyDetail() {
           <div className="py-4">
             <div className="grid gap-3 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
               {allDocs?.map((doc) => (
-                <div key={doc.id || doc.name} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 group shadow-sm hover:shadow-md hover:border-primary/20">
+                <div key={(doc as { id?: number }).id || doc.name} className="flex items-center justify-between p-3 rounded-xl border border-border/50 bg-slate-50/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-300 group shadow-sm hover:shadow-md hover:border-primary/20">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="h-10 w-10 shrink-0 rounded-lg bg-white dark:bg-slate-800 flex items-center justify-center shadow-sm group-hover:bg-primary/5 transition-colors">
                       <FileText className="h-5 w-5 text-slate-500 group-hover:text-primary transition-colors" />

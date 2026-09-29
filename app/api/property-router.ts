@@ -5,7 +5,8 @@ import { TRPCError } from "@trpc/server";
 import { format } from "date-fns";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import { createRouter, adminQuery, staffQuery, publicQuery } from "./middleware";
+import { createRouter, adminQuery, staffQuery } from "./middleware";
+import { isRealEstateStaffRole, assertRealEstateModuleAccess } from "./lib/access-control";
 import { logger } from "./lib/logger";
 import { getDb } from "./queries/connection";
 import {
@@ -81,6 +82,9 @@ export const propertyRouter = createRouter({
       const db = getDb();
       const userId = ctx.unifiedUser!.id;
       const userName = ctx.unifiedUser!.name;
+
+      // Only real-estate staff (staff/admin) may create properties
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
       // Validate inputs before insert
       if (!input.propertyName || input.propertyName.trim().length === 0) {
@@ -360,6 +364,7 @@ export const propertyRouter = createRouter({
     )
     .query(async ({ input, ctx }) => {
       const db = getDb();
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
       const conditions = [];
 
       // Fast property search: property name prioritized, then other fields
@@ -400,7 +405,7 @@ export const propertyRouter = createRouter({
       if (input.step) conditions.push(eq(properties.currentStep, input.step));
 
       if (ctx.unifiedUser!.role === "staff") {
-        conditions.push(eq(properties.listedById, ctx.unifiedUser!.id));
+        // Staff can view ALL properties (not just their own listings)
       } else if (input.listedById) {
         conditions.push(eq(properties.listedById, input.listedById));
       }
@@ -471,19 +476,10 @@ export const propertyRouter = createRouter({
         ? await db.select().from(propertyImages).where(inArray(propertyImages.propertyId, propertyIds))
         : [];
 
-      // Security: Mask sensitive PII fields for staff users in list view
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+      // Real-estate staff (like admin) work with the full data of all properties —
+      // they enter owner/buyer PII themselves and must be able to edit it safely.
       const resultsWithImages = results.map(p => ({
         ...p,
-        // Mask sensitive fields for non-admin staff
-        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
-        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
-        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
-        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
-        buyerAddress: isAdmin ? p.buyerAddress : null,
-        sellingPrice: isAdmin ? p.sellingPrice : null,
-        realEstateFee: isAdmin ? p.realEstateFee : null,
-        loanAmount: isAdmin ? p.loanAmount : null,
         images: allImages.filter(img => img.propertyId === p.id)
       }));
 
@@ -494,6 +490,7 @@ export const propertyRouter = createRouter({
     .input(z.object({ id: z.number() }))
     .query(async ({ input, ctx }) => {
       const db = getDb();
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
       const property = await db
         .select({
@@ -548,31 +545,16 @@ export const propertyRouter = createRouter({
 
       if (property.length === 0) return null;
 
-      if (ctx.unifiedUser!.role === "staff" && property[0].listedById !== ctx.unifiedUser!.id) {
-        return null;
-      }
+      // Staff can now view ALL properties (read-only access for others' listings)
 
       const images = await db
         .select()
         .from(propertyImages)
         .where(eq(propertyImages.propertyId, input.id));
 
-      // Security: Mask sensitive PII fields for staff users in detail view
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+      // Real-estate staff (like admin) see the full data of all properties
       const p = property[0];
-      return {
-        ...p,
-        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
-        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
-        ownerAddress: isAdmin ? p.ownerAddress : null,
-        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
-        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
-        buyerAddress: isAdmin ? p.buyerAddress : null,
-        sellingPrice: isAdmin ? p.sellingPrice : null,
-        realEstateFee: isAdmin ? p.realEstateFee : null,
-        loanAmount: isAdmin ? p.loanAmount : null,
-        images,
-      };
+      return { ...p, images };
     }),
 
   update: staffQuery
@@ -753,12 +735,11 @@ export const propertyRouter = createRouter({
         updateData.realEstateFee = fee.toFixed(2);
       }
 
-      // Ownership check BEFORE any side effects
+      // Ownership check BEFORE any side effects — real-estate staff may edit ANY property;
+      // developers and architecture staff may not edit properties at all.
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
       let staffProp: { listedById: number; approvalStatus: string } | null = null;
       if (ctx.unifiedUser!.role === "staff") {
-        if (oldProp.listedById !== ctx.unifiedUser!.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to edit this property" });
-        }
         staffProp = { listedById: oldProp.listedById, approvalStatus: oldProp.approvalStatus };
       }
 
@@ -915,12 +896,7 @@ export const propertyRouter = createRouter({
         commissionAmount: z.string().optional(),
         paymentAmount: z.string().optional(),
       })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-      const userId = ctx.unifiedUser!.id;
-      const userName = ctx.unifiedUser!.name;
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+    )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const isAdmin = ctx.unifiedUser!.role === "admin";
 
       // Validate numeric amount fields if provided
       if (input.commissionAmount !== undefined && input.commissionAmount.trim() !== "") {
@@ -939,9 +915,8 @@ export const propertyRouter = createRouter({
       return await db.transaction(async (tx) => {
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
-        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
-        }
+        // Real-estate staff can work on any property
+        assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
         const existing = await tx.select().from(propertyAgreements)
           .where(eq(propertyAgreements.propertyId, input.propertyId))
@@ -1014,12 +989,7 @@ export const propertyRouter = createRouter({
         remainingPaymentScreenshot: z.string().optional(),
         remainingPaymentAmount: z.string().optional(),
       })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-      const userId = ctx.unifiedUser!.id;
-      const userName = ctx.unifiedUser!.name;
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+    )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const isAdmin = ctx.unifiedUser!.role === "admin";
 
       // Validate remaining payment amount if provided
       if (input.remainingPaymentAmount !== undefined && input.remainingPaymentAmount.trim() !== "") {
@@ -1035,10 +1005,8 @@ export const propertyRouter = createRouter({
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
 
-        // Authorization: staff can only modify their own properties
-        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
-        }
+        // Authorization: real-estate staff can modify ANY property; other roles cannot
+        assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
         const propertyType = await tx.select({ requiresBuildingDocs: propertyTypes.requiresBuildingDocs })
           .from(propertyTypes)
@@ -1127,12 +1095,7 @@ export const propertyRouter = createRouter({
         lagthramStatus: z.enum(["pending", "processing", "completed"]),
         loanStatus: z.enum(["pending", "processing", "completed"]),
       })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-      const userId = ctx.unifiedUser!.id;
-      const userName = ctx.unifiedUser!.name;
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+    )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const isAdmin = ctx.unifiedUser!.role === "admin";
 
       const values: {
         lagthramStatus: "pending" | "processing" | "completed";
@@ -1153,10 +1116,8 @@ export const propertyRouter = createRouter({
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
 
-        // Authorization: staff can only modify their own properties
-        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
-        }
+        // Authorization: real-estate staff can modify ANY property; other roles cannot
+        assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
         const existing = await tx.select().from(verificationProcesses)
           .where(eq(verificationProcesses.propertyId, input.propertyId))
@@ -1207,15 +1168,7 @@ export const propertyRouter = createRouter({
     .input(
       z.object({
         propertyId: z.number(),
-        finalDocument: z.string().min(1, "Final document is required"),
-        completionCertificate: z.string().optional(),
-      })
-    )
-    .mutation(async ({ input, ctx }) => {
-      const db = getDb();
-      const userId = ctx.unifiedUser!.id;
-      const userName = ctx.unifiedUser!.name;
-      const isAdmin = ctx.unifiedUser!.role === "admin";
+        finalDocument: z.string().min(1, "Final document is required"),        completionCertificate: z.string().optional(),      })    )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const userName = ctx.unifiedUser!.name;      const isAdmin = ctx.unifiedUser!.role === "admin";
 
       const values = {
         finalDocument: input.finalDocument,
@@ -1227,10 +1180,8 @@ export const propertyRouter = createRouter({
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
         if (prop.length === 0) throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
 
-        // Authorization: staff can only modify their own properties
-        if (ctx.unifiedUser!.role === "staff" && prop[0].listedById !== userId) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized to modify this property" });
-        }
+        // Authorization: real-estate staff can modify ANY property; other roles cannot
+        assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
         if (!input.finalDocument) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Final Lagthram Document is required. Please upload the document." });
@@ -1338,6 +1289,7 @@ export const propertyRouter = createRouter({
     .query(async ({ input, ctx }) => {
       const db = getDb();
       const userRole = ctx.unifiedUser!.role;
+      assertRealEstateModuleAccess(userRole);
 
       const property = await db
         .select({
@@ -1391,10 +1343,7 @@ export const propertyRouter = createRouter({
 
       if (property.length === 0) return null;
 
-      // Staff can only see their own properties, admin can see all
-      if (userRole === "staff" && property[0].listedById !== ctx.unifiedUser!.id) {
-        return null;
-      }
+      // Staff can view the full workflow of ALL properties
 
       const agreement = await db.select().from(propertyAgreements)
         .where(eq(propertyAgreements.propertyId, input.id))
@@ -1425,19 +1374,12 @@ export const propertyRouter = createRouter({
         .where(eq(propertyPriceHistory.propertyId, input.id))
         .orderBy(desc(propertyPriceHistory.createdAt));
 
-      // SECURITY: Mask PII for staff users
+      // Real-estate staff (like admin) work with the full data of all properties;
+      // admin-only internal notes stay restricted to admins.
       const isAdmin = userRole === "admin";
       const p = property[0];
       const maskedProperty = {
         ...p,
-        ownerCID: isAdmin ? p.ownerCID : p.ownerCID ? `${p.ownerCID.slice(0, 3)}****${p.ownerCID.slice(-4)}` : null,
-        ownerPhone: isAdmin ? p.ownerPhone : p.ownerPhone ? `${p.ownerPhone.slice(0, 4)}****${p.ownerPhone.slice(-3)}` : null,
-        buyerCID: isAdmin ? p.buyerCID : p.buyerCID ? `${p.buyerCID.slice(0, 3)}****${p.buyerCID.slice(-4)}` : null,
-        buyerPhone: isAdmin ? p.buyerPhone : p.buyerPhone ? `${p.buyerPhone.slice(0, 4)}****${p.buyerPhone.slice(-3)}` : null,
-        buyerAddress: isAdmin ? p.buyerAddress : null,
-        sellingPrice: isAdmin ? p.sellingPrice : null,
-        realEstateFee: isAdmin ? p.realEstateFee : null,
-        loanAmount: isAdmin ? p.loanAmount : null,
         adminNotes: isAdmin ? p.adminNotes : null,
       };
 
@@ -1458,15 +1400,9 @@ export const propertyRouter = createRouter({
     .query(async ({ input, ctx }) => {
       const db = getDb();
 
-      // Verify ownership for staff
-      if (ctx.unifiedUser!.role === "staff") {
-        const prop = await db.select({ listedById: properties.listedById })
-          .from(properties)
-          .where(eq(properties.id, input.propertyId))
-          .limit(1);
-        if (prop.length === 0 || prop[0].listedById !== ctx.unifiedUser!.id) {
-          throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
-        }
+      // Verify access — real-estate staff may view documents of ALL properties
+      if (!isRealEstateStaffRole(ctx.unifiedUser!.role)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
       }
 
       const agreement = await db.select().from(propertyAgreements).where(eq(propertyAgreements.propertyId, input.propertyId)).limit(1);
@@ -1714,7 +1650,7 @@ export const propertyRouter = createRouter({
       });
     }),
 
-  pendingApprovals: adminQuery.query(async ({ ctx }) => {
+  pendingApprovals: adminQuery.query(async () => {
     const db = getDb();
 
     // Get all properties that need approval (not approved, not completed, not draft)
@@ -1794,22 +1730,21 @@ export const propertyRouter = createRouter({
     };
   }),
 
-  staffDashboardStats: staffQuery.query(async ({ ctx }) => {
+  staffDashboardStats: staffQuery.query(async () => {
     const db = getDb();
-    const userId = ctx.unifiedUser!.id;
+    // Staff now works with the whole property portfolio — stats cover all properties
 
     const totalProperties = await db.select({ count: count() })
-      .from(properties)
-      .where(eq(properties.listedById, userId));
+      .from(properties);
     const pendingCount = await db.select({ count: count() })
       .from(properties)
-      .where(and(eq(properties.listedById, userId), or(eq(properties.approvalStatus, "submitted"), eq(properties.approvalStatus, "pending_review"))));
+      .where(or(eq(properties.approvalStatus, "submitted"), eq(properties.approvalStatus, "pending_review")));
     const rejectedCount = await db.select({ count: count() })
       .from(properties)
-      .where(and(eq(properties.listedById, userId), eq(properties.approvalStatus, "rejected")));
+      .where(eq(properties.approvalStatus, "rejected"));
     const completedCount = await db.select({ count: count() })
       .from(properties)
-      .where(and(eq(properties.listedById, userId), eq(properties.workflowStatus, "completed")));
+      .where(eq(properties.workflowStatus, "completed"));
 
     return {
       totalProperties: totalProperties[0]?.count || 0,
@@ -1851,7 +1786,7 @@ export const propertyRouter = createRouter({
 
       const property = prop[0];
 
-      if (ctx.unifiedUser!.role === "staff" && property.listedById !== ctx.unifiedUser!.id) {
+      if (!isRealEstateStaffRole(ctx.unifiedUser!.role)) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Not authorized" });
       }
 
@@ -1896,15 +1831,10 @@ export const propertyRouter = createRouter({
     )
     .query(async ({ input, ctx }) => {
       const db = getDb();
-      const userRole = ctx.unifiedUser!.role;
-      const userId = ctx.unifiedUser!.id;
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
+      // All real-estate roles see every property
       const conditions = [];
-
-      // Staff can only see their own properties
-      if (userRole === "staff") {
-        conditions.push(eq(properties.listedById, userId));
-      }
 
       const escapedSearch = input.search?.replace(/[%_]/g, "\\$&");
       if (escapedSearch) {
@@ -2032,14 +1962,11 @@ export const propertyRouter = createRouter({
     )
     .query(async ({ input, ctx }) => {
       const db = getDb();
-      const userRole = ctx.unifiedUser!.role;
-      const userId = ctx.unifiedUser!.id;
+      assertRealEstateModuleAccess(ctx.unifiedUser!.role);
 
       const conditions = [];
 
-      if (userRole === "staff") {
-        conditions.push(eq(properties.listedById, userId));
-      }
+      // All real-estate roles see every property
 
       const escapedSearch = input?.search?.replace(/[%_]/g, "\\$&");
       if (escapedSearch) {

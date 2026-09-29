@@ -5,8 +5,6 @@ import { getDb } from "./queries/connection";
 import {
   properties,
   localUsers,
-  attendance,
-  payroll,
   propertyTypes,
   approvalHistory,
 } from "@db/schema";

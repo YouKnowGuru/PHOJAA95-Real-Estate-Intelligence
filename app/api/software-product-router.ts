@@ -41,7 +41,7 @@ export const softwareProductRouter = createRouter({
           or(
             like(softwareProducts.name, `%${input.search}%`),
             like(softwareProducts.productCode, `%${input.search}%`)
-          )
+          ) as any
         );
       }
       if (input.category) conditions.push(eq(softwareProducts.category, input.category as any));

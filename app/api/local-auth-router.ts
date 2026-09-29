@@ -4,7 +4,7 @@ import * as jose from "jose";
 import * as cookie from "cookie";
 import { eq, and, gt, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { createRouter, publicQuery, rateLimitedQuery, authRateLimitedQuery, authedQuery } from "./middleware";
+import { createRouter, publicQuery, authRateLimitedQuery, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { localUsers, passwordResetTokens } from "@db/schema";
 import { env } from "./lib/env";

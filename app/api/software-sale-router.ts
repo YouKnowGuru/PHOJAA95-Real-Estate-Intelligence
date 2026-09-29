@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { eq, like, desc, count, and, or, isNull, inArray } from "drizzle-orm";
+import { eq, like, desc, count, and, isNull, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, developerQuery, developerOnlyQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { softwareSales, softwareSaleFeatures, softwareProducts, softwareCustomers, softwareProjects, softwareInvoices, softwareInvoiceItems, softwarePayments } from "@db/schema";
+import { softwareSales, softwareSaleFeatures, softwareProducts, softwareCustomers, softwareInvoices, softwareInvoiceItems } from "@db/schema";
 import { logActivity, notifyCreator, notifyAdminsForApproval } from "./software-activity-helper";
 import {
   actorDisplayName,
@@ -286,7 +286,7 @@ export const softwareSaleRouter = createRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Sale is not pending approval" });
       }
 
-      let status = existing[0].status;
+      let status: (typeof existing)[number]["status"] = existing[0].status;
       if (input.action === "approve") status = "approved";
       else if (input.action === "reject") status = "rejected";
       else if (input.action === "request_revision") status = "draft";

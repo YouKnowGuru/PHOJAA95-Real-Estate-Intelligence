@@ -201,7 +201,7 @@ export default function Properties() {
   return (
     <AnimatedPage>
       <PageHeader
-        title={isAdmin ? "Properties" : "My Properties"}
+        title="Properties"
         description="Manage and track all property listings"
         icon={<Building2 className="h-5 w-5" />}
         actions={

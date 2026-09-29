@@ -23,7 +23,7 @@ const REPORT_TYPES = [
   { value: "revenue_report", label: "Revenue Report" },
   { value: "outstanding_payments", label: "Outstanding Payments" },
   { value: "developer_performance", label: "Developer Performance" },
-];
+] as const;
 
 const EXPORT_FORMATS = [
   { value: "pdf", label: "PDF", icon: FileText },
@@ -168,7 +168,7 @@ export default function SoftwareReports() {
           <EmptyState
             title="No reports found"
             description="Generate sales, project, payment, and performance reports."
-            icon={<BarChart3 className="h-5 w-5" />}
+            icon={BarChart3}
           />
         )}
       </AppleCard>

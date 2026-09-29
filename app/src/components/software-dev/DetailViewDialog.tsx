@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import {
   ExternalLink,
   Calendar,
-  User,
   Tag,
   DollarSign,
   FileText,

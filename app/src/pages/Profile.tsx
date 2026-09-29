@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { UserCircle, Mail, Phone, MapPin, Building2, Save, ShieldCheck, Pencil } from "lucide-react";
-import { motion } from "framer-motion";
 import { CloudinaryUpload } from "@/components/CloudinaryUpload";
 import { PageHeader } from "@/components/ui/page-header";
 import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";

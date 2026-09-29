@@ -1,7 +1,6 @@
 import { Link } from "react-router";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -93,7 +92,7 @@ function DeveloperDashboard() {
     onError: (err) => toast.error(err.message),
   });
 
-  const todayRecord = attendanceData?.records?.find((r) => r.date === todayStr);
+  const todayRecord = attendanceData?.records?.find((r) => String(r.date) === todayStr);
   const attStats = attendanceData?.stats ?? { present: 0, late: 0, absent: 0, halfDay: 0 };
   const latestPayslip = payslips?.[0];
 
@@ -105,7 +104,7 @@ function DeveloperDashboard() {
 
   const monthlySalesData =
     devStats?.monthlySales?.map((item: { month: string; total: string | number; count: number }) => ({
-      month: item.month,
+      month: String(item.month),
       revenue: Number(item.total || 0),
     })) ?? [];
 
@@ -707,16 +706,16 @@ function StaffDashboard() {
     <AnimatedPage>
       <PageHeader
         title="My Dashboard"
-        description="Track your property listings and approvals"
+        description="Track all property listings and approvals"
         icon={<Building2 className="h-5 w-5" />}
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KPICard
-          title="My Properties"
+          title="Total Properties"
           value={stats?.totalProperties || 0}
           icon={Building2}
-          subtitle="Total listings"
+          subtitle="All listings"
           color="bg-blue-500"
           delay={0}
         />

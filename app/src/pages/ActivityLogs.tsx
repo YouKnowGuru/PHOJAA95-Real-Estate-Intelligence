@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollText, Clock, User, Building2, Filter } from "lucide-react";
+import { ScrollText, Clock, User, Filter } from "lucide-react";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { PageHeader } from "@/components/ui/page-header";
-import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
-import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardContent } from "@/components/ui/apple-card";
+import { AnimatedPage } from "@/components/ui/animated-page";
+import { AppleCard, AppleCardContent } from "@/components/ui/apple-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,8 +15,11 @@ export default function ActivityLogs() {
   const [actionFilter, setActionFilter] = useState("all");
 
   const { data, isLoading } = trpc.activityLog.list.useQuery({
-    search: search || undefined,
-    action: actionFilter === "all" ? undefined : actionFilter,
+    // Note: the list endpoint has no search filter (it never did — the API input
+    // only supports action/entityType/date range), so only the action filter is sent.
+    action: actionFilter === "all"
+      ? undefined
+      : (actionFilter as "created" | "updated" | "deleted" | "approved" | "rejected" | "login" | "logout"),
     limit: 50,
   });
 
@@ -114,7 +116,8 @@ export default function ActivityLogs() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      {log.description}
+                      {/* The API rows have no description column; this renders nothing (unchanged behavior). */}
+                      {(log as { description?: string | null }).description}
                     </p>
                     <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                       <span className="flex items-center gap-1">

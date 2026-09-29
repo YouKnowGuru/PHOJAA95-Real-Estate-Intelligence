@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, desc, and, isNull, gt } from "drizzle-orm";
+import { eq, desc, and, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, publicQuery, verifyRateLimitedPublicQuery } from "./middleware";
 import { getDb } from "./queries/connection";

@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
-import { eq, and, isNull, or, sql } from "drizzle-orm";
+import { eq, and, isNull, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
-import type { getDb } from "./queries/connection";
+import type { getDb } from "../queries/connection";
 import {
   architectureOrders,
   architectureProjects,
@@ -15,6 +15,25 @@ export const SOFTWARE_REVENUE_SALE_STATUSES = ["fully_paid", "completed"] as con
 
 export function isAdminRole(role: string): boolean {
   return role === "admin";
+}
+
+/**
+ * Real-estate property module roles.
+ * Admin sees/edits everything; real-estate staff can now also see and edit
+ * ALL properties (not just the ones they listed). Software developers and
+ * architecture staff are explicitly excluded from this module.
+ */
+export function isRealEstateStaffRole(role: string): boolean {
+  return role === "staff" || isAdminRole(role);
+}
+
+export function assertRealEstateModuleAccess(role: string): void {
+  if (!isRealEstateStaffRole(role)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This action is restricted to real-estate staff and admins.",
+    });
+  }
 }
 
 export function isArchitectureStaffRole(role: string): boolean {
@@ -63,7 +82,7 @@ export function assertSoftwareDeveloperProjectAccess(
 }
 
 /** Customers owned by the developer or linked through their sales/projects. */
-export function softwareCustomerVisibleToDeveloper(userId: number) {
+export function softwareCustomerVisibleToDeveloper(userId: number): SQL {
   return or(
     eq(softwareCustomers.createdBy, userId),
     sql`${softwareCustomers.id} IN (
@@ -74,15 +93,15 @@ export function softwareCustomerVisibleToDeveloper(userId: number) {
       SELECT customer_id FROM software_projects
       WHERE created_by = ${userId} AND deleted_at IS NULL
     )`
-  );
+  ) as SQL;
 }
 
 /** Projects created by or assigned to the developer. */
-export function softwareProjectVisibleToDeveloper(userId: number) {
+export function softwareProjectVisibleToDeveloper(userId: number): SQL {
   return or(
     eq(softwareProjects.createdBy, userId),
     eq(softwareProjects.assignedDeveloperId, userId)
-  );
+  ) as SQL;
 }
 
 export async function assertSoftwareDeveloperCustomerAccess(

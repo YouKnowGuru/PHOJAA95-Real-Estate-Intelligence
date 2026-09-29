@@ -38,7 +38,7 @@ export function ArchitectureReportSummary({ reportType, summary }: SummaryProps)
   switch (reportType) {
     case "sales":
       statCards.push(
-        { label: "Total Orders", value: summary.totalOrders ?? 0 },
+        { label: "Total Orders", value: (summary.totalOrders as number) ?? 0 },
         { label: "Total Revenue", value: formatArchCurrency(summary.totalRevenue as number) },
         { label: "Collected", value: formatArchCurrency(summary.collected as number) },
         { label: "Outstanding", value: formatArchCurrency(summary.outstanding as number) },
@@ -57,7 +57,7 @@ export function ArchitectureReportSummary({ reportType, summary }: SummaryProps)
       break;
 
     case "projects": {
-      statCards.push({ label: "Total Projects", value: summary.totalProjects ?? 0 });
+      statCards.push({ label: "Total Projects", value: (summary.totalProjects as number) ?? 0 });
       const byStatus = summary.projectsByStatus as Array<{ status: string; count: number }> | undefined;
       byStatus?.forEach((row) => {
         chartData.push({ label: formatStatusLabel(row.status), value: Number(row.count ?? 0) });
@@ -100,7 +100,7 @@ export function ArchitectureReportSummary({ reportType, summary }: SummaryProps)
 
     case "payment_collection":
       statCards.push(
-        { label: "Total Payments", value: summary.totalPayments ?? 0 },
+        { label: "Total Payments", value: (summary.totalPayments as number) ?? 0 },
         { label: "Total Collected", value: formatArchCurrency(summary.totalCollected as number) },
       );
       (summary.verificationStats as Array<{ status: string; count: number }> | undefined)?.forEach((row) => {
@@ -110,7 +110,7 @@ export function ArchitectureReportSummary({ reportType, summary }: SummaryProps)
 
     case "outstanding_balances":
       statCards.push(
-        { label: "Outstanding Orders", value: summary.count ?? 0 },
+        { label: "Outstanding Orders", value: (summary.count as number) ?? 0 },
         { label: "Total Outstanding", value: formatArchCurrency(summary.totalOutstanding as number) },
         { label: "Total Billed", value: formatArchCurrency(summary.totalBilled as number) },
       );

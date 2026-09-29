@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { ReactNode } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import type { ReactNode } from "react";
 
 interface ResponsiveCardProps {
   children: ReactNode;

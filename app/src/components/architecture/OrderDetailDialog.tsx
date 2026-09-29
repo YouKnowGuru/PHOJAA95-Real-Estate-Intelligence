@@ -6,7 +6,7 @@ import { OniLoader } from "@/components/ui/oni-loader";
 import { formatStatusLabel, getStatusVariant, softwareFormDialogClass } from "@/components/software-dev";
 import { formatDisplayDate } from "@/lib/format-date";
 import { DEV_STAGES } from "@/pages/architecture/constants";
-import { User, Calendar, CreditCard, TrendingUp } from "lucide-react";
+import { Calendar, CreditCard, TrendingUp } from "lucide-react";
 
 function DetailRow({ label, value }: { label: string; value?: React.ReactNode }) {
   if (value === undefined || value === null || value === "") return null;
@@ -52,10 +52,10 @@ export function OrderDetailDialog({ orderId, open, onOpenChange }: OrderDetailDi
         ) : (
           <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
             <AppleCard hover={false} className="p-4">
-              <DetailRow label="Customer" value={order.customer?.fullName} />
-              <DetailRow label="Email" value={order.customer?.email} />
-              <DetailRow label="Phone" value={order.customer?.phone} />
-              <DetailRow label="Address" value={order.customer?.address} />
+              <DetailRow label="Customer" value={order.customer?.fullName as string | undefined} />
+              <DetailRow label="Email" value={order.customer?.email as string | undefined} />
+              <DetailRow label="Phone" value={order.customer?.phone as string | undefined} />
+              <DetailRow label="Address" value={order.customer?.address as string | undefined} />
               <DetailRow label="Description" value={order.description} />
               <DetailRow label="Extra Features" value={order.extraFeatures} />
               <DetailRow label="Est. Completion" value={order.estimatedCompletionDate ? formatDisplayDate(order.estimatedCompletionDate) : undefined} />

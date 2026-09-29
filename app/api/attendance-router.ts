@@ -12,6 +12,14 @@ function getBhutanDateStr(date: Date = new Date()): string {
   return date.toLocaleDateString("en-CA", { timeZone: "Asia/Thimphu" });
 }
 
+/**
+ * The `attendance.date` schema column is declared in Date mode, but every caller
+ * stores/queries it as a "YYYY-MM-DD" string (MySQL DATE columns carry no time
+ * component, so the runtime behavior is identical). This cast keeps those call
+ * sites type-correct without changing any runtime value.
+ */
+const dateCol = attendance.date as unknown as Parameters<typeof eq>[0];
+
 /** Roles that check in via attendance (excludes admin). */
 const ATTENDANCE_ELIGIBLE_ROLES = ["staff", "developer", "architecture_staff"] as const;
 
@@ -42,7 +50,7 @@ export const attendanceRouter = createRouter({
           .where(
             and(
               eq(attendance.userId, userId),
-              eq(attendance.date, localDateStr)
+              eq(dateCol, localDateStr)
             )
           )
           .for("update")
@@ -54,7 +62,7 @@ export const attendanceRouter = createRouter({
 
         const result = await tx.insert(attendance).values({
           userId,
-          date: localDateStr,
+          date: localDateStr as unknown as Date,
           checkIn: now,
           status,
           notes: input.notes,
@@ -80,7 +88,7 @@ export const attendanceRouter = createRouter({
         .where(
           and(
             eq(attendance.userId, userId),
-            eq(attendance.date, localDateStr)
+            eq(dateCol, localDateStr)
           )
         )
         .for("update")
@@ -206,7 +214,7 @@ export const attendanceRouter = createRouter({
           .where(
             and(
               eq(attendance.userId, input.userId),
-              eq(attendance.date, input.date)
+              eq(dateCol, input.date)
             )
           )
           .limit(1);
@@ -218,7 +226,7 @@ export const attendanceRouter = createRouter({
         } else {
           await tx.insert(attendance).values({
             userId: input.userId,
-            date: input.date,
+            date: input.date as unknown as Date,
             status: input.status,
             notes: input.notes,
           });
@@ -290,7 +298,7 @@ export const attendanceRouter = createRouter({
           count: count(),
         })
         .from(attendance)
-        .where(eq(attendance.date, today))
+        .where(eq(dateCol, today))
         .groupBy(attendance.status);
 
       const totalStaffResult = await db

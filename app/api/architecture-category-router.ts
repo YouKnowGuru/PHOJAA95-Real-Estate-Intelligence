@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, like, desc, count, and, isNull } from "drizzle-orm";
+import { eq, like, and, isNull } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, architectureStaffQuery } from "./middleware";
 import { getDb } from "./queries/connection";

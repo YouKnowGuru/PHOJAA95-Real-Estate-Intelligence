@@ -134,7 +134,7 @@ export default function Reports() {
         <KPICard title="Total Properties" value={stats?.totalProperties || 0} icon={Building2} color="bg-blue-500" delay={0} />
         <KPICard title="Completed Sales" value={stats?.completedSales || 0} icon={Award} color="bg-emerald-500" delay={0.1} />
         <KPICard title="Total Revenue" value={formatCurrency(stats?.totalRevenue || "0")} icon={DollarSign} color="bg-violet-500" delay={0.2} />
-        <KPICard title="Active Staff" value={stats?.activeStaff || 0} icon={Users} color="bg-primary" delay={0.3} />
+        <KPICard title="Active Staff" value={stats?.totalStaff || 0} icon={Users} color="bg-primary" delay={0.3} />
       </div>
 
       {/* Charts */}

@@ -78,7 +78,7 @@ async function logWorkProgressActivity({
   metadata,
 }: {
   userId?: number;
-  userName?: string;
+  userName?: string | null;
   action: string;
   entityId?: number;
   metadata?: Record<string, unknown>;

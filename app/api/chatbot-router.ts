@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, desc, and, count, like, or, gte, lt, sql } from "drizzle-orm";
+import { eq, desc, and, count, like, or, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, authedQuery, chatRateLimitedQuery } from "./middleware";
 import { logger } from "./lib/logger";
@@ -105,10 +105,6 @@ const NAV_PAGE_ROUTES: Record<string, string> = {
     "software-dev": "/software-dev",
     architecture: "/architecture",
 };
-
-const ADMIN_ONLY_PAGES = new Set([
-    "users", "approvals", "activity-logs", "reports", "property-types",
-]);
 
 const STAFF_ALLOWED_PAGES = new Set([
     "dashboard", "properties", "documents", "billing", "attendance", "payroll",
@@ -315,9 +311,9 @@ async function executeToolCall(
                 const { properties } = await import("../db/schema");
                 const conditions = [];
 
-                // SECURITY: Real-estate staff can only search their own properties
-                if (ctx.unifiedUser?.role === "staff") {
-                    conditions.push(eq(properties.listedById, ctx.unifiedUser!.id));
+                // Real-estate staff (staff + admin) can search ALL properties
+                if (ctx.unifiedUser?.role && !isAdminRole(ctx.unifiedUser.role) && ctx.unifiedUser.role !== "staff") {
+                    return JSON.stringify({ error: "Access denied" });
                 }
 
                 if (status) {
@@ -370,25 +366,24 @@ async function executeToolCall(
                 if (!property) return JSON.stringify({ error: "Property not found" });
 
                 const isAdmin = isAdminRole(ctx.unifiedUser?.role);
-                if (ctx.unifiedUser?.role === "staff" && property.listedById !== ctx.unifiedUser?.id) {
-                    return JSON.stringify({ error: "You can only view properties assigned to you" });
-                }
+                // Real-estate staff (staff + admin) can view details of ALL properties
                 if (!isAdmin && ctx.unifiedUser?.role !== "staff") {
                     return JSON.stringify({ error: "Access denied" });
                 }
 
-                // Security: Mask sensitive PII for staff users
+                // Real-estate staff (staff + admin) see the full data of all properties;
+                // admin-only internal notes stay restricted to admins.
                 return JSON.stringify({
                     id: property.id,
                     name: property.propertyName,
                     address: property.address,
                     owner: property.ownerName,
-                    ownerCID: isAdmin ? property.ownerCID : property.ownerCID ? `${property.ownerCID.slice(0, 3)}****${property.ownerCID.slice(-4)}` : null,
-                    ownerPhone: isAdmin ? property.ownerPhone : property.ownerPhone ? `${property.ownerPhone.slice(0, 4)}****${property.ownerPhone.slice(-3)}` : null,
+                    ownerCID: property.ownerCID,
+                    ownerPhone: property.ownerPhone,
                     buyer: property.buyerName,
-                    buyerCID: isAdmin ? property.buyerCID : property.buyerCID ? `${property.buyerCID.slice(0, 3)}****${property.buyerCID.slice(-4)}` : null,
-                    sellingPrice: isAdmin ? property.sellingPrice : null,
-                    fee: isAdmin ? property.realEstateFee : null,
+                    buyerCID: property.buyerCID,
+                    sellingPrice: property.sellingPrice,
+                    fee: property.realEstateFee,
                     status: property.approvalStatus,
                     workflowStatus: property.workflowStatus,
                     currentStep: property.currentStep,

@@ -59,11 +59,11 @@ export function CustomerDetailDialog({ customerId, open, onOpenChange }: Custome
               <DetailRow label="Created" value={customer.createdAt ? new Date(customer.createdAt).toLocaleString() : undefined} />
             </AppleCard>
 
-            {customer.portalToken && (
+            {(customer as { portalToken?: string }).portalToken && (
               <AppleCard hover={false} className="p-4">
                 <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold"><User className="h-4 w-4" /> Customer Portal</h4>
                 <p className="mb-3 break-all text-xs text-muted-foreground">
-                  {typeof window !== "undefined" ? `${window.location.origin}/portal/architecture/${customer.portalToken}` : ""}
+                  {typeof window !== "undefined" ? `${window.location.origin}/portal/architecture/${(customer as { portalToken?: string }).portalToken}` : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
@@ -71,7 +71,7 @@ export function CustomerDetailDialog({ customerId, open, onOpenChange }: Custome
                     variant="outline"
                     className="gap-1"
                     onClick={() => {
-                      const url = `${window.location.origin}/portal/architecture/${customer.portalToken}`;
+                      const url = `${window.location.origin}/portal/architecture/${(customer as { portalToken?: string }).portalToken}`;
                       navigator.clipboard.writeText(url);
                       toast.success("Portal link copied");
                     }}
@@ -79,7 +79,7 @@ export function CustomerDetailDialog({ customerId, open, onOpenChange }: Custome
                     <Copy className="h-3.5 w-3.5" /> Copy Link
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1" asChild>
-                    <a href={`/portal/architecture/${customer.portalToken}`} target="_blank" rel="noopener noreferrer">
+                    <a href={`/portal/architecture/${(customer as { portalToken?: string }).portalToken}`} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-3.5 w-3.5" /> Open Portal
                     </a>
                   </Button>

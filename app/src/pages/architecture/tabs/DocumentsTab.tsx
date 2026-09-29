@@ -141,7 +141,7 @@ export default function DocumentsTab({ canManage }: { canManage: boolean }) {
     id: number;
     title: string;
     description?: string | null;
-    category: DocCategory;
+    category: string;
     fileUrl: string;
     fileName: string;
     fileType: string;
@@ -151,7 +151,7 @@ export default function DocumentsTab({ canManage }: { canManage: boolean }) {
     setEditForm({
       title: doc.title,
       description: doc.description || "",
-      category: doc.category,
+      category: doc.category as DocCategory,
       fileUrl: doc.fileUrl,
       fileName: doc.fileName,
       fileType: doc.fileType,
@@ -209,7 +209,7 @@ export default function DocumentsTab({ canManage }: { canManage: boolean }) {
                     <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{doc.description}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1 truncate">{doc.fileName}</p>
-                  <SecureFileLink url={doc.fileUrl} className="text-sm text-primary mt-2 inline-block">View / Download</SecureFileLink>
+                  <SecureFileLink url={doc.fileUrl} label="View / Download" className="text-sm text-primary mt-2 inline-block" />
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 gap-1">

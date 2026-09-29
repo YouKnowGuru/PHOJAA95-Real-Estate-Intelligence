@@ -4,10 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { LogIn, LogOut, Calendar, Users, Download, Search, Filter, Clock, Trash2, CheckCircle2, XCircle, Timer, PackageOpen } from "lucide-react";
+import { LogIn, LogOut, Calendar, Users, Download, Search, Filter, Clock, Trash2, CheckCircle2, XCircle, Timer } from "lucide-react";
 import { motion } from "framer-motion";
 import { AttendanceCalendar } from "@/components/AttendanceCalendar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -17,15 +16,7 @@ import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
 import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, AppleCardContent } from "@/components/ui/apple-card";
 import { KPICard } from "@/components/ui/kpi-card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
-
-const statusColors: Record<string, string> = {
-  present: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
-  absent: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-  late: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  half_day: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-};
 
 export default function AttendancePage() {
   const { isAdmin } = useAuth();

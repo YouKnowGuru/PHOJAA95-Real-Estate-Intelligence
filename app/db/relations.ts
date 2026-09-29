@@ -12,9 +12,6 @@ import {
   payroll,
   approvalHistory,
   activityLogs,
-  notifications,
-  systemSettings,
-  passwordResetTokens,
   propertyImages,
   chatConversations,
   chatMessages,
@@ -29,7 +26,6 @@ import {
   softwareInvoices,
   softwareInvoiceItems,
   softwareCertificates,
-  softwareDocuments,
 } from "./schema";
 
 // ─── USERS ─────────────────────────────────────────────────────────
