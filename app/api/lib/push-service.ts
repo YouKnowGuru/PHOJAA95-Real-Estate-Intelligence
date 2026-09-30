@@ -1,9 +1,20 @@
-import webpush from "web-push";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import { logger } from "./logger";
 import { notifications, payroll, pushSubscriptions, salaryNoticeLog, localUsers, systemSettings } from "@db/schema";
 import { ensureSchemaPatches } from "./ensure-schema";
+
+// web-push is loaded lazily (never at module scope) so that a problem with
+// this optional dependency can NEVER break the main API boot on the host.
+type WebPushApi = typeof import("web-push");
+let webpush: WebPushApi | null = null;
+async function loadWebPush(): Promise<WebPushApi> {
+  if (webpush) return webpush;
+  const mod = await import("web-push");
+  // CJS/ESM interop: the API may sit under `default` or directly on the module
+  webpush = ((mod as { default?: WebPushApi }).default ?? mod) as WebPushApi;
+  return webpush;
+}
 
 /**
  * Salary-due reminder system.
@@ -30,6 +41,7 @@ let vapidCache: { publicKey: string; privateKey: string } | null = null;
 
 /** Get (or lazily create + persist) the VAPID keypair used for web push. */
 export async function getVapidKeys(): Promise<{ publicKey: string; privateKey: string }> {
+  const webpushModule = await loadWebPush();
   if (vapidCache) return vapidCache;
 
   const db = getDb();
@@ -42,7 +54,7 @@ export async function getVapidKeys(): Promise<{ publicKey: string; privateKey: s
   let privateKey = rows.find(r => r.key === VAPID_PRIVATE_KEY_SETTING)?.value ?? null;
 
   if (!publicKey || !privateKey) {
-    const generated = webpush.generateVAPIDKeys();
+    const generated = webpushModule.generateVAPIDKeys();
     publicKey = generated.publicKey;
     privateKey = generated.privateKey;
     await db
@@ -56,10 +68,9 @@ export async function getVapidKeys(): Promise<{ publicKey: string; privateKey: s
   }
 
   vapidCache = { publicKey, privateKey };
-  webpush.setVapidDetails(VAPID_SUBJECT, publicKey, privateKey);
+  webpushModule.setVapidDetails(VAPID_SUBJECT, publicKey, privateKey);
   return vapidCache;
 }
-
 export async function getVapidPublicKey(): Promise<string> {
   return (await getVapidKeys()).publicKey;
 }
@@ -80,9 +91,11 @@ export async function sendPushToUser(userId: number, payload: PushPayload): Prom
   const subs = await db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, userId));
   let delivered = 0;
 
+  const webpushModule = await loadWebPush();
+
   for (const sub of subs) {
     try {
-      await webpush.sendNotification(
+      await webpushModule.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         JSON.stringify(payload),
       );

@@ -144,8 +144,11 @@ if (env.isProduction) {
   serveStaticFiles(app);
 
   // ─── Salary-due reminder scheduler (popups + web push on payday) ───
-  const { startSalaryDueScheduler } = await import("./lib/push-service");
-  startSalaryDueScheduler();
+  // NOTE: no top-level await here — it breaks Passenger/older Node hosts.
+  // Fire-and-forget lazy load keeps boot synchronous and safe.
+  void import("./lib/push-service")
+    .then((m) => m.startSalaryDueScheduler())
+    .catch((err) => logger.error("Failed to start salary-due scheduler", { error: String(err) }));
 
   const port = parseInt(process.env.PORT || "3000");
   const server = serve({ fetch: app.fetch, port }, () => {
