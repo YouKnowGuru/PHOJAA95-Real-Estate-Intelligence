@@ -17,15 +17,18 @@ async function loadWebPush(): Promise<WebPushApi> {
 }
 
 /**
- * Salary-due reminder system.
+ * Salary-due reminder system (persistent until paid).
  *
- * On the 30th of every month (or the last day of shorter months, e.g. February)
- * every admin gets:
- *   1. An in-app popup on every screen (served by push-router.salaryDueStatus)
- *   2. A web-push notification on desktop/mobile even when the app is closed
- *   3. A row in the in-app Notifications bell
+ * From the 30th of every month (or the last day of shorter months) until
+ * every payroll record for that month is marked paid, each admin gets:
+ *   1. An in-app popup on every screen that re-appears after each snooze
+ *      (served by push-router.salaryDueStatus)
+ *   2. A web-push roughly every hour during waking hours (~15+/day) on
+ *      desktop/mobile, even when the app is closed
+ *   3. A row in the in-app Notifications bell (once per month)
  *
- * Each admin is notified once per month (salary_notice_log guards duplicates).
+ * The ONLY way to stop the reminders is to mark salaries paid in Payroll.
+ * SALARY_NAG_MINUTES env var changes the push interval (default 60).
  */
 
 const VAPID_PUBLIC_KEY_SETTING = "vapid_public_key";
@@ -164,7 +167,15 @@ function monthLabel(month: string): string {
   return new Date(y, (m || 1) - 1, 1).toLocaleString("en-US", { month: "long", year: "numeric" });
 }
 
-/** One scheduler tick: notify every admin whose salary notice for this month is still unseen. */
+/**
+ * One scheduler tick.
+ *
+ * Persistent-reminder mode: from the due day until every salary is paid,
+ * each admin is pushed at most once per hour (≈16 per 8am–11pm window,
+ * 15+ per day). The only way to stop the reminders is to actually mark
+ * salaries paid in Payroll. A silent heartbeat is written on every tick
+ * so monitoring can confirm the scheduler is alive.
+ */
 export async function runSalaryDueCheck(): Promise<void> {
   try {
     await ensureSchemaPatches();
@@ -175,7 +186,7 @@ export async function runSalaryDueCheck(): Promise<void> {
     const month = monthKey(now);
     const due = await getMonthlyDue(month);
 
-    // All salaries already paid → nothing to remind.
+    // All salaries already paid → stop nagging immediately.
     if (due.hasRows && due.pendingCount === 0) return;
 
     const adminIds = await countAdmins();
@@ -207,25 +218,33 @@ export async function runSalaryDueCheck(): Promise<void> {
         log = undefined;
       }
 
-      // Push once per month. If the admin has no subscribed device yet,
-      // leave pushSent=false so the next tick retries once they enable
-      // notifications (popup offers the opt-in on payday).
-      if (!log || !log.pushSent) {
-        const delivered = await sendPushToUser(adminId, {
-          title: "💰 Salary Payment Due",
-          body,
-          tag: `salary-due-${month}`,
-          url: "/payroll",
-          requireInteraction: true,
-        });
-        if (delivered > 0) {
-          await db
-            .update(salaryNoticeLog)
-            .set({ pushSent: true, pushSentAt: new Date() })
-            .where(and(eq(salaryNoticeLog.userId, adminId), eq(salaryNoticeLog.month, month)));
-        }
-        logger.info("Salary-due notice processed", { adminId, month, delivered, pending: due.pendingCount });
+      // Per-admin nag throttle: at most one push per N minutes (default 60).
+      const nagMinutes = (() => {
+        const parsed = parseInt(process.env.SALARY_NAG_MINUTES || "60", 10);
+        return Math.min(Math.max(isNaN(parsed) ? 60 : parsed, 5), 720);
+      })();
+      if (log && log.lastPushAt && Date.now() - new Date(log.lastPushAt).getTime() < nagMinutes * 60_000) {
+        continue; // pushed recently — wait for the next tick
       }
+
+      // Send the hourly nag. If the admin has no subscribed device yet,
+      // delivery returns 0 and the next tick retries (opt-in via popup).
+      const delivered = await sendPushToUser(adminId, {
+        title: "💰 Salary Payment Due",
+        body,
+        tag: `salary-due-${month}`,
+        url: "/payroll",
+        requireInteraction: true,
+      });
+      await db
+        .update(salaryNoticeLog)
+        .set({
+          pushSent: delivered > 0 ? true : (log?.pushSent ?? false),
+          pushSentAt: log?.pushSentAt ?? (delivered > 0 ? new Date() : null),
+          lastPushAt: new Date(),
+        })
+        .where(and(eq(salaryNoticeLog.userId, adminId), eq(salaryNoticeLog.month, month)));
+      logger.info("Salary-due nag processed", { adminId, month, delivered, pending: due.pendingCount });
     }
   } catch (err) {
     // Never crash the server from the scheduler; the next tick retries.
@@ -241,5 +260,5 @@ export function startSalaryDueScheduler(): void {
   if (process.env.DISABLE_SCHEDULERS === "1") return;
   setTimeout(() => { void runSalaryDueCheck(); }, FIRST_RUN_DELAY_MS);
   setInterval(() => { void runSalaryDueCheck(); }, SCHEDULER_INTERVAL_MS);
-  logger.info("Salary-due scheduler started (checks every 30 minutes)");
+  logger.info("Salary-due scheduler started (persistent mode: hourly nags until paid)");
 }

@@ -36,7 +36,8 @@ export function SalaryDuePopup() {
   const utils = trpc.useUtils();
   const statusQuery = trpc.push.salaryDueStatus.useQuery(undefined, {
     enabled: isAdmin,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 30,
+    refetchInterval: 1000 * 60, // re-check every minute so the popup returns after snooze expiry
     retry: false,
   });
 
@@ -50,8 +51,10 @@ export function SalaryDuePopup() {
   const hasPending = Boolean(status && (status.pendingCount > 0 || !status.hasRows));
 
   useEffect(() => {
-    if (status && status.isDueDay && hasPending && !status.seen) {
+    if (status && status.isDueDay && hasPending && !status.dismissed) {
       setOpen(true);
+    } else if (status && status.dismissed) {
+      setOpen(false);
     }
   }, [status, hasPending]);
 
@@ -123,7 +126,7 @@ export function SalaryDuePopup() {
     dismissMutation.mutate();
   }
 
-  if (!isAdmin || !status || !status.isDueDay || !hasPending || status.seen) return null;
+  if (!isAdmin || !status || !status.isDueDay || !hasPending || status.dismissed) return null;
 
   const monthLabel = new Date(
     Number(status.month.slice(0, 4)),
@@ -142,8 +145,9 @@ export function SalaryDuePopup() {
             Salary Payment Due
           </DialogTitle>
           <DialogDescription className="text-center text-sm">
-            It is the <span className="font-semibold text-amber-600">30th</span> — staff salaries for{" "}
-            <span className="font-semibold">{monthLabel}</span> need your attention.
+            It is payday — staff salaries for <span className="font-semibold">{monthLabel}</span> need your
+            attention. This reminder will <span className="font-semibold text-amber-600">keep repeating</span>{" "}
+            until all salaries are marked paid.
           </DialogDescription>
         </DialogHeader>
 
@@ -170,6 +174,7 @@ export function SalaryDuePopup() {
 
         {showPushPrompt && pushState !== "subscribed" && (
           <div className="flex items-start justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/70 px-3 py-2.5 text-xs dark:border-blue-900 dark:bg-blue-950/40">
+            {/* One-time per-device opt-in: push reminders also repeat hourly until paid */}
             <div className="flex items-start gap-2">
               <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
               <span>
@@ -225,7 +230,7 @@ export function SalaryDuePopup() {
             </Link>
           </Button>
           <Button variant="outline" className="w-full" onClick={handleDismiss}>
-            Dismiss for this month
+            Remind me in 30 minutes
           </Button>
         </DialogFooter>
       </DialogContent>

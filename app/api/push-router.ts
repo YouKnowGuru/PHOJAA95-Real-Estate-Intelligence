@@ -61,7 +61,8 @@ export const pushRouter = createRouter({
   /**
    * Popup state for the salary-due banner shown on every admin screen:
    * - due: true when today is payday (30th / last day of month) and salaries are pending
-   * - popup: false once the admin dismisses this month's popup (seenAt set)
+   * - dismissed: false while the admin's snooze (last dismissal) is older than 30 min —
+   *   the popup keeps coming back until salaries are actually paid.
    */
   salaryDueStatus: adminQuery.query(async ({ ctx }) => {
     const db = getDb();
@@ -97,17 +98,26 @@ export const pushRouter = createRouter({
       await db.insert(salaryNoticeLog).values({ userId: ctx.unifiedUser!.id, month });
     }
 
+    // Snooze window: after dismissing, hide the popup for 30 minutes.
+    // It then re-appears on the next screen/navigation until payroll is paid.
+    const SNOOZE_MS = 30 * 60 * 1000;
+    const seenAt = existing[0]?.seenAt ? new Date(existing[0].seenAt).getTime() : 0;
+    const snoozed = seenAt > 0 && Date.now() - seenAt < SNOOZE_MS;
+
     return {
       isDueDay,
       month,
       pendingCount,
       totalNet: String(due?.totalNet ?? "0"),
       hasRows,
-      seen: existing.length > 0 && existing[0].seenAt !== null,
+      dismissed: snoozed,
     };
   }),
 
-  /** Admin dismisses this month's popup. */
+  /**
+   * Admin dismisses the popup — a 30-minute snooze, NOT a permanent dismiss.
+   * The reminder keeps returning until this month's salaries are paid.
+   */
   dismissSalaryNotice: adminQuery.mutation(async ({ ctx }) => {
     const db = getDb();
     const now = new Date();

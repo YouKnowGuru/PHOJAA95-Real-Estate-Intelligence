@@ -45,12 +45,15 @@ export async function ensureSchemaPatches(): Promise<void> {
       month varchar(7) NOT NULL,
       push_sent boolean NOT NULL DEFAULT false,
       push_sent_at timestamp NULL,
+      last_push_at timestamp NULL,
       seen_at timestamp NULL,
       created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
       KEY idx_salary_notice_user (user_id),
       KEY idx_salary_notice_month (month),
       CONSTRAINT fk_salary_notice_user FOREIGN KEY (user_id) REFERENCES local_users(id) ON DELETE CASCADE
     )`,
+    // Column patch for installs that already created the earlier table shape
+    "ALTER TABLE `salary_notice_log` ADD COLUMN IF NOT EXISTS `last_push_at` timestamp NULL",
   ];
 
   for (const statement of tablePatches) {

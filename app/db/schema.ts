@@ -1321,14 +1321,15 @@ export const pushSubscriptions = mysqlTable("push_subscriptions", {
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
 
-// ─── SALARY NOTICE LOG (one in-app notice per admin per month) ─────
+// ─── SALARY NOTICE LOG (persistent reminders until salaries are paid) ──
 export const salaryNoticeLog = mysqlTable("salary_notice_log", {
   id: serial("id").primaryKey(),
   userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "cascade" }),
   month: varchar("month", { length: 7 }).notNull(), // YYYY-MM the notice is about
-  pushSent: boolean("push_sent").default(false).notNull(),
-  pushSentAt: timestamp("push_sent_at"),
-  seenAt: timestamp("seen_at"),
+  pushSent: boolean("push_sent").default(false).notNull(), // at least one push delivered
+  pushSentAt: timestamp("push_sent_at"), // first successful push
+  lastPushAt: timestamp("last_push_at"), // latest push — used for nag throttling
+  seenAt: timestamp("seen_at"), // last popup dismissal (acts as a 30-min snooze)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [
   index("idx_salary_notice_user").on(table.userId),
