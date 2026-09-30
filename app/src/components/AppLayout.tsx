@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationBell } from "@/components";
+import { SalaryDuePopup } from "./SalaryDuePopup";
 import { ChatbotFAB } from "@/components/Chatbot";
 import { toast } from "sonner";
 import {
@@ -387,6 +388,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* AI Chatbot */}
       <ChatbotFAB />
+
+      {/* Monthly salary-due reminder popup (admin only, every screen) */}
+      <SalaryDuePopup />
     </div>
   );
 }

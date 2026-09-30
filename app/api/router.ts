@@ -10,6 +10,7 @@ import { activityLogRouter } from "./activity-log-router";
 import { seedRouter } from "./seed-router";
 import { uploadRouter } from "./upload-router";
 import { notificationRouter } from "./notification-router";
+import { pushRouter } from "./push-router";
 import { reportRouter } from "./report-router";
 import { settingsRouter } from "./settings-router";
 import { chatbotRouter } from "./chatbot-router";
@@ -50,6 +51,7 @@ export const appRouter = createRouter({
   seed: seedRouter,
   upload: uploadRouter,
   notification: notificationRouter,
+  push: pushRouter,
   report: reportRouter,
   settings: settingsRouter,
   chatbot: chatbotRouter,

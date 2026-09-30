@@ -1304,3 +1304,36 @@ export const workProgressReports = mysqlTable("work_progress_reports", {
 
 export type WorkProgressReport = typeof workProgressReports.$inferSelect;
 export type InsertWorkProgressReport = typeof workProgressReports.$inferInsert;
+
+// ─── PUSH SUBSCRIPTIONS (web push for salary reminders etc.) ───────
+export const pushSubscriptions = mysqlTable("push_subscriptions", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "cascade" }),
+  endpoint: varchar("endpoint", { length: 512 }).notNull().unique(),
+  p256dh: varchar("p256dh", { length: 255 }).notNull(),
+  auth: varchar("auth", { length: 255 }).notNull(),
+  userAgent: varchar("user_agent", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_push_subs_user").on(table.userId),
+]);
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type InsertPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+// ─── SALARY NOTICE LOG (one in-app notice per admin per month) ─────
+export const salaryNoticeLog = mysqlTable("salary_notice_log", {
+  id: serial("id").primaryKey(),
+  userId: bigint("user_id", { mode: "number", unsigned: true }).notNull().references(() => localUsers.id, { onDelete: "cascade" }),
+  month: varchar("month", { length: 7 }).notNull(), // YYYY-MM the notice is about
+  pushSent: boolean("push_sent").default(false).notNull(),
+  pushSentAt: timestamp("push_sent_at"),
+  seenAt: timestamp("seen_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_salary_notice_user").on(table.userId),
+  index("idx_salary_notice_month").on(table.month),
+]);
+
+export type SalaryNoticeLog = typeof salaryNoticeLog.$inferSelect;
+export type InsertSalaryNoticeLog = typeof salaryNoticeLog.$inferInsert;

@@ -41,6 +41,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        importScripts: ['/push-sw.js'],
         globPatterns: ['**/*.{js,css,html,svg,png,ico,jpg,webp,woff2}'],
         globIgnores: ['**/uploads/**'],
         navigateFallbackDenylist: [/^\/uploads\//, /^\/api\//],

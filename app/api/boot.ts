@@ -143,6 +143,10 @@ export default app;
 if (env.isProduction) {
   serveStaticFiles(app);
 
+  // ─── Salary-due reminder scheduler (popups + web push on payday) ───
+  const { startSalaryDueScheduler } = await import("./lib/push-service");
+  startSalaryDueScheduler();
+
   const port = parseInt(process.env.PORT || "3000");
   const server = serve({ fetch: app.fetch, port }, () => {
     logger.info(`Server running on http://localhost:${port}/`);

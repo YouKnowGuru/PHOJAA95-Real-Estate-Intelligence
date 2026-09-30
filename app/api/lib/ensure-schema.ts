@@ -25,6 +25,42 @@ export async function ensureSchemaPatches(): Promise<void> {
     "ALTER TABLE `software_customers` ADD INDEX IF NOT EXISTS `idx_software_customers_created_by` (`created_by`)",
   ];
 
+  const tablePatches = [
+    // Push notifications (salary reminders) — safe to re-run
+    `CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id int AUTO_INCREMENT PRIMARY KEY,
+      user_id bigint unsigned NOT NULL,
+      endpoint varchar(512) NOT NULL,
+      p256dh varchar(255) NOT NULL,
+      auth varchar(255) NOT NULL,
+      user_agent varchar(255),
+      created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_push_endpoint (endpoint),
+      KEY idx_push_subs_user (user_id),
+      CONSTRAINT fk_push_subs_user FOREIGN KEY (user_id) REFERENCES local_users(id) ON DELETE CASCADE
+    )`,
+    `CREATE TABLE IF NOT EXISTS salary_notice_log (
+      id int AUTO_INCREMENT PRIMARY KEY,
+      user_id bigint unsigned NOT NULL,
+      month varchar(7) NOT NULL,
+      push_sent boolean NOT NULL DEFAULT false,
+      push_sent_at timestamp NULL,
+      seen_at timestamp NULL,
+      created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_salary_notice_user (user_id),
+      KEY idx_salary_notice_month (month),
+      CONSTRAINT fk_salary_notice_user FOREIGN KEY (user_id) REFERENCES local_users(id) ON DELETE CASCADE
+    )`,
+  ];
+
+  for (const statement of tablePatches) {
+    try {
+      await db.execute(sql.raw(statement));
+    } catch (err) {
+      logger.warn("Schema patch skipped", { statement: statement.slice(0, 60), error: String(err) });
+    }
+  }
+
   for (const statement of columnPatches) {
     try {
       await db.execute(sql.raw(statement));

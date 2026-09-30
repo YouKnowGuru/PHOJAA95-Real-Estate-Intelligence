@@ -4,6 +4,7 @@ export { PDFViewer, FilePreview } from "./PDFViewer";
 export { StepWizard, StepContent } from "./StepWizard";
 export { ApprovalBadge, StepBadge } from "./ApprovalBadge";
 export { NotificationBell } from "./NotificationBell";
+export { SalaryDuePopup } from "./SalaryDuePopup";
 export { ActivityTimeline } from "./ActivityTimeline";
 export { AnalyticsCard, StatCard } from "./AnalyticsCards";
 export { PropertyCard, PropertyList } from "./PropertyCard";
