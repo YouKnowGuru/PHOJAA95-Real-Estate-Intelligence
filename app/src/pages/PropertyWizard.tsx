@@ -108,7 +108,6 @@ export default function PropertyWizard() {
     buyerPhone: "",
     buyerAddress: "",
     agreementFile: "",
-    paymentScreenshot: "",
     commissionAmount: "",
     paymentAmount: "",
   });
@@ -119,7 +118,6 @@ export default function PropertyWizard() {
     internalAgreement: "",
     occupancyCertificate: "",
     plrVerification: "",
-    remainingPaymentScreenshot: "",
     remainingPaymentAmount: "",
   });
 
@@ -209,7 +207,6 @@ export default function PropertyWizard() {
         buyerPhone: p.buyerPhone || prev.buyerPhone || "",
         buyerAddress: p.buyerAddress || prev.buyerAddress || "",
         agreementFile: existingProperty.agreement?.agreementFile || prev.agreementFile || "",
-        paymentScreenshot: existingProperty.agreement?.paymentScreenshot || prev.paymentScreenshot || "",
         commissionAmount: existingProperty.agreement?.commissionAmount?.toString() || p?.realEstateFee?.toString() || prev.commissionAmount || "",
         paymentAmount: existingProperty.agreement?.paymentAmount?.toString() || prev.paymentAmount || "",
       }));
@@ -222,7 +219,6 @@ export default function PropertyWizard() {
         internalAgreement: existingProperty.documents.internalAgreement || "",
         occupancyCertificate: existingProperty.documents.occupancyCertificate || "",
         plrVerification: existingProperty.documents.plrVerification || "",
-        remainingPaymentScreenshot: existingProperty.documents.remainingPaymentScreenshot || "",
         remainingPaymentAmount: existingProperty.documents.remainingPaymentAmount?.toString() || "",
       });
     }
@@ -442,8 +438,8 @@ export default function PropertyWizard() {
       toast.error("Please upload the Property Agreement File before submitting.");
       return;
     }
-    if (!step2Data.paymentScreenshot) {
-      toast.error("Please upload the 50% Payment Screenshot before submitting.");
+    if (!step2Data.paymentAmount || step2Data.paymentAmount.trim() === "") {
+      toast.error("Please enter the 50% Payment Amount before submitting.");
       return;
     }
     submitStep2Mutation.mutate({
@@ -459,10 +455,6 @@ export default function PropertyWizard() {
     if (!propertyId) return;
     if (!step3Data.gewogCertification) {
       toast.error("Please upload the Gewog Endorse Document before submitting.");
-      return;
-    }
-    if (!step3Data.remainingPaymentScreenshot) {
-      toast.error("Please upload the Remaining 50% Payment Screenshot before submitting.");
       return;
     }
     if (!step3Data.remainingPaymentAmount || step3Data.remainingPaymentAmount.trim() === "") {
@@ -1145,17 +1137,6 @@ export default function PropertyWizard() {
                   hint="Upload the signed property agreement document (PDF, Word, or image)"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>50% Payment Screenshot *</Label>
-                <FileUploader
-                  accept="image/*"
-                  maxSize={10 * 1024 * 1024}
-                  value={step2Data.paymentScreenshot}
-                  onChange={(url) => setStep2Data({ ...step2Data, paymentScreenshot: url })}
-                  label="Upload screenshot"
-                  hint="Upload the 50% payment proof screenshot"
-                />
-              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Commission Amount</Label>
@@ -1167,7 +1148,7 @@ export default function PropertyWizard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Payment Amount</Label>
+                  <Label>50% Payment Amount *</Label>
                   <Input
                     type="number"
                     value={step2Data.paymentAmount}
@@ -1194,7 +1175,7 @@ export default function PropertyWizard() {
                   variant="outline"
                   onClick={() => {
                     // Auto-save step 2 before navigating forward
-                    if (step2Data.agreementFile && step2Data.paymentScreenshot && step2Data.buyerName.trim()) {
+                    if (step2Data.agreementFile && step2Data.paymentAmount.trim() && step2Data.buyerName.trim()) {
                       submitStep2Mutation.mutate({
                         propertyId: propertyId!,
                         ...step2Data,
@@ -1321,24 +1302,14 @@ export default function PropertyWizard() {
                     <Upload className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <Label className="text-base font-bold">Remaining 50% Payment Screenshot *</Label>
-                    <p className="text-xs text-muted-foreground">This is required for all property types to conclude the transaction.</p>
+                    <Label className="text-base font-bold">Remaining Payment Amount *</Label>
+                    <p className="text-xs text-muted-foreground">Record the remaining payment amount to conclude the transaction.</p>
                   </div>
                 </div>
-                
-                <div className="max-w-xl">
-                  <FileUploader
-                    accept="image/*"
-                    maxSize={10 * 1024 * 1024}
-                    value={step3Data.remainingPaymentScreenshot}
-                    onChange={(url) => setStep3Data({ ...step3Data, remainingPaymentScreenshot: url })}
-                    label="Upload final payment screenshot"
-                    hint="Upload the remaining 50% payment proof screenshot"
-                  />
-                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
                   <div className="space-y-2">
-                    <Label>Remaining Payment Amount</Label>
+                    <Label>Remaining Payment Amount *</Label>
                     <Input
                       type="number"
                       value={step3Data.remainingPaymentAmount}
@@ -1375,7 +1346,7 @@ export default function PropertyWizard() {
                     const requiresBuildingDocs = BUILDING_TYPES.includes(finalTypeName);
 
                     const hasRequiredDocs = step3Data.gewogCertification &&
-                      step3Data.remainingPaymentScreenshot &&
+                      step3Data.remainingPaymentAmount &&
                       (!requiresBuildingDocs || (step3Data.internalAgreement && step3Data.occupancyCertificate && step3Data.plrVerification));
 
                     if (hasRequiredDocs) {

@@ -892,7 +892,8 @@ export const propertyRouter = createRouter({
         buyerPhone: z.string().min(1, "⚠️ Buyer Phone is required.").max(20),
         buyerAddress: z.string().min(1, "⚠️ Buyer Address is required."),
         agreementFile: z.string().min(1, "Agreement file is required"),
-        paymentScreenshot: z.string().min(1, "Payment screenshot is required"),
+        // No longer collected in the wizard; kept optional so the column can be cleared
+        paymentScreenshot: z.string().optional(),
         commissionAmount: z.string().optional(),
         paymentAmount: z.string().optional(),
       })
@@ -935,7 +936,8 @@ export const propertyRouter = createRouter({
 
         const values = {
           agreementFile: input.agreementFile,
-          paymentScreenshot: input.paymentScreenshot,
+          // Screenshots are no longer collected; clear any previously stored one
+          paymentScreenshot: input.paymentScreenshot ?? null,
           commissionAmount: input.commissionAmount,
           paymentAmount: input.paymentAmount,
           approvalStatus: "approved" as const,
@@ -1024,9 +1026,6 @@ export const propertyRouter = createRouter({
           }
         }
 
-        if (!input.remainingPaymentScreenshot) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Remaining payment screenshot is required. Please upload the payment proof." });
-        }
         if (!input.remainingPaymentAmount || input.remainingPaymentAmount.trim() === "") {
           throw new TRPCError({ code: "BAD_REQUEST", message: "Remaining payment amount is required. Please enter the amount." });
         }
@@ -1052,6 +1051,8 @@ export const propertyRouter = createRouter({
           await tx.update(propertyDocuments)
             .set({
               ...values,
+              // Screenshots are no longer collected; clear any previously stored one
+              remainingPaymentScreenshot: null,
               approvalStatus: "approved",
               approvedBy: userId,
               approvedAt: new Date(),
