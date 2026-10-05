@@ -576,26 +576,6 @@ export default function PropertyWizard() {
       toast.error("Please upload the Gewog Endorse Document before submitting.");
       return;
     }
-    const typeName = existingProperty?.property?.propertyTypeName ?? "";
-    const selectedType = propertyTypes?.find(pt => pt.id === parseInt(step1Data.propertyTypeId));
-    const typeNameFromForm = selectedType?.name ?? "";
-    const finalTypeName = typeName || typeNameFromForm;
-    const BUILDING_TYPES = ["Building", "Flat", "Apartment", "Duplex", "Bungalow"];
-    const requiresBuildingDocs = BUILDING_TYPES.includes(finalTypeName);
-    if (requiresBuildingDocs) {
-      if (!step3Data.internalAgreement) {
-        toast.error("Please upload the Internal Agreement document.");
-        return;
-      }
-      if (!step3Data.occupancyCertificate) {
-        toast.error("Please upload the Occupancy Certificate.");
-        return;
-      }
-      if (!step3Data.plrVerification) {
-        toast.error("Please upload the PLR Verification document.");
-        return;
-      }
-    }
     submitStep3Mutation.mutate({
       propertyId,
       ...step3Data,
@@ -1419,7 +1399,7 @@ export default function PropertyWizard() {
                 {requiresBuildingDocs && (
                   <>
                     <div className="space-y-2">
-                      <Label>Internal Agreement *</Label>
+                      <Label>Internal Agreement</Label>
                       <FileUploader
                         accept={DOCUMENT_UPLOAD_ACCEPT}
                         maxSize={10 * 1024 * 1024}
@@ -1430,7 +1410,7 @@ export default function PropertyWizard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Occupancy Certificate *</Label>
+                      <Label>Occupancy Certificate</Label>
                       <FileUploader
                         accept={DOCUMENT_UPLOAD_ACCEPT}
                         maxSize={10 * 1024 * 1024}
@@ -1441,7 +1421,7 @@ export default function PropertyWizard() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>PLR Verification *</Label>
+                      <Label>PLR Verification</Label>
                       <FileUploader
                         accept={DOCUMENT_UPLOAD_ACCEPT}
                         maxSize={10 * 1024 * 1024}
@@ -1473,16 +1453,7 @@ export default function PropertyWizard() {
                   variant="outline"
                   onClick={() => {
                     // Auto-save step 3 before navigating forward
-                    const typeName = existingProperty?.property?.propertyTypeName ?? "";
-                    const selectedType = propertyTypes?.find(pt => pt.id === parseInt(step1Data.propertyTypeId));
-                    const typeNameFromForm = selectedType?.name ?? "";
-                    const finalTypeName = typeName || typeNameFromForm;
-                    const BUILDING_TYPES = ["Building", "Flat", "Apartment", "Duplex", "Bungalow"];
-                    const requiresBuildingDocs = BUILDING_TYPES.includes(finalTypeName);
-
-                    const hasRequiredDocs = step3Data.agreementFile &&
-                      step3Data.gewogCertification &&
-                      (!requiresBuildingDocs || (step3Data.internalAgreement && step3Data.occupancyCertificate && step3Data.plrVerification));
+                    const hasRequiredDocs = step3Data.agreementFile && step3Data.gewogCertification;
 
                     if (hasRequiredDocs) {
                       submitStep3Mutation.mutate({

@@ -1100,7 +1100,7 @@ export const propertyRouter = createRouter({
         const requiresBuildingDocs = propertyType[0]?.requiresBuildingDocs ?? false;
 
         if (requiresBuildingDocs) {
-          const buildingDocs = ["gewogCertification", "internalAgreement", "occupancyCertificate", "plrVerification"];
+          const buildingDocs = ["gewogCertification"];
           const missingDocs = buildingDocs.filter(doc => !input[doc as keyof typeof input]);
 
           if (missingDocs.length > 0) {
