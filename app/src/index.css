@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
@@ -5,26 +6,27 @@
 @layer base {
   :root {
     /* Apple-inspired light mode palette */
-    --background: 0 0% 100%;
-    --foreground: 220 15% 15%;
+    --background: 210 25% 98%;
+    --foreground: 222 22% 14%;
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 15%;
+    --card-foreground: 222 22% 14%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 15%;
+    --popover-foreground: 222 22% 14%;
     --primary: 160 84% 39%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
-    --secondary-foreground: 220 15% 15%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 220 15% 15%;
+    --secondary-foreground: 222 22% 14%;
+    --muted: 220 16% 95%;
+    --muted-foreground: 220 9% 42%;
+    --accent: 220 16% 95%;
+    --accent-foreground: 222 22% 14%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
     --ring: 160 84% 39%;
     --radius: 0.875rem;
+    --surface-elevated: 0 0% 100%;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 220 15% 15%;
     --sidebar-primary: 160 84% 39%;
@@ -73,35 +75,36 @@
   }
 
   .dark {
-    /* Apple-inspired dark mode - deep slate, not pure black */
-    --background: 220 20% 8%;
-    --foreground: 210 20% 96%;
-    --card: 220 18% 11%;
-    --card-foreground: 210 20% 96%;
-    --popover: 220 18% 11%;
-    --popover-foreground: 210 20% 96%;
-    --primary: 160 84% 50%;
-    --primary-foreground: 220 20% 8%;
-    --secondary: 220 14% 16%;
-    --secondary-foreground: 210 20% 96%;
-    --muted: 220 14% 16%;
-    --muted-foreground: 220 9% 60%;
-    --accent: 220 14% 16%;
-    --accent-foreground: 210 20% 96%;
+    /* Apple-inspired dark mode - deep layered slate, not pure black */
+    --background: 222 24% 6%;
+    --foreground: 210 25% 96%;
+    --card: 222 22% 10%;
+    --card-foreground: 210 25% 96%;
+    --popover: 222 22% 10%;
+    --popover-foreground: 210 25% 96%;
+    --primary: 160 84% 47%;
+    --primary-foreground: 222 24% 6%;
+    --secondary: 220 16% 15%;
+    --secondary-foreground: 210 25% 96%;
+    --muted: 220 16% 15%;
+    --muted-foreground: 218 11% 64%;
+    --accent: 220 16% 15%;
+    --accent-foreground: 210 25% 96%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 160 84% 50%;
-    --sidebar-background: 220 18% 11%;
-    --sidebar-foreground: 210 20% 96%;
-    --sidebar-primary: 160 84% 50%;
-    --sidebar-primary-foreground: 220 20% 8%;
-    --sidebar-accent: 220 14% 16%;
-    --sidebar-accent-foreground: 210 20% 96%;
-    --sidebar-border: 220 14% 18%;
-    --sidebar-ring: 160 84% 50%;
-    --chart-1: 160 84% 50%;
+    --border: 220 15% 19%;
+    --input: 220 15% 19%;
+    --ring: 160 84% 47%;
+    --surface-elevated: 222 22% 13%;
+    --sidebar-background: 222 24% 8%;
+    --sidebar-foreground: 210 25% 96%;
+    --sidebar-primary: 160 84% 47%;
+    --sidebar-primary-foreground: 222 24% 6%;
+    --sidebar-accent: 220 16% 15%;
+    --sidebar-accent-foreground: 210 25% 96%;
+    --sidebar-border: 220 15% 19%;
+    --sidebar-ring: 160 84% 47%;
+    --chart-1: 160 84% 47%;
     --chart-2: 220 90% 60%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
@@ -148,6 +151,7 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -200,6 +204,14 @@
   }
   
   /* Premium shadow system */
+  .shadow-apple-md {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 16px rgba(0, 0, 0, 0.05), 0 16px 40px rgba(0, 0, 0, 0.07);
+  }
+
+  .dark .shadow-apple-md {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25), 0 6px 16px rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.16);
+  }
+
   .shadow-apple {
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.04), 0 8px 16px rgba(0, 0, 0, 0.04);
   }
@@ -341,6 +353,342 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* ============================================================
+     PREMIUM EFFECTS — aurora, spotlight, shine, glow, grid
+     ============================================================ */
+
+  /* Aurora orbs — slow drifting gradient blobs (theme-aware) */
+  .aurora-orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(90px);
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  .aurora-orb-1 {
+    width: 480px;
+    height: 480px;
+    top: -160px;
+    right: -120px;
+    background: hsl(var(--primary) / 0.13);
+    animation: aurora-drift 18s ease-in-out infinite;
+  }
+
+  .aurora-orb-2 {
+    width: 380px;
+    height: 380px;
+    bottom: -140px;
+    left: -100px;
+    background: hsl(var(--chart-2) / 0.1);
+    animation: aurora-drift 22s ease-in-out infinite reverse;
+  }
+
+  .aurora-orb-3 {
+    width: 300px;
+    height: 300px;
+    top: 35%;
+    left: 45%;
+    background: hsl(var(--chart-4) / 0.07);
+    animation: aurora-drift 26s ease-in-out infinite;
+    animation-delay: -8s;
+  }
+
+  .dark .aurora-orb-1 { background: hsl(var(--primary) / 0.09); }
+  .dark .aurora-orb-2 { background: hsl(var(--chart-2) / 0.08); }
+  .dark .aurora-orb-3 { background: hsl(var(--chart-4) / 0.06); }
+
+  @keyframes aurora-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.8; }
+    33% { transform: translate(-40px, 30px) scale(1.08); opacity: 1; }
+    66% { transform: translate(30px, -24px) scale(0.94); opacity: 0.7; }
+  }
+
+  @keyframes float-soft {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .animate-float {
+    animation: float-soft 5s ease-in-out infinite;
+  }
+
+  /* ============================================================
+     SHOOTING STARS — running meteor streaks across the background
+     ============================================================ */
+  .shooting-star {
+    --star-color: hsl(var(--primary) / 0.75);
+    --star-angle: 13deg;
+    position: absolute;
+    top: var(--star-top, 15%);
+    left: -280px;
+    width: 130px;
+    height: 2px;
+    border-radius: 9999px;
+    opacity: 0;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--star-color));
+    filter: drop-shadow(0 0 6px var(--star-color));
+    will-change: transform, opacity;
+    animation: star-shoot var(--star-duration, 8s) linear infinite;
+    animation-delay: var(--star-delay, 0s);
+  }
+
+  .dark .shooting-star {
+    --star-color: rgba(255, 255, 255, 0.92);
+  }
+
+  .shooting-star-1 {
+    --star-top: 14%;
+    --star-angle: 13deg;
+    --star-duration: 7.5s;
+    --star-delay: 0.8s;
+  }
+
+  .shooting-star-2 {
+    --star-top: 38%;
+    --star-angle: 17deg;
+    --star-duration: 10.5s;
+    --star-delay: 4.2s;
+    width: 95px;
+    height: 1.5px;
+  }
+
+  .shooting-star-3 {
+    --star-top: 58%;
+    --star-angle: 11deg;
+    --star-duration: 13s;
+    --star-delay: 7.6s;
+    width: 165px;
+    filter: drop-shadow(0 0 9px var(--star-color));
+  }
+
+  .shooting-star-4 {
+    --star-top: 6%;
+    --star-angle: 19deg;
+    --star-duration: 9s;
+    --star-delay: 2.4s;
+    width: 80px;
+    height: 1.5px;
+  }
+
+  .shooting-star-5 {
+    --star-top: 74%;
+    --star-angle: 9deg;
+    --star-duration: 11.5s;
+    --star-delay: 5.8s;
+    width: 140px;
+  }
+
+  .shooting-star-6 {
+    --star-top: 26%;
+    --star-angle: 15deg;
+    --star-duration: 6.5s;
+    --star-delay: 1.2s;
+    width: 110px;
+    height: 1px;
+    filter: drop-shadow(0 0 4px var(--star-color));
+  }
+
+  .shooting-star-7 {
+    --star-top: 88%;
+    --star-angle: 12deg;
+    --star-duration: 15s;
+    --star-delay: 9.5s;
+    width: 155px;
+    filter: drop-shadow(0 0 10px var(--star-color));
+  }
+
+  .shooting-star-8 {
+    --star-top: 47%;
+    --star-angle: 20deg;
+    --star-duration: 8.5s;
+    --star-delay: 12.2s;
+    width: 70px;
+    height: 1px;
+  }
+
+  @keyframes star-shoot {
+    0% {
+      transform: rotate(var(--star-angle)) translateX(0);
+      opacity: 0;
+    }
+    2% { opacity: 0.9; }
+    11% { opacity: 0.9; }
+    14% {
+      transform: rotate(var(--star-angle)) translateX(calc(100vw + 560px));
+      opacity: 0;
+    }
+    100% {
+      transform: rotate(var(--star-angle)) translateX(calc(100vw + 560px));
+      opacity: 0;
+    }
+  }
+
+  /* Mouse-tracking spotlight for cards — set --spot-x / --spot-y from JS */
+  .spotlight-card {
+    position: relative;
+  }
+
+  .spotlight-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(
+      320px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      hsl(var(--primary) / 0.07),
+      transparent 65%
+    );
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .dark .spotlight-card::before {
+    background: radial-gradient(
+      320px circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      hsl(var(--primary) / 0.12),
+      transparent 65%
+    );
+  }
+
+  .spotlight-card:hover::before {
+    opacity: 1;
+  }
+
+  /* Shine sweep — light beam crossing on hover */
+  .shine-sweep {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shine-sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.28) 50%,
+      transparent 68%
+    );
+    transform: translateX(-130%);
+    transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .dark .shine-sweep::after {
+    background: linear-gradient(
+      115deg,
+      transparent 32%,
+      rgba(255, 255, 255, 0.09) 50%,
+      transparent 68%
+    );
+  }
+
+  .shine-sweep:hover::after {
+    transform: translateX(130%);
+  }
+
+  /* Primary glow for buttons and highlights */
+  .shadow-glow-primary {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.18), 0 4px 14px hsl(var(--primary) / 0.28);
+  }
+
+  .shadow-glow-primary:hover {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.28), 0 6px 22px hsl(var(--primary) / 0.4);
+  }
+
+  .dark .shadow-glow-primary {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.22), 0 4px 18px hsl(var(--primary) / 0.22);
+  }
+
+  .dark .shadow-glow-primary:hover {
+    box-shadow: 0 0 0 1px hsl(var(--primary) / 0.32), 0 6px 26px hsl(var(--primary) / 0.34);
+  }
+
+  /* Subtle dotted grid background */
+  .grid-pattern {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.055) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 40%, black 30%, transparent 75%);
+  }
+
+  .dark .grid-pattern {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.07) 1px, transparent 1px);
+  }
+
+  /* Gradient border card wrapper (use p-[1px] wrapper technique) */
+  .border-gradient {
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.5), hsl(var(--chart-2) / 0.3) 50%, hsl(var(--primary) / 0.15));
+  }
+
+  /* Tabular numerals for stats */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Elevated surface (dark mode layered depth) */
+  .surface-elevated {
+    background-color: hsl(var(--surface-elevated));
+  }
+
+  /* Nav sliding pill */
+  .nav-pill {
+    position: absolute;
+    inset: 0;
+    border-radius: 0.75rem;
+    background: hsl(var(--primary) / 0.1);
+    border: 1px solid hsl(var(--primary) / 0.14);
+  }
+
+  .dark .nav-pill {
+    background: hsl(var(--primary) / 0.14);
+    border-color: hsl(var(--primary) / 0.2);
+  }
+
+  /* ============================================================
+     REDUCED MOTION — respect user preference
+     ============================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    .aurora-orb,
+    .shooting-star,
+    .animate-float,
+    .status-pulse,
+    .oni-mask,
+    .oni-glow,
+    .oni-ripple,
+    .oni-orbit-dot,
+    .oni-loading-text,
+    .oni-mask-sweep::after {
+      animation: none !important;
+    }
+
+    .oni-mask-sweep {
+      display: none;
+    }
+
+    .shine-sweep::after,
+    .spotlight-card::before {
+      display: none;
+    }
+
+    .card-lift:hover {
+      transform: none;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
   
   /* Card hover lift */
   .card-lift {
@@ -444,12 +792,16 @@ body {
   overflow-x: hidden;
 }
 
-/* Oni Loader Animations (preserved from original) */
+/* ============================================================
+   ONI LOADER v2 — sonar ripples + orbiting glow dots + logo
+   light-sweep + shimmer text. No float, no spin rings, no bounce.
+   ============================================================ */
 .oni-loader-container {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: oni-enter 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .oni-mask-wrapper {
@@ -459,48 +811,158 @@ body {
   justify-content: center;
 }
 
+/* Logo: subtle breathing sync with the sonar wave (no float) */
 .oni-mask {
   position: relative;
   z-index: 2;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  animation: oni-float 3s ease-in-out infinite, oni-pulse-glow 2s ease-in-out infinite;
-  filter: drop-shadow(0 0 20px rgba(220, 38, 38, 0.5));
+  filter: drop-shadow(0 0 18px hsl(var(--primary) / 0.38));
+  animation: oni-breathe 3.6s ease-in-out infinite;
 }
 
+/* Soft radial glow behind the logo */
 .oni-glow {
   position: absolute;
-  width: 120%;
-  height: 120%;
+  inset: 6%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(220, 38, 38, 0.3) 0%, transparent 70%);
-  animation: oni-glow-pulse 2s ease-in-out infinite;
+  background: radial-gradient(
+    circle,
+    hsl(var(--primary) / 0.4) 0%,
+    hsl(var(--chart-3) / 0.16) 48%,
+    transparent 72%
+  );
+  animation: oni-glow-ping 3.6s ease-in-out infinite;
   z-index: 1;
 }
 
-.oni-ring {
+.dark .oni-glow {
+  background: radial-gradient(
+    circle,
+    hsl(var(--primary) / 0.5) 0%,
+    hsl(var(--chart-3) / 0.22) 48%,
+    transparent 74%
+  );
+}
+
+/* Sonar ripples — circles emitted outward, staggered like radar */
+.oni-ripple {
   position: absolute;
-  width: 140%;
-  height: 140%;
+  inset: 0;
   border-radius: 50%;
-  border: 3px solid transparent;
-  border-top-color: #dc2626;
-  border-right-color: #f59e0b;
-  animation: oni-spin 1.5s linear infinite;
+  border: 2px solid hsl(var(--primary) / 0.55);
+  opacity: 0;
+  pointer-events: none;
   z-index: 0;
+  animation: oni-sonar 3.6s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
-.oni-ring-delayed {
-  width: 160%;
-  height: 160%;
-  border-top-color: #f59e0b;
-  border-right-color: #dc2626;
-  animation-direction: reverse;
-  animation-duration: 2s;
-  opacity: 0.6;
+.oni-ripple-1 { animation-delay: 0s; }
+.oni-ripple-2 {
+  animation-delay: 1.2s;
+  border-color: hsl(var(--chart-3) / 0.5);
+}
+.oni-ripple-3 {
+  animation-delay: 2.4s;
+  border-color: hsl(var(--chart-2) / 0.45);
 }
 
+/* Light sweep masked to the logo's own alpha shape (glass glint) */
+.oni-mask-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  -webkit-mask: url('/loader.png') center / contain no-repeat;
+  mask: url('/loader.png') center / contain no-repeat;
+}
+
+.oni-mask-sweep::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  left: -70%;
+  width: 45%;
+  height: 220%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 45%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 100%
+  );
+  transform: rotate(18deg);
+  animation: oni-sweep 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Orbiting glow dots — three layers, different radii / speeds / directions */
+.oni-orbit {
+  position: absolute;
+  inset: -16%;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.oni-orbit-dot {
+  position: absolute;
+  inset: 0;
+  animation:
+    oni-orbit-spin var(--orbit-dur, 3.2s) linear infinite,
+    oni-dot-glow 1.8s ease-in-out infinite;
+}
+
+.oni-orbit-dot::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--dot-color, hsl(var(--primary)));
+  box-shadow: 0 0 12px var(--dot-color, hsl(var(--primary)));
+}
+
+.oni-orbit-dot-1 {
+  --orbit-dur: 3.2s;
+  --dot-color: hsl(var(--primary));
+}
+
+.oni-orbit-dot-2 {
+  inset: 10%;
+  --orbit-dur: 4.6s;
+  --dot-color: hsl(var(--chart-3));
+  animation-direction: reverse, normal;
+  animation-delay: 0s, 0.6s;
+}
+
+.oni-orbit-dot-2::before {
+  width: 6px;
+  height: 6px;
+  top: -3px;
+  left: calc(50% - 3px);
+}
+
+.oni-orbit-dot-3 {
+  inset: -6%;
+  --orbit-dur: 6.4s;
+  --dot-color: hsl(var(--chart-2));
+  animation-delay: 0s, 1.2s;
+  opacity: 0.7;
+}
+
+.oni-orbit-dot-3::before {
+  width: 5px;
+  height: 5px;
+  top: -2.5px;
+  left: calc(50% - 2.5px);
+}
+
+/* (old conic spin rings removed — see sonar + orbit above) */
+
+/* Loading text: gradient shimmer sweep instead of opacity pulse */
 .oni-text-container {
   display: flex;
   align-items: center;
@@ -508,87 +970,77 @@ body {
 }
 
 .oni-loading-text {
-  font-size: 1rem;
-  font-weight: 500;
-  color: hsl(var(--foreground));
-  animation: oni-text-pulse 1.5s ease-in-out infinite;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted-foreground)) 20%,
+    hsl(var(--foreground)) 45%,
+    hsl(var(--primary)) 55%,
+    hsl(var(--muted-foreground)) 80%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: oni-text-shimmer 2.4s linear infinite;
 }
 
-.oni-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.oni-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: hsl(var(--primary));
-  animation: oni-dot-bounce 1.4s ease-in-out infinite;
-}
-
-.oni-dot-delay-1 {
-  animation-delay: 0.2s;
-}
-
-.oni-dot-delay-2 {
-  animation-delay: 0.4s;
-}
-
-@keyframes oni-float {
-  0%, 100% {
-    transform: translateY(0) scale(1);
+@keyframes oni-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
   }
-  50% {
-    transform: translateY(-15px) scale(1.05);
-  }
-}
-
-@keyframes oni-pulse-glow {
-  0%, 100% {
-    filter: drop-shadow(0 0 20px rgba(220, 38, 38, 0.5));
-  }
-  50% {
-    filter: drop-shadow(0 0 40px rgba(220, 38, 38, 0.8)) drop-shadow(0 0 60px rgba(245, 158, 11, 0.4));
-  }
-}
-
-@keyframes oni-glow-pulse {
-  0%, 100% {
-    opacity: 0.5;
-    transform: scale(0.95);
-  }
-  50% {
+  to {
     opacity: 1;
-    transform: scale(1.1);
-  }
-}
-
-@keyframes oni-spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes oni-text-pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes oni-dot-bounce {
-  0%, 80%, 100% {
-    transform: scale(0.6);
-    opacity: 0.4;
-  }
-  40% {
     transform: scale(1);
-    opacity: 1;
   }
+}
+
+/* Logo breathing — synced to the 3.6s sonar cycle */
+@keyframes oni-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
+}
+
+/* Glow ping — in phase with the logo breath */
+@keyframes oni-glow-ping {
+  0%, 100% { opacity: 0.45; transform: scale(0.94); }
+  50% { opacity: 0.95; transform: scale(1.07); }
+}
+
+/* Sonar ripple: emit small → expand → vanish at the edge */
+@keyframes oni-sonar {
+  0% { transform: scale(0.85); opacity: 0; }
+  12% { opacity: 0.75; }
+  100% { transform: scale(1.9); opacity: 0; }
+}
+
+/* Glass glint sweeping across the logo, once per cycle */
+@keyframes oni-sweep {
+  0% { transform: translateX(0) rotate(18deg); opacity: 1; }
+  44% { transform: translateX(430%) rotate(18deg); opacity: 1; }
+  45% { transform: translateX(430%) rotate(18deg); opacity: 0; }
+  100% { transform: translateX(430%) rotate(18deg); opacity: 0; }
+}
+
+/* Orbit layers */
+@keyframes oni-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Dot brightness wave as it travels */
+@keyframes oni-dot-glow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Shimmer travels across the uppercase label */
+@keyframes oni-text-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }

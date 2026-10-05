@@ -25,19 +25,31 @@ export function EmptyState({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
       className={cn(
-        "flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4",
+        "group relative flex flex-col items-center justify-center py-16 sm:py-20 text-center px-4 overflow-hidden",
         "rounded-2xl border border-dashed border-border/60 bg-muted/20",
         className
       )}
       {...props}
     >
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-5">
-        <Icon className="h-8 w-8 text-muted-foreground/50" />
+      {/* Decorative corner dots */}
+      <span aria-hidden className="pointer-events-none absolute top-4 left-4 h-1.5 w-1.5 rounded-full bg-primary/30" />
+      <span aria-hidden className="pointer-events-none absolute bottom-4 right-4 h-1.5 w-1.5 rounded-full bg-primary/20" />
+      <span aria-hidden className="pointer-events-none absolute top-4 right-8 h-1 w-1 rounded-full bg-primary/20" />
+      <span aria-hidden className="pointer-events-none absolute bottom-4 left-8 h-1 w-1 rounded-full bg-primary/25" />
+
+      {/* Gradient icon ring with float */}
+      <div className="relative mb-5">
+        <div
+          aria-hidden
+          className="absolute inset-0 rounded-full bg-primary/20 blur-xl opacity-60 transition-opacity duration-500 group-hover:opacity-100"
+        />
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-inset ring-primary/20 animate-float">
+          <Icon className="h-8 w-8 text-primary/70 transition-transform duration-300 group-hover:scale-110" />
+        </div>
       </div>
+
       <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-      <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">
-        {description}
-      </p>
+      <p className="text-sm text-muted-foreground mt-1.5 max-w-sm">{description}</p>
       {action && <div className="mt-6">{action}</div>}
     </motion.div>
   );

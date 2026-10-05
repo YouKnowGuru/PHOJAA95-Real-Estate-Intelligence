@@ -18,24 +18,31 @@ function OniLoader({ className, size = "lg", text = "Loading..." }: OniLoaderPro
     <div className={cn("flex flex-col items-center gap-6", className)}>
       <div className="oni-loader-container">
         <div className={cn("oni-mask-wrapper", sizeClasses[size])}>
-          <img
-            src="/loader.png"
-            alt="Loading"
-            className="oni-mask"
-          />
-          <div className="oni-glow" />
-          <div className="oni-ring" />
-          <div className="oni-ring oni-ring-delayed" />
+          {/* Sonar ripples expanding outward, staggered */}
+          <span aria-hidden className="oni-ripple oni-ripple-1" />
+          <span aria-hidden className="oni-ripple oni-ripple-2" />
+          <span aria-hidden className="oni-ripple oni-ripple-3" />
+
+          {/* Soft glow behind the logo */}
+          <span aria-hidden className="oni-glow" />
+
+          {/* The brand mark, gently breathing */}
+          <img src="/loader.png" alt="" className="oni-mask" />
+
+          {/* Light sweep masked to the logo's alpha shape */}
+          <span aria-hidden className="oni-mask-sweep" />
+
+          {/* Orbiting glow dots */}
+          <span aria-hidden className="oni-orbit">
+            <span className="oni-orbit-dot oni-orbit-dot-1" />
+            <span className="oni-orbit-dot oni-orbit-dot-2" />
+            <span className="oni-orbit-dot oni-orbit-dot-3" />
+          </span>
         </div>
       </div>
       {text && (
         <div className="oni-text-container">
           <p className="oni-loading-text">{text}</p>
-          <div className="oni-dots">
-            <span className="oni-dot" />
-            <span className="oni-dot oni-dot-delay-1" />
-            <span className="oni-dot oni-dot-delay-2" />
-          </div>
         </div>
       )}
     </div>

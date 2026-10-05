@@ -61,10 +61,21 @@ export default function Login() {
 
   return (
     <div className="relative min-h-[100dvh] w-full flex items-center justify-center overflow-hidden bg-gradient-to-br from-background via-background to-muted/30">
-      {/* Subtle background glow */}
+      {/* Layered aurora + grid + shooting stars background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[30%] -right-[20%] w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
-        <div className="absolute -bottom-[30%] -left-[20%] w-[500px] h-[500px] rounded-full bg-primary/3 blur-[100px]" />
+        <div className="absolute inset-0 grid-pattern" />
+        <div className="aurora-orb aurora-orb-1" />
+        <div className="aurora-orb aurora-orb-2" />
+        <div className="aurora-orb aurora-orb-3" />
+        {/* Running shooting stars */}
+        <div className="shooting-star shooting-star-1" />
+        <div className="shooting-star shooting-star-2" />
+        <div className="shooting-star shooting-star-3" />
+        <div className="shooting-star shooting-star-4" />
+        <div className="shooting-star shooting-star-5" />
+        <div className="shooting-star shooting-star-6" />
+        <div className="shooting-star shooting-star-7" />
+        <div className="shooting-star shooting-star-8" />
       </div>
 
       {/* Main content */}
@@ -127,8 +138,12 @@ export default function Login() {
           className="w-full max-w-[400px] shrink-0"
         >
           <div className="rounded-2xl border border-border/40 bg-card/80 backdrop-blur-xl shadow-apple-md overflow-hidden">
-            {/* Top accent */}
-            <div className="h-1 w-full bg-gradient-to-r from-primary to-primary/60" />
+            {/* Top accent — animated gradient sheen */}
+            <motion.div
+              className="h-1 w-full bg-gradient-to-r from-primary via-chart-2 to-primary bg-[length:200%_100%]"
+              animate={{ backgroundPosition: ["0% 0", "200% 0"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
 
             <div className="p-6 sm:p-8">
               {/* Header */}

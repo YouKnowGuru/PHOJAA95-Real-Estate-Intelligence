@@ -34,8 +34,9 @@ export function PageHeader({
       <div className="min-w-0">
         <div className="flex items-center gap-2.5">
           {icon && (
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0">
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 text-primary ring-1 ring-inset ring-primary/15 shrink-0">
               {icon}
+              <div className="absolute inset-0 rounded-xl bg-primary/20 blur-md opacity-40 -z-10" aria-hidden />
             </div>
           )}
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground truncate">
@@ -43,7 +44,7 @@ export function PageHeader({
           </h1>
         </div>
         {description && (
-          <p className="text-sm text-muted-foreground mt-1.5 truncate ml-0 sm:ml-[42px]">
+          <p className="text-sm text-muted-foreground mt-1.5 truncate ml-0 sm:ml-[46px]">
             {description}
           </p>
         )}

@@ -4,7 +4,7 @@ import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { KPICard } from "@/components/ui/kpi-card";
+import { KPICard, KPIHeroCard } from "@/components/ui/kpi-card";
 import { AppleCard, AppleCardHeader, AppleCardTitle, AppleCardDescription, AppleCardContent } from "@/components/ui/apple-card";
 import { AnimatedPage, AnimatedSection } from "@/components/ui/animated-page";
 import { PageHeader } from "@/components/ui/page-header";
@@ -52,7 +52,24 @@ const formatCurrency = (val: string | number) => {
   return `Nu. ${n.toLocaleString()}`;
 };
 
-const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"];
+/* Theme-aware chart palette — reads CSS vars so charts adapt to light/dark and accent themes */
+const COLORS = [
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--muted-foreground))",
+];
+
+const CHART_TOOLTIP_STYLE = {
+  background: "hsl(var(--card))",
+  border: "1px solid hsl(var(--border))",
+  borderRadius: "12px",
+  fontSize: "12px",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+  color: "hsl(var(--card-foreground))",
+} as const;
 
 function formatDevCurrency(val: string | number) {
   const n = typeof val === "string" ? parseFloat(val) : val;
@@ -436,9 +453,9 @@ function AdminDashboard() {
   }) || [];
 
   const statusData = [
-    { name: "Completed", value: stats?.completedSales || 0, color: "hsl(var(--primary))" },
-    { name: "Pending", value: stats?.pendingApprovals || 0, color: "#f59e0b" },
-    { name: "Rejected", value: stats?.rejectedCount || 0, color: "#ef4444" },
+    { name: "Completed", value: stats?.completedSales || 0, color: "hsl(var(--chart-1))" },
+    { name: "Pending", value: stats?.pendingApprovals || 0, color: "hsl(var(--chart-3))" },
+    { name: "Rejected", value: stats?.rejectedCount || 0, color: "hsl(var(--destructive))" },
   ];
 
   if (statsLoading) {
@@ -465,15 +482,23 @@ function AdminDashboard() {
         icon={<Building2 className="h-5 w-5" />}
       />
 
-      {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Bento — hero metric (2×2) + satellite cards */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <KPIHeroCard
+          title="Total Revenue"
+          value={formatCurrency(stats?.totalRevenue || "0")}
+          icon={DollarSign}
+subtitle="Commission earned this term"
+          sparkline={monthlyData.map((d) => d.revenue)}
+          delay={0}
+        />
         <KPICard
           title="Total Properties"
           value={stats?.totalProperties || 0}
           icon={Building2}
           subtitle="All property listings"
           color="bg-blue-500"
-          delay={0}
+          delay={0.1}
         />
         <KPICard
           title="Pending Approvals"
@@ -481,7 +506,7 @@ function AdminDashboard() {
           icon={Clock}
           subtitle="Awaiting your review"
           color="bg-amber-500"
-          delay={0.1}
+          delay={0.2}
         />
         <KPICard
           title="Completed Sales"
@@ -489,15 +514,15 @@ function AdminDashboard() {
           icon={CheckCircle2}
           subtitle="Successfully closed"
           color="bg-emerald-500"
-          delay={0.2}
+          delay={0.3}
         />
         <KPICard
-          title="Total Revenue"
-          value={formatCurrency(stats?.totalRevenue || "0")}
-          icon={DollarSign}
-          subtitle="Commission earned"
-          color="bg-violet-500"
-          delay={0.3}
+          title="Rejected"
+          value={stats?.rejectedCount || 0}
+          icon={XCircle}
+          subtitle="Needs revision"
+          color="bg-red-500"
+          delay={0.4}
         />
       </div>
 
@@ -525,16 +550,7 @@ function AdminDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
                   <YAxis tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} stroke="hsl(var(--border))" />
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    }}
-                    formatter={(value: number) => [`Nu. ${value.toLocaleString()}`, "Revenue"]}
-                  />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} formatter={(value: number) => [`Nu. ${value.toLocaleString()}`, "Revenue"]} />
                   <Area
                     type="monotone"
                     dataKey="revenue"
@@ -574,15 +590,7 @@ function AdminDashboard() {
                       <Cell key={index} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "12px",
-                      fontSize: "12px",
-                      boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
-                    }}
-                  />
+                  <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex flex-wrap justify-center gap-4 mt-2">
@@ -623,7 +631,7 @@ function AdminDashboard() {
                       fontSize: "12px",
                     }}
                   />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="count" fill="hsl(var(--chart-2))" radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </AppleCardContent>
@@ -701,6 +709,7 @@ function StaffDashboard() {
     { label: "Pending", value: stats?.pendingApprovals || 0, color: "bg-amber-500", total: stats?.totalProperties || 1 },
     { label: "Rejected", value: stats?.rejectedCount || 0, color: "bg-red-500", total: stats?.totalProperties || 1 },
   ];
+  // (bars animate in via framer-motion below)
 
   return (
     <AnimatedPage>

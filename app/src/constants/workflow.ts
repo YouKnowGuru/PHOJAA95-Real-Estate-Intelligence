@@ -1,7 +1,7 @@
 export const WORKFLOW_STEPS = [
   { id: 1, label: "Property Info", description: "Enter property details and owner information" },
-  { id: 2, label: "Buyer & Agreement", description: "Enter buyer details and upload agreement with payment proof" },
-  { id: 3, label: "Documents", description: "Upload required property certification documents" },
+  { id: 2, label: "Buyer & Agreement", description: "Enter buyer details, commission and the total amount paid" },
+  { id: 3, label: "Documents", description: "Upload the property agreement and all required documents at once" },
   { id: 4, label: "Verification", description: "Update lagthram and loan verification status" },
   { id: 5, label: "Completion", description: "Upload final documents for completion" },
 ] as const;

@@ -1,5 +1,6 @@
 import { jsPDF } from "jspdf";
 import { format } from "date-fns";
+import { pdfMoney, pdfText } from "@contracts/pdf-text";
 
 export interface CertificateData {
   propertyName: string;
@@ -48,7 +49,7 @@ export function generateCompletionCertificate(data: CertificateData): Buffer {
     doc.setFont("helvetica", "bold");
     doc.text(`${label}:`, margin, y);
     doc.setFont("helvetica", "normal");
-    doc.text(value, margin + 45, y);
+    doc.text(pdfText(value) || "-", margin + 45, y);
     y += 8;
   };
 
@@ -61,11 +62,11 @@ export function generateCompletionCertificate(data: CertificateData): Buffer {
   const displayPrice = data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice
     ? data.finalSellingPrice
     : data.sellingPrice;
-  addField("Selling Price", `Nu. ${displayPrice}`);
+  addField("Selling Price", `Nu. ${pdfMoney(displayPrice)}`);
   if (data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice) {
-    addField("Gross Price", `Nu. ${data.sellingPrice}`);
+    addField("Gross Price", `Nu. ${pdfMoney(data.sellingPrice)}`);
   }
-  addField("Commission Fee", `Nu. ${data.realEstateFee}`);
+  addField("Commission Fee", `Nu. ${pdfMoney(data.realEstateFee)}`);
   addField("Listed By", data.listedByName);
   addField("Completion Date", format(data.completedAt, "MMMM dd, yyyy"));
 
@@ -128,7 +129,7 @@ export function generateCertificatePdfBase64(data: CertificateData): string {
     doc.setFont("helvetica", "bold");
     doc.text(`${label}:`, margin, y);
     doc.setFont("helvetica", "normal");
-    doc.text(value, margin + 45, y);
+    doc.text(pdfText(value) || "-", margin + 45, y);
     y += 8;
   };
 
@@ -141,11 +142,11 @@ export function generateCertificatePdfBase64(data: CertificateData): string {
   const displayPrice = data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice
     ? data.finalSellingPrice
     : data.sellingPrice;
-  addField("Selling Price", `Nu. ${displayPrice}`);
+  addField("Selling Price", `Nu. ${pdfMoney(displayPrice)}`);
   if (data.finalSellingPrice && data.finalSellingPrice !== data.sellingPrice) {
-    addField("Gross Price", `Nu. ${data.sellingPrice}`);
+    addField("Gross Price", `Nu. ${pdfMoney(data.sellingPrice)}`);
   }
-  addField("Commission Fee", `Nu. ${data.realEstateFee}`);
+  addField("Commission Fee", `Nu. ${pdfMoney(data.realEstateFee)}`);
   addField("Listed By", data.listedByName);
   addField("Completion Date", format(data.completedAt, "MMMM dd, yyyy"));
 

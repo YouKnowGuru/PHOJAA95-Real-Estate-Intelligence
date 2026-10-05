@@ -34,7 +34,6 @@ import {
   Trash2,
   ExternalLink,
   Calculator,
-  TrendingDown,
   Tag,
   Ruler,
 } from "lucide-react";
@@ -46,6 +45,46 @@ const steps = WORKFLOW_STEPS.map(({ id, label }) => ({
   label,
   icon: [Building2, FileText, Upload, Shield, CheckCircle2][id - 1]!,
 }));
+
+const BUILDING_DOC_TYPES = ["Building", "Flat", "Apartment", "Duplex", "Bungalow"];
+
+type DocSlot = "agreementFile" | "gewogCertification" | "internalAgreement" | "occupancyCertificate" | "plrVerification";
+
+const DOC_SLOT_LABEL: Record<DocSlot, string> = {
+  agreementFile: "Property Agreement",
+  gewogCertification: "Gewog Endorse Document",
+  internalAgreement: "Internal Agreement",
+  occupancyCertificate: "Occupancy Certificate",
+  plrVerification: "PLR Verification",
+};
+
+/** Guess which document slot a selected file belongs to from its file name. */
+function inferDocSlot(fileName: string, slots: DocSlot[]): DocSlot | "" {
+  const name = fileName.toLowerCase();
+  const rules: [DocSlot, RegExp][] = [
+    ["internalAgreement", /internal/],
+    ["occupancyCertificate", /occupancy|completion|certificate/],
+    ["plrVerification", /plr|verification|verify/],
+    ["gewogCertification", /gewog|endorse/],
+    ["agreementFile", /agreement|contract|deed|sale|purchase|transfer|khazon/],
+  ];
+  for (const [slot, re] of rules) {
+    if (re.test(name) && slots.includes(slot)) return slot;
+  }
+  return "";
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.includes(",") ? result.split(",")[1] : result);
+    };
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function PropertyWizard() {
   const navigate = useNavigate();
@@ -82,8 +121,6 @@ export default function PropertyWizard() {
     loanAmount: "",
     pricePerDecimal: "",
     landSizeDecimal: "",
-    negotiatedPrice: "",
-    discountAmount: "",
     finalSellingPrice: "",
     priceOverrideReason: "",
     thramNumber: "",
@@ -107,19 +144,24 @@ export default function PropertyWizard() {
     buyerCID: "",
     buyerPhone: "",
     buyerAddress: "",
-    agreementFile: "",
     commissionAmount: "",
-    paymentAmount: "",
+    totalAmountPaid: "",
   });
 
-  // Step 3: Documents
+  // Step 3: Documents (the property agreement is uploaded here with everything else)
   const [step3Data, setStep3Data] = useState({
+    agreementFile: "",
     gewogCertification: "",
     internalAgreement: "",
     occupancyCertificate: "",
     plrVerification: "",
-    remainingPaymentAmount: "",
   });
+
+  // Bulk upload: files chosen at once, then attached to their slots in Step 3
+  const [bulkFiles, setBulkFiles] = useState<{ key: string; file: File; fileName: string; slot: DocSlot | "" }[]>([]);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const bulkInputRef = useRef<HTMLInputElement>(null);
 
   // Step 4: Verification
   const [step4Data, setStep4Data] = useState({
@@ -143,7 +185,6 @@ export default function PropertyWizard() {
     const p = existingProperty.property;
     if (p) {
 
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep1Data({
         propertyName: p.propertyName || "",
         propertyTypeId: p.propertyTypeId?.toString() || "",
@@ -159,8 +200,6 @@ export default function PropertyWizard() {
         loanAmount: p.loanAmount?.toString() || "",
         pricePerDecimal: p.pricePerDecimal?.toString() || "",
         landSizeDecimal: p.landSizeDecimal?.toString() || "",
-        negotiatedPrice: p.negotiatedPrice?.toString() || "",
-        discountAmount: p.discountAmount?.toString() || "",
         finalSellingPrice: p.finalSellingPrice?.toString() || "",
         priceOverrideReason: p.priceOverrideReason || "",
         thramNumber: p.thramNumber || "",
@@ -200,27 +239,42 @@ export default function PropertyWizard() {
 
     // Load Step 2 data
     if (existingProperty.agreement || p) {
+      const price = parseFloat(p.finalSellingPrice ?? p.sellingPrice ?? "0") || 0;
+      const stepNo = p.currentStep ?? 0;
+      const storedTotal = existingProperty.agreement?.totalAmountPaid?.toString();
+
+      // Legacy records (50% advance + remaining split) are converted to the same
+      // total the billing screens calculate, so nothing about past data changes
+      const legacyPayment = existingProperty.agreement?.paymentAmount;
+      const legacyRemaining = existingProperty.documents?.remainingPaymentAmount;
+      let legacyTotal = "";
+      if (legacyPayment != null || legacyRemaining != null) {
+        const initial = legacyPayment != null ? parseFloat(legacyPayment) : price / 2;
+        const remaining = legacyRemaining != null ? parseFloat(legacyRemaining) : Math.max(0, price - initial);
+        legacyTotal = ((stepNo >= 3 ? initial : 0) + (stepNo >= 4 ? remaining : 0)).toFixed(2);
+      }
+
       setStep2Data(prev => ({
         ...prev,
         buyerName: p.buyerName || prev.buyerName || "",
         buyerCID: p.buyerCID || prev.buyerCID || "",
         buyerPhone: p.buyerPhone || prev.buyerPhone || "",
         buyerAddress: p.buyerAddress || prev.buyerAddress || "",
-        agreementFile: existingProperty.agreement?.agreementFile || prev.agreementFile || "",
         commissionAmount: existingProperty.agreement?.commissionAmount?.toString() || p?.realEstateFee?.toString() || prev.commissionAmount || "",
-        paymentAmount: existingProperty.agreement?.paymentAmount?.toString() || prev.paymentAmount || "",
+        totalAmountPaid: storedTotal || legacyTotal || prev.totalAmountPaid || "",
       }));
     }
 
-    // Load Step 3 data
-    if (existingProperty.documents) {
-      setStep3Data({
-        gewogCertification: existingProperty.documents.gewogCertification || "",
-        internalAgreement: existingProperty.documents.internalAgreement || "",
-        occupancyCertificate: existingProperty.documents.occupancyCertificate || "",
-        plrVerification: existingProperty.documents.plrVerification || "",
-        remainingPaymentAmount: existingProperty.documents.remainingPaymentAmount?.toString() || "",
-      });
+    // Load Step 3 data (documents + the agreement file, which is uploaded here)
+    if (existingProperty.documents || existingProperty.agreement) {
+      setStep3Data(prev => ({
+        ...prev,
+        agreementFile: existingProperty.agreement?.agreementFile || prev.agreementFile || "",
+        gewogCertification: existingProperty.documents?.gewogCertification || prev.gewogCertification || "",
+        internalAgreement: existingProperty.documents?.internalAgreement || prev.internalAgreement || "",
+        occupancyCertificate: existingProperty.documents?.occupancyCertificate || prev.occupancyCertificate || "",
+        plrVerification: existingProperty.documents?.plrVerification || prev.plrVerification || "",
+      }));
     }
 
     // Load Step 4 data
@@ -323,12 +377,86 @@ export default function PropertyWizard() {
     onError: (err) => toast.error(err.message),
   });
 
+  // ── Step 3 bulk upload ─────────────────────────────────────────────
+  const uploadMutation = trpc.upload.upload.useMutation();
+
+  // Document slots offered on this property (building documents only for building types)
+  const docTypeName =
+    existingProperty?.property?.propertyTypeName ||
+    propertyTypes?.find((pt) => pt.id === parseInt(step1Data.propertyTypeId))?.name ||
+    "";
+  const visibleDocSlots: DocSlot[] = [
+    "agreementFile",
+    "gewogCertification",
+    ...(BUILDING_DOC_TYPES.includes(docTypeName)
+      ? (["internalAgreement", "occupancyCertificate", "plrVerification"] as DocSlot[])
+      : []),
+  ];
+
+  const handleBulkFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    setBulkFiles(
+      files.map((file, index) => ({
+        key: `${Date.now()}-${index}`,
+        file,
+        fileName: file.name,
+        slot: inferDocSlot(file.name, visibleDocSlots),
+      }))
+    );
+  };
+
+  const handleBulkAttach = async () => {
+    if (bulkUploading) return;
+    const queued = bulkFiles.filter((item) => item.slot !== "");
+    if (queued.length === 0) return;
+
+    setBulkUploading(true);
+    setBulkProgress({ done: 0, total: queued.length });
+
+    const updates: Partial<typeof step3Data> = {};
+    const failed: string[] = [];
+
+    for (let i = 0; i < queued.length; i++) {
+      const item = queued[i];
+      try {
+        if (item.file.size > 10 * 1024 * 1024) {
+          throw new Error("File size exceeds 10MB limit");
+        }
+        const base64 = await readFileAsBase64(item.file);
+        const result = await uploadMutation.mutateAsync({
+          file: base64,
+          fileName: item.file.name,
+          mimeType: item.file.type || "application/octet-stream",
+          folder: "documents",
+          propertyId,
+        });
+        updates[item.slot as DocSlot] = result.url;
+      } catch {
+        failed.push(item.fileName);
+      }
+      setBulkProgress({ done: i + 1, total: queued.length });
+    }
+
+    if (Object.keys(updates).length > 0) {
+      setStep3Data((prev) => ({ ...prev, ...updates }));
+    }
+    setBulkFiles((prev) => prev.filter((item) => !item.slot || failed.includes(item.fileName)));
+    setBulkUploading(false);
+    setBulkProgress(null);
+
+    if (failed.length > 0) {
+      toast.error(`Could not upload: ${failed.join(", ")}`);
+    } else if (Object.keys(updates).length > 0) {
+      toast.success(`${Object.keys(updates).length} document(s) attached below`);
+    }
+  };
+
   // ── Land Pricing Auto-Calculation ─────────────────────────────────
   const calculatePricing = () => {
     const pricePerDec = parseFloat(step1Data.pricePerDecimal || "0");
     const landSize = parseFloat(step1Data.landSizeDecimal || "0");
-    const negotiated = parseFloat(step1Data.negotiatedPrice || "0");
-    const discount = parseFloat(step1Data.discountAmount || "0");
 
     let sellingPrice = 0;
     if (pricePerDec > 0 && landSize > 0) {
@@ -337,14 +465,7 @@ export default function PropertyWizard() {
       sellingPrice = parseFloat(step1Data.sellingPrice);
     }
 
-    let finalPrice = sellingPrice;
-    if (negotiated > 0) {
-      finalPrice = negotiated - discount;
-    } else if (discount > 0) {
-      finalPrice = sellingPrice - discount;
-    }
-    finalPrice = Math.max(0, finalPrice);
-
+    const finalPrice = Math.max(0, sellingPrice);
     const commission = finalPrice * 0.03;
 
     return {
@@ -382,8 +503,6 @@ export default function PropertyWizard() {
       loanAmount: step1Data.loanAmount || undefined,
       pricePerDecimal: isLand ? step1Data.pricePerDecimal : undefined,
       landSizeDecimal: step1Data.landSizeDecimal,
-      negotiatedPrice: isLand ? step1Data.negotiatedPrice : undefined,
-      discountAmount: isLand ? step1Data.discountAmount : undefined,
       finalSellingPrice: isLand ? pricing.finalSellingPrice : undefined,
       priceOverrideReason: isPriceOverride ? step1Data.priceOverrideReason : undefined,
       thramNumber: step1Data.thramNumber || undefined,
@@ -434,31 +553,27 @@ export default function PropertyWizard() {
       toast.error("Please enter the Buyer Address before submitting.");
       return;
     }
-    if (!step2Data.agreementFile) {
-      toast.error("Please upload the Property Agreement File before submitting.");
-      return;
-    }
-    if (!step2Data.paymentAmount || step2Data.paymentAmount.trim() === "") {
-      toast.error("Please enter the 50% Payment Amount before submitting.");
+    if (!step2Data.totalAmountPaid || step2Data.totalAmountPaid.trim() === "") {
+      toast.error("Please enter the Total Amount Paid before submitting.");
       return;
     }
     submitStep2Mutation.mutate({
       propertyId,
       ...step2Data,
       commissionAmount: step2Data.commissionAmount || undefined,
-      paymentAmount: step2Data.paymentAmount || undefined,
+      totalAmountPaid: step2Data.totalAmountPaid || undefined,
     });
   };
 
   const handleStep3Submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!propertyId) return;
-    if (!step3Data.gewogCertification) {
-      toast.error("Please upload the Gewog Endorse Document before submitting.");
+    if (!step3Data.agreementFile) {
+      toast.error("Please upload the Property Agreement File before submitting.");
       return;
     }
-    if (!step3Data.remainingPaymentAmount || step3Data.remainingPaymentAmount.trim() === "") {
-      toast.error("Please enter the Remaining Payment Amount before submitting.");
+    if (!step3Data.gewogCertification) {
+      toast.error("Please upload the Gewog Endorse Document before submitting.");
       return;
     }
     const typeName = existingProperty?.property?.propertyTypeName ?? "";
@@ -623,54 +738,6 @@ export default function PropertyWizard() {
                     />
                   </div>
 
-                  {/* ── NEGOTIATED PRICE & DISCOUNT ──────────────────────── */}
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <span>Negotiated Price (Nu.)</span>
-                      <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={step1Data.negotiatedPrice}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const pricing = calculatePricing();
-                        setStep1Data({
-                          ...step1Data,
-                          negotiatedPrice: val,
-                          realEstateFee: pricing.realEstateFee,
-                          finalSellingPrice: pricing.finalSellingPrice,
-                        });
-                      }}
-                      placeholder="Override auto-calculated price"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <span>Discount Amount (Nu.)</span>
-                      <span className="text-xs text-muted-foreground font-normal">(Optional)</span>
-                    </Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={step1Data.discountAmount}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        const pricing = calculatePricing();
-                        setStep1Data({
-                          ...step1Data,
-                          discountAmount: val,
-                          realEstateFee: pricing.realEstateFee,
-                          finalSellingPrice: pricing.finalSellingPrice,
-                        });
-                      }}
-                      placeholder="e.g. 125000"
-                    />
-                  </div>
-
                   {/* Loan Amount for Land properties */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
@@ -765,8 +832,6 @@ export default function PropertyWizard() {
                       landSize={step1Data.landSizeDecimal}
                       pricePerDecimal={step1Data.pricePerDecimal}
                       sellingPrice={isPriceOverride ? step1Data.sellingPrice : calculatePricing().sellingPrice}
-                      negotiatedPrice={step1Data.negotiatedPrice}
-                      discountAmount={step1Data.discountAmount}
                       finalSellingPrice={calculatePricing().finalSellingPrice}
                       commission={calculatePricing().realEstateFee}
                       isOverride={isPriceOverride}
@@ -1126,16 +1191,9 @@ export default function PropertyWizard() {
             <Separator />
 
             <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Property Agreement File *</Label>
-                <FileUploader
-                  accept={DOCUMENT_UPLOAD_ACCEPT}
-                  maxSize={10 * 1024 * 1024}
-                  value={step2Data.agreementFile}
-                  onChange={(url) => setStep2Data({ ...step2Data, agreementFile: url })}
-                  label="Upload agreement"
-                  hint="Upload the signed property agreement document (PDF, Word, or image)"
-                />
+              <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-xs text-muted-foreground">
+                <FileText className="h-4 w-4 shrink-0 text-primary" />
+                <span>All files — including the property agreement — are uploaded together in Step 3 (Documents).</span>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -1148,13 +1206,16 @@ export default function PropertyWizard() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>50% Payment Amount *</Label>
+                  <Label>Total Amount Paid *</Label>
                   <Input
                     type="number"
-                    value={step2Data.paymentAmount}
-                    onChange={(e) => setStep2Data({ ...step2Data, paymentAmount: e.target.value })}
-                    placeholder="Enter payment amount"
+                    min="0"
+                    step="0.01"
+                    value={step2Data.totalAmountPaid}
+                    onChange={(e) => setStep2Data({ ...step2Data, totalAmountPaid: e.target.value })}
+                    placeholder="Enter total amount paid"
                   />
+                  <p className="text-xs text-muted-foreground">Total amount received from the buyer (any number of payments).</p>
                 </div>
               </div>
             </div>
@@ -1175,12 +1236,12 @@ export default function PropertyWizard() {
                   variant="outline"
                   onClick={() => {
                     // Auto-save step 2 before navigating forward
-                    if (step2Data.agreementFile && step2Data.paymentAmount.trim() && step2Data.buyerName.trim()) {
+                    if (step2Data.totalAmountPaid.trim() && step2Data.buyerName.trim()) {
                       submitStep2Mutation.mutate({
                         propertyId: propertyId!,
                         ...step2Data,
                         commissionAmount: step2Data.commissionAmount || undefined,
-                        paymentAmount: step2Data.paymentAmount || undefined,
+                        totalAmountPaid: step2Data.totalAmountPaid || undefined,
                       }, {
                         onSuccess: () => navigateToStep(3),
                       });
@@ -1242,7 +1303,107 @@ export default function PropertyWizard() {
                 eSakor Portal
               </a>
 
+              {/* ── BULK UPLOAD: pick every document in one go ──────────── */}
+              <div className="space-y-3 rounded-xl border border-dashed p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-base font-bold">Upload all documents at once</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Select every file together — each one is matched to its document slot below.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={bulkUploading}
+                    onClick={() => bulkInputRef.current?.click()}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Choose files
+                  </Button>
+                  <input
+                    ref={bulkInputRef}
+                    type="file"
+                    multiple
+                    accept={DOCUMENT_UPLOAD_ACCEPT}
+                    className="hidden"
+                    onChange={handleBulkFileSelect}
+                    disabled={bulkUploading}
+                  />
+                </div>
+
+                {bulkFiles.length > 0 && (
+                  <div className="space-y-2">
+                    {bulkFiles.map((item, index) => (
+                      <div key={item.key} className="flex flex-wrap items-center gap-2 rounded-lg border p-2">
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-[140px] flex-1 truncate text-sm">{item.fileName}</span>
+                        <Select
+                          value={item.slot}
+                          onValueChange={(v) =>
+                            setBulkFiles((prev) =>
+                              prev.map((f, i) => (i === index ? { ...f, slot: v as DocSlot } : f))
+                            )
+                          }
+                        >
+                          <SelectTrigger className="h-8 w-[220px] text-xs">
+                            <SelectValue placeholder="Choose document type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {visibleDocSlots.map((slot) => (
+                              <SelectItem key={slot} value={slot}>
+                                {DOC_SLOT_LABEL[slot]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          disabled={bulkUploading}
+                          onClick={() => setBulkFiles((prev) => prev.filter((_, i) => i !== index))}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleBulkAttach}
+                        disabled={bulkUploading || bulkFiles.some((f) => !f.slot)}
+                      >
+                        {bulkUploading
+                          ? `Uploading ${bulkProgress?.done ?? 0}/${bulkProgress?.total ?? 0}...`
+                          : `Attach ${bulkFiles.length} file${bulkFiles.length === 1 ? "" : "s"}`}
+                      </Button>
+                      <Button type="button" size="sm" variant="ghost" onClick={() => setBulkFiles([])} disabled={bulkUploading}>
+                        Clear
+                      </Button>
+                      {bulkFiles.some((f) => !f.slot) && (
+                        <span className="text-xs text-muted-foreground">Choose a document type for every file first.</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Property Agreement File *</Label>
+                  <FileUploader
+                    accept={DOCUMENT_UPLOAD_ACCEPT}
+                    maxSize={10 * 1024 * 1024}
+                    value={step3Data.agreementFile}
+                    onChange={(url) => setStep3Data({ ...step3Data, agreementFile: url })}
+                    label="Upload agreement"
+                    hint="Signed property agreement document (PDF, Word or image)"
+                  />
+                </div>
+
                 <div className="space-y-2">
                   <Label>Gewog Endorse Document *</Label>
                   <FileUploader
@@ -1294,32 +1455,6 @@ export default function PropertyWizard() {
                 )}
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Upload className="h-4 w-4 text-primary" />
-                  </div>
-                  <div>
-                    <Label className="text-base font-bold">Remaining Payment Amount *</Label>
-                    <p className="text-xs text-muted-foreground">Record the remaining payment amount to conclude the transaction.</p>
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2 max-w-xl">
-                  <div className="space-y-2">
-                    <Label>Remaining Payment Amount *</Label>
-                    <Input
-                      type="number"
-                      value={step3Data.remainingPaymentAmount}
-                      onChange={(e) => setStep3Data({ ...step3Data, remainingPaymentAmount: e.target.value })}
-                      placeholder="Enter remaining payment amount"
-                    />
-                    <p className="text-xs text-muted-foreground">Enter the actual remaining payment amount.</p>
-                  </div>
-                </div>
-              </div>
             </div>
             <div className="flex flex-col-reverse sm:flex-row justify-between gap-3">
               <Button
@@ -1345,8 +1480,8 @@ export default function PropertyWizard() {
                     const BUILDING_TYPES = ["Building", "Flat", "Apartment", "Duplex", "Bungalow"];
                     const requiresBuildingDocs = BUILDING_TYPES.includes(finalTypeName);
 
-                    const hasRequiredDocs = step3Data.gewogCertification &&
-                      step3Data.remainingPaymentAmount &&
+                    const hasRequiredDocs = step3Data.agreementFile &&
+                      step3Data.gewogCertification &&
                       (!requiresBuildingDocs || (step3Data.internalAgreement && step3Data.occupancyCertificate && step3Data.plrVerification));
 
                     if (hasRequiredDocs) {
@@ -1555,27 +1690,6 @@ export default function PropertyWizard() {
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          {propertyId ? "Continue Workflow" : "New Property Listing"}
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Complete the 5-step workflow process
-        </p>
-      </div>
-
-      {/* Step Indicators */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2">
-        {steps.map((step, index) => {
-          const isActive = step.id === currentStep;
-          const isCompleted = step.id < currentStep;
-          const isRejected = existingProperty?.property?.approvalStatus === "rejected" && existingProperty?.property?.currentStep === step.id;
-          
-          // Allow navigation to: current step, completed steps, or rejected step
-          const isAccessible = isAdmin || step.id <= (existingProperty?.property?.currentStep || 1) || isRejected;
-          
   if (propertyId && existingProperty === undefined) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -1588,7 +1702,28 @@ export default function PropertyWizard() {
   }
 
   return (
-            <div key={step.id} className="flex items-center gap-2 flex-1 min-w-0">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+          {propertyId ? "Continue Workflow" : "New Property Listing"}
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Complete the 5-step workflow process
+        </p>
+      </div>
+
+      {/* Step Indicators */}
+      <div className="flex items-center justify-between gap-1 sm:gap-2 overflow-x-auto pb-2">
+        {steps.map((step, index) => {
+          const isActive = step.id === currentStep;
+          const isCompleted = step.id < currentStep;
+          const isRejected = existingProperty?.property?.approvalStatus === "rejected" && existingProperty?.property?.currentStep === step.id;
+          
+          // Allow navigation to: current step, completed steps, or rejected step
+          const isAccessible = isAdmin || step.id <= (existingProperty?.property?.currentStep || 1) || isRejected;
+
+          return (
+            <div key={step.id} className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
               <motion.div
                 whileHover={isAccessible ? { scale: 1.02, y: -2 } : {}}
                 whileTap={isAccessible ? { scale: 0.98 } : {}}
@@ -1599,24 +1734,24 @@ export default function PropertyWizard() {
                     navigate(`${basePath}?step=${step.id}`, { replace: true });
                   }
                 }}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ring-1 ring-inset ${
                   isActive
-                    ? "bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-foreground"
+                    ? "bg-primary/10 text-primary ring-primary/25 dark:bg-primary/20 dark:text-primary-foreground"
                     : isRejected
-                    ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 animate-pulse"
+                    ? "bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/50 animate-pulse"
                     : isCompleted
-                    ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 hover:bg-primary/5 dark:hover:bg-primary/10"
+                    ? "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 hover:bg-primary/5 dark:hover:bg-primary/10"
                     : isAccessible
-                    ? "text-muted-foreground hover:bg-slate-50 dark:hover:bg-slate-800"
-                    : "text-muted-foreground opacity-50 cursor-not-allowed"
+                    ? "text-muted-foreground ring-border/60 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    : "text-muted-foreground ring-border/40 opacity-50 cursor-not-allowed"
                 }`}
               >
                 <step.icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline truncate">{step.label}</span>
-                {isRejected && <span className="text-[10px]">(Rejected)</span>}
+                <span className="hidden sm:block truncate min-w-0">{step.label}</span>
+                {isRejected && <span className="text-[10px] shrink-0">(Rejected)</span>}
               </motion.div>
               {index < steps.length - 1 && (
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               )}
             </div>
           );
@@ -1635,8 +1770,8 @@ export default function PropertyWizard() {
           </CardTitle>
           <CardDescription>
             {currentStep === 1 && "Enter property details and owner information"}
-            {currentStep === 2 && "Enter buyer details and upload agreement with payment proof"}
-            {currentStep === 3 && "Upload required property certification documents"}
+            {currentStep === 2 && "Enter buyer details, commission and the total amount paid"}
+            {currentStep === 3 && "Upload the property agreement and all required documents at once"}
             {currentStep === 4 && "Update lagthram and loan verification status"}
             {currentStep === 5 && "Upload final documents for completion"}
             {isAdmin && <span className="block text-xs text-green-600 dark:text-green-400 mt-1">Admin: Steps will auto-approve on submission</span>}
@@ -1676,8 +1811,6 @@ function PricingSummaryCard({
   landSize,
   pricePerDecimal,
   sellingPrice,
-  negotiatedPrice,
-  discountAmount,
   finalSellingPrice,
   commission,
   isOverride,
@@ -1685,8 +1818,6 @@ function PricingSummaryCard({
   landSize: string;
   pricePerDecimal: string;
   sellingPrice: string;
-  negotiatedPrice: string;
-  discountAmount: string;
   finalSellingPrice: string;
   commission: string;
   isOverride: boolean;
@@ -1698,8 +1829,6 @@ function PricingSummaryCard({
   };
 
   const hasLandPricing = parseFloat(landSize || "0") > 0 && parseFloat(pricePerDecimal || "0") > 0;
-  const hasNegotiated = parseFloat(negotiatedPrice || "0") > 0;
-  const hasDiscount = parseFloat(discountAmount || "0") > 0;
 
   return (
     <motion.div
@@ -1750,28 +1879,6 @@ function PricingSummaryCard({
           <span className="text-sm text-muted-foreground">Gross Selling Price</span>
           <span className="text-sm font-medium text-foreground">{fmt(sellingPrice)}</span>
         </div>
-
-        {/* Negotiated Price */}
-        {hasNegotiated && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <TrendingDown className="h-3 w-3 text-blue-500" />
-              Negotiated Price
-            </span>
-            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{fmt(negotiatedPrice)}</span>
-          </div>
-        )}
-
-        {/* Discount */}
-        {hasDiscount && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
-              <TrendingDown className="h-3 w-3 text-red-500" />
-              Discount
-            </span>
-            <span className="text-sm font-medium text-red-600 dark:text-red-400">- {fmt(discountAmount)}</span>
-          </div>
-        )}
 
         {/* Divider */}
         <div className="h-px bg-emerald-200 dark:bg-emerald-700/40" />

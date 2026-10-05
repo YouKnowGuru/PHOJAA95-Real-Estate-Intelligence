@@ -51,12 +51,12 @@ export function ModulePayrollTab({
   const utils = trpc.useUtils();
 
   const { data: myPayroll, isLoading: myLoading } = trpc.payroll.myPayroll.useQuery(
-    { month: selectedMonth },
+    { month: selectedMonth === "all" ? undefined : (selectedMonth || undefined) },
     { enabled: !isAdmin }
   );
 
   const { data: teamPayroll, isLoading: adminLoading } = trpc.payroll.list.useQuery(
-    { month: selectedMonth, role: teamRole, limit: 100 },
+    { month: selectedMonth === "all" ? undefined : (selectedMonth || undefined), role: teamRole },
     { enabled: isAdmin }
   );
 
@@ -109,12 +109,37 @@ export function ModulePayrollTab({
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0 w-full lg:w-auto">
-          <Input
-            type="month"
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(e.target.value)}
-            className="h-10 sm:h-9 w-full sm:w-[150px]"
-          />
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <Input
+              type="month"
+              value={selectedMonth === "all" ? "" : selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value || "all")}
+              className="h-10 sm:h-9 w-full sm:w-[150px]"
+            />
+            {selectedMonth !== "all" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedMonth("all")}
+                className="h-10 sm:h-9 text-xs text-muted-foreground whitespace-nowrap"
+                title="View all payments till now"
+              >
+                All time
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setSelectedMonth(currentMonth)}
+                className="h-10 sm:h-9 text-xs whitespace-nowrap"
+                title="View current month"
+              >
+                This month
+              </Button>
+            )}
+          </div>
           {isAdmin && (
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button size="sm" onClick={() => setShowAdd(true)} className="flex-1 sm:flex-initial h-10 sm:h-9">

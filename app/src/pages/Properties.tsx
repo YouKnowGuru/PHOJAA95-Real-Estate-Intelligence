@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { trpc } from "@/lib/trpc";
 import type { RouterOutputs } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -51,6 +50,7 @@ import {
   Layers,
   SlidersHorizontal,
   X,
+  Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { STEP_LABELS } from "@/constants/workflow";
@@ -71,7 +71,6 @@ const statusColors: Record<string, string> = {
 
 export default function Properties() {
   const { isAdmin } = useAuth();
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<"all" | "draft" | "submitted" | "pending_review" | "approved" | "rejected" | "completed" | "cancelled">("all");
   const [step, setStep] = useState<string>("all");
@@ -95,8 +94,6 @@ export default function Properties() {
     status: status === "all" ? undefined : status || undefined,
     step: step && step !== "all" ? parseInt(step) : undefined,
     propertyTypeId: propertyTypeId && propertyTypeId !== "all" ? parseInt(propertyTypeId) : undefined,
-    page,
-    limit: 12,
   });
 
   const { data: propertyTypes } = trpc.propertyType.list.useQuery();
@@ -126,7 +123,6 @@ export default function Properties() {
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
-    setPage(1);
   };
 
   const clearFilters = () => {
@@ -134,14 +130,13 @@ export default function Properties() {
     setStatus("all");
     setStep("all");
     setPropertyTypeId("all");
-    setPage(1);
   };
 
   const hasActiveFilters = search !== "" || status !== "all" || step !== "all" || propertyTypeId !== "all";
 
   const filterContent = (
     <>
-      <Select value={status} onValueChange={(v) => { setStatus(v as typeof status); setPage(1); }}>
+      <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
         <SelectTrigger className="h-9 w-full sm:w-[140px] text-xs">
           <Filter className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Status" />
@@ -156,7 +151,7 @@ export default function Properties() {
           <SelectItem value="completed">Completed</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={step} onValueChange={(v) => { setStep(v); setPage(1); }}>
+      <Select value={step} onValueChange={(v) => setStep(v)}>
         <SelectTrigger className="h-9 w-full sm:w-[130px] text-xs">
           <Layers className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Step" />
@@ -170,7 +165,7 @@ export default function Properties() {
           <SelectItem value="5">Step 5</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={propertyTypeId} onValueChange={(v) => { setPropertyTypeId(v); setPage(1); }}>
+      <Select value={propertyTypeId} onValueChange={(v) => setPropertyTypeId(v)}>
         <SelectTrigger className="h-9 w-full sm:w-[140px] text-xs">
           <Tag className="mr-1.5 h-3 w-3" />
           <SelectValue placeholder="Type" />
@@ -202,7 +197,11 @@ export default function Properties() {
     <AnimatedPage>
       <PageHeader
         title="Properties"
-        description="Manage and track all property listings"
+        description={
+          data?.total !== undefined
+            ? `Manage and track all ${data.total} ${data.total === 1 ? "property listing" : "property listings"}`
+            : "Manage and track all property listings"
+        }
         icon={<Building2 className="h-5 w-5" />}
         actions={
           <Link to="/properties/new">
@@ -322,101 +321,6 @@ export default function Properties() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-
-          {/* Pagination */}
-          {data && data.totalPages > 1 && (
-            <Pagination className="mt-6">
-              <PaginationContent className="flex-wrap justify-center gap-y-2">
-                <PaginationItem>
-                  <PaginationPrevious
-                    onClick={() => setPage(Math.max(1, page - 1))}
-                    className={page <= 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-                {data.totalPages <= 7 ? (
-                  [...Array(data.totalPages)].map((_, i) => (
-                    <PaginationItem key={i + 1}>
-                      <PaginationLink
-                        isActive={page === i + 1}
-                        onClick={() => setPage(i + 1)}
-                        className="cursor-pointer"
-                      >
-                        {i + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))
-                ) : (
-                  <>
-                    {page <= 3 ? (
-                      <>
-                        {[1, 2, 3, 4].map((i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink isActive={page === i} onClick={() => setPage(i)} className="cursor-pointer">
-                              {i}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <span className="text-sm text-muted-foreground px-2">...</span>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationLink onClick={() => setPage(data.totalPages)} className="cursor-pointer">
-                            {data.totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      </>
-                    ) : page >= data.totalPages - 2 ? (
-                      <>
-                        <PaginationItem>
-                          <PaginationLink onClick={() => setPage(1)} className="cursor-pointer">1</PaginationLink>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <span className="text-sm text-muted-foreground px-2">...</span>
-                        </PaginationItem>
-                        {[data.totalPages - 3, data.totalPages - 2, data.totalPages - 1, data.totalPages].map((i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink isActive={page === i} onClick={() => setPage(i)} className="cursor-pointer">
-                              {i}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                      </>
-                    ) : (
-                      <>
-                        <PaginationItem>
-                          <PaginationLink onClick={() => setPage(1)} className="cursor-pointer">1</PaginationLink>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <span className="text-sm text-muted-foreground px-2">...</span>
-                        </PaginationItem>
-                        {[page - 1, page, page + 1].map((i) => (
-                          <PaginationItem key={i}>
-                            <PaginationLink isActive={page === i} onClick={() => setPage(i)} className="cursor-pointer">
-                              {i}
-                            </PaginationLink>
-                          </PaginationItem>
-                        ))}
-                        <PaginationItem>
-                          <span className="text-sm text-muted-foreground px-2">...</span>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationLink onClick={() => setPage(data.totalPages)} className="cursor-pointer">
-                            {data.totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      </>
-                    )}
-                  </>
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    onClick={() => setPage(Math.min(data.totalPages, page + 1))}
-                    className={page >= data.totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          )}
         </>
       )}
     </AnimatedPage>
@@ -432,6 +336,7 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
   onDelete: (id: number, name: string) => void;
 }) {
   const [imageError, setImageError] = useState(false);
+  const navigate = useNavigate();
   const isPending = !property.isSold && property.currentStep === 4;
 
   return (
@@ -568,6 +473,19 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                       Nu. {parseFloat(property.realEstateFee ?? "0").toLocaleString("en-BT", { minimumFractionDigits: 2 })}
                     </p>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-primary shrink-0"
+                    title="Email clients about this property"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      navigate(`/email-campaigns?propertyId=${property.id}`);
+                    }}
+                  >
+                    <Mail className="h-3 w-3" />
+                  </Button>
                   {isAdmin && (
                     <Button
                       variant="ghost"

@@ -64,6 +64,20 @@
       "when": 1780913899170,
       "tag": "0008_spotty_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1790860602483,
+      "tag": "0009_total_amount_paid",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1790938403817,
+      "tag": "0010_robust_nocturne",
+      "breakpoints": true
     }
   ]
 }

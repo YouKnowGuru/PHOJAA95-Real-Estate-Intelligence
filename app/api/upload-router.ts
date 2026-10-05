@@ -161,10 +161,10 @@ export const uploadRouter = createRouter({
 
       if (agreement[0]) {
         if (agreement[0].agreementFile) {
-          allDocuments.push({ name: "Agreement File", url: agreement[0].agreementFile, step: 2 });
+          allDocuments.push({ name: "Agreement File", url: agreement[0].agreementFile, step: 3 });
         }
         if (agreement[0].paymentScreenshot) {
-          allDocuments.push({ name: "Payment Screenshot (50%)", url: agreement[0].paymentScreenshot, step: 2 });
+          allDocuments.push({ name: "Payment Screenshot", url: agreement[0].paymentScreenshot, step: 2 });
         }
       }
 

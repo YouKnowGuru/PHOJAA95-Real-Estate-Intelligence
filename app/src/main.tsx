@@ -3,11 +3,11 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router'
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { OniLoader } from "@/components/ui/oni-loader";
 import './index.css'
 import 'leaflet/dist/leaflet.css'
 import { TRPCProvider } from "@/providers/trpc"
 import { RouteErrorBoundary as ErrorBoundary } from "@/components/ErrorBoundary";
-import { Skeleton } from "@/components/ui/skeleton";
 import App from './App.tsx'
 
 // Handle Vite chunk load/preload errors automatically by reloading the page
@@ -23,8 +23,8 @@ window.addEventListener("vite:preloadError", (event) => {
 
 function AppFallback() {
   return (
-    <div className="flex h-screen items-center justify-center">
-      <Skeleton className="h-32 w-32" />
+    <div className="flex h-screen items-center justify-center bg-background">
+      <OniLoader size="lg" text="Starting up" />
     </div>
   );
 }
@@ -38,7 +38,7 @@ createRoot(document.getElementById('root')!).render(
             <Suspense fallback={<AppFallback />}>
               <App />
             </Suspense>
-            <Toaster position="top-right" richColors />
+            <Toaster position="top-right" richColors duration={4000} closeButton />
           </TRPCProvider>
         </ThemeProvider>
       </BrowserRouter>

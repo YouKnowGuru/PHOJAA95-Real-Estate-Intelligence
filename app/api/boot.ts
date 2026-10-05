@@ -15,6 +15,7 @@ import { createOAuthCallbackHandler } from "./kimi/auth";
 import { Paths } from "@contracts/constants";
 import { createUploadMiddleware, handleApiFileRequest } from "./lib/serve-upload";
 import { ensureSchemaPatches } from "./lib/ensure-schema";
+import { handleUnsubscribe } from "./lib/unsubscribe";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -132,6 +133,9 @@ app.use("/api/trpc/*", async (c) => {
 });
 // ─── Dedicated file download endpoint (reliable fallback) ───────────
 app.get("/api/file/*", (c) => handleApiFileRequest(c));
+
+// ─── One-click unsubscribe from campaign emails (public, signed link) ─
+app.get("/api/unsubscribe", handleUnsubscribe);
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 

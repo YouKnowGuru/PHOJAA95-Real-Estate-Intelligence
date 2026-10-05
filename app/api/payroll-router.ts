@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, or, like } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -113,20 +113,32 @@ export const payrollRouter = createRouter({
       z.object({
         userId: z.number().optional(),
         month: z.string().optional(),
-        status: z.enum(["pending", "paid"]).optional(),
+        status: z.enum(["pending", "paid", "all"]).optional(),
         role: z.enum(["staff", "developer", "architecture_staff"]).optional(),
-        page: z.number().default(1),
-        limit: z.number().default(20),
-      }).default(() => ({ page: 1, limit: 12 }))
+        search: z.string().optional(),
+        page: z.number().optional().default(1),
+        limit: z.number().optional(),
+      }).optional().default({ page: 1 })
     )
     .query(async ({ input }) => {
       const db = getDb();
       const conditions = [];
 
       if (input.userId) conditions.push(eq(payroll.userId, input.userId));
-      if (input.month) conditions.push(eq(payroll.month, input.month));
-      if (input.status) conditions.push(eq(payroll.paymentStatus, input.status));
+      if (input.month && input.month !== "all") conditions.push(eq(payroll.month, input.month));
+      if (input.status && input.status !== "all") conditions.push(eq(payroll.paymentStatus, input.status));
       if (input.role) conditions.push(eq(localUsers.role, input.role));
+      if (input.search?.trim()) {
+        const q = `%${input.search.trim().replace(/[%_]/g, "\\$&")}%`;
+        conditions.push(
+          or(
+            like(localUsers.fullName, q),
+            like(localUsers.employeeId, q),
+            like(localUsers.pfNumber, q),
+            like(localUsers.email, q)
+          )
+        );
+      }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -138,9 +150,10 @@ export const payrollRouter = createRouter({
       const total = totalResult[0]?.count || 0;
 
       const page = input.page || 1;
-      const limit = Math.max(1, input.limit || 20);
+      const limit = input.limit;
+      const offset = limit ? (page - 1) * limit : 0;
 
-      const results = await db
+      const baseQuery = db
         .select({
           id: payroll.id,
           userId: payroll.userId,
@@ -165,11 +178,13 @@ export const payrollRouter = createRouter({
         .from(payroll)
         .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
         .where(whereClause)
-        .orderBy(desc(payroll.createdAt))
-        .limit(limit)
-        .offset((page - 1) * limit);
+        .orderBy(desc(payroll.month), desc(payroll.paidAt), desc(payroll.createdAt));
 
-      return { items: results, total, page, limit, totalPages: Math.ceil(total / limit) };
+      const results = limit
+        ? await baseQuery.limit(limit).offset(offset)
+        : await baseQuery;
+
+      return { items: results, total, page, limit: limit ?? total, totalPages: limit ? Math.ceil(total / limit) : 1 };
     }),
 
   markPaid: adminQuery
@@ -193,18 +208,20 @@ export const payrollRouter = createRouter({
     .input(
       z.object({
         month: z.string().optional(),
-        page: z.number().default(1),
-        limit: z.number().default(12),
-      }).default(() => ({ page: 1, limit: 12 }))
+        status: z.enum(["pending", "paid", "all"]).optional(),
+        page: z.number().optional().default(1),
+        limit: z.number().optional(),
+      }).optional().default({ page: 1 })
     )
     .query(async ({ ctx, input }) => {
       const db = getDb();
       const userId = ctx.unifiedUser!.id;
       const conditions = [eq(payroll.userId, userId)];
 
-      if (input.month) conditions.push(eq(payroll.month, input.month));
+      if (input.month && input.month !== "all") conditions.push(eq(payroll.month, input.month));
+      if (input.status && input.status !== "all") conditions.push(eq(payroll.paymentStatus, input.status));
 
-      const results = await db
+      const baseQuery = db
         .select({
           id: payroll.id,
           userId: payroll.userId,
@@ -227,9 +244,14 @@ export const payrollRouter = createRouter({
         .from(payroll)
         .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
         .where(and(...conditions))
-        .orderBy(desc(payroll.month))
-        .limit(input.limit || 12)
-        .offset(((input.page || 1) - 1) * (input.limit || 12));
+        .orderBy(desc(payroll.month), desc(payroll.paidAt), desc(payroll.createdAt));
+
+      const limit = input.limit;
+      const offset = limit ? ((input.page || 1) - 1) * limit : 0;
+
+      const results = limit
+        ? await baseQuery.limit(limit).offset(offset)
+        : await baseQuery;
 
       return results;
     }),
@@ -245,9 +267,28 @@ export const payrollRouter = createRouter({
     }),
 
   salarySummary: adminQuery
-    .input(z.object({ month: z.string() }))
+    .input(
+      z.object({
+        userId: z.number().optional(),
+        month: z.string().optional(),
+        role: z.enum(["staff", "developer", "architecture_staff"]).optional(),
+      }).optional().default({})
+    )
     .query(async ({ input }) => {
       const db = getDb();
+      const conditions = [];
+
+      if (input?.userId) {
+        conditions.push(eq(payroll.userId, input.userId));
+      }
+      if (input?.month && input.month !== "all") {
+        conditions.push(eq(payroll.month, input.month));
+      }
+      if (input?.role) {
+        conditions.push(eq(localUsers.role, input.role));
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
       const result = await db
         .select({
@@ -256,11 +297,12 @@ export const payrollRouter = createRouter({
           totalDeduction: sql<string>`COALESCE(SUM(${payroll.deduction}), 0)`,
           totalPF: sql<string>`COALESCE(SUM(${payroll.pfDeduction}), 0)`,
           totalNet: sql<string>`COALESCE(SUM(${payroll.netSalary}), 0)`,
-          totalPaid: sql<number>`SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN 1 ELSE 0 END)`,
-          totalPending: sql<number>`SUM(CASE WHEN ${payroll.paymentStatus} = 'pending' THEN 1 ELSE 0 END)`,
+          totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN 1 ELSE 0 END), 0)`,
+          totalPending: sql<number>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'pending' THEN 1 ELSE 0 END), 0)`,
         })
         .from(payroll)
-        .where(eq(payroll.month, input.month));
+        .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
+        .where(whereClause);
 
       return result[0] || {
         totalBase: "0",
@@ -271,5 +313,72 @@ export const payrollRouter = createRouter({
         totalPaid: 0,
         totalPending: 0,
       };
+    }),
+
+  distinctMonths: staffQuery.query(async () => {
+    const db = getDb();
+    const rows = await db
+      .selectDistinct({ month: payroll.month })
+      .from(payroll)
+      .orderBy(desc(payroll.month));
+    return rows.map((r) => r.month).filter(Boolean);
+  }),
+
+  staffTotals: adminQuery
+    .input(
+      z.object({
+        role: z.enum(["staff", "developer", "architecture_staff"]).optional(),
+        search: z.string().optional(),
+      }).optional().default({})
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const conditions = [];
+
+      if (input?.role) conditions.push(eq(localUsers.role, input.role));
+      if (input?.search?.trim()) {
+        const q = `%${input.search.trim().replace(/[%_]/g, "\\$&")}%`;
+        conditions.push(
+          or(
+            like(localUsers.fullName, q),
+            like(localUsers.employeeId, q),
+            like(localUsers.pfNumber, q)
+          )
+        );
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select({
+          userId: payroll.userId,
+          userName: localUsers.fullName,
+          userRole: localUsers.role,
+          employeeId: localUsers.employeeId,
+          pfNumber: localUsers.pfNumber,
+          totalBase: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.baseSalary} ELSE 0 END), 0)`,
+          totalBonus: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.bonus} ELSE 0 END), 0)`,
+          totalDeduction: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.deduction} ELSE 0 END), 0)`,
+          totalPF: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.pfDeduction} ELSE 0 END), 0)`,
+          totalPaidNet: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.netSalary} ELSE 0 END), 0)`,
+          totalPendingNet: sql<string>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'pending' THEN ${payroll.netSalary} ELSE 0 END), 0)`,
+          paidMonthsCount: sql<number>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN 1 ELSE 0 END), 0)`,
+          pendingMonthsCount: sql<number>`COALESCE(SUM(CASE WHEN ${payroll.paymentStatus} = 'pending' THEN 1 ELSE 0 END), 0)`,
+          lastPaidMonth: sql<string | null>`MAX(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.month} ELSE NULL END)`,
+          lastPaidAt: sql<Date | null>`MAX(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.paidAt} ELSE NULL END)`,
+        })
+        .from(payroll)
+        .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
+        .where(whereClause)
+        .groupBy(
+          payroll.userId,
+          localUsers.fullName,
+          localUsers.role,
+          localUsers.employeeId,
+          localUsers.pfNumber
+        )
+        .orderBy(desc(sql`SUM(CASE WHEN ${payroll.paymentStatus} = 'paid' THEN ${payroll.netSalary} ELSE 0 END)`));
+
+      return rows;
     }),
 });

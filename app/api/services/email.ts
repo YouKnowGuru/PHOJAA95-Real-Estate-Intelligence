@@ -14,9 +14,11 @@ export interface SendEmailOptions {
   to: string;
   subject: string;
   html: string;
+  /** Optional extra MIME headers (e.g. List-Unsubscribe). */
+  headers?: Record<string, string>;
 }
 
-export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<void> {
+export async function sendEmail({ to, subject, html, headers }: SendEmailOptions): Promise<void> {
   const from = process.env.SMTP_FROM || "noreply@phojaa95.com";
   
   await transporter.sendMail({
@@ -24,6 +26,7 @@ export async function sendEmail({ to, subject, html }: SendEmailOptions): Promis
     to,
     subject,
     html,
+    headers,
   });
 }
 

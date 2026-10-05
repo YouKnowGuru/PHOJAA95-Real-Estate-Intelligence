@@ -61,6 +61,8 @@ module.exports = {
       },
       boxShadow: {
         xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        "glow-sm": "0 0 12px hsl(var(--primary) / 0.25)",
+        glow: "0 0 24px hsl(var(--primary) / 0.3)",
       },
       keyframes: {
         "accordion-down": {
@@ -75,11 +77,41 @@ module.exports = {
           "0%,70%,100%": { opacity: "1" },
           "20%,50%": { opacity: "0" },
         },
+        "fade-up": {
+          from: { opacity: "0", transform: "translateY(14px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "slide-in-right": {
+          from: { opacity: "0", transform: "translateX(24px)" },
+          to: { opacity: "1", transform: "translateX(0)" },
+        },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "pulse-soft": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.55" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
+        "fade-up": "fade-up 0.45s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "fade-in": "fade-in 0.35s ease-out both",
+        "scale-in": "scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both",
+        "slide-in-right": "slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
+        float: "float 5s ease-in-out infinite",
+        "pulse-soft": "pulse-soft 2.2s ease-in-out infinite",
       },
     },
   },

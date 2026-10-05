@@ -3,8 +3,14 @@ import { z } from "zod";
 import { eq, and, like, desc, sql, or, count, ne, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { format } from "date-fns";
-import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import {
+  buildBillingExcelBase64,
+  buildBillingPdfBase64,
+  getExportBranding,
+  type BillingExportMeta,
+  type BillingExportRow,
+  type BillingExportTotals,
+} from "./lib/billing-export";
 import { createRouter, adminQuery, staffQuery } from "./middleware";
 import { isRealEstateStaffRole, assertRealEstateModuleAccess } from "./lib/access-control";
 import { logger } from "./lib/logger";
@@ -39,6 +45,60 @@ function generateCSV(data: Record<string, unknown>[], headers: string[]): string
 function fmtPlain(val: string | number | null | undefined): string {
   const n = typeof val === "number" ? val : parseFloat(val ?? "0");
   return isNaN(n) ? "0.00" : n.toFixed(2);
+}
+
+// ─── Billing payment expressions ────────────────────────────────────────────
+// Shared by getBillingList + exportBilling so the row filters, the KPI totals
+// and every export format always agree on what "paid" means for a property.
+const billingPriceSql = () =>
+  sql<string>`COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0)`;
+
+const billingPaidSql = () => {
+  const price = billingPriceSql();
+  // Legacy split (no "total amount paid" recorded): 50% advance at step 3,
+  // remainder at step 4 — exactly what computePayments() does in Billing.tsx.
+  const advance = sql`CASE WHEN ${propertyAgreements.paymentAmount} IS NOT NULL THEN ${propertyAgreements.paymentAmount} ELSE ${price} / 2 END`;
+
+  // LEAST(...): a few legacy rows have advance+remainder recorded ABOVE the
+  // selling price (data entry), which used to make "received" exceed "billed".
+  return sql<string>`LEAST(${price},
+  CASE
+  WHEN ${propertyAgreements.totalAmountPaid} IS NOT NULL THEN
+    CASE WHEN ${properties.currentStep} >= 3 THEN ${propertyAgreements.totalAmountPaid} ELSE 0 END
+  ELSE (
+    (CASE WHEN ${properties.currentStep} >= 3 THEN ${advance} ELSE 0 END)
+    + (CASE WHEN ${properties.currentStep} >= 4 THEN
+         CASE WHEN ${propertyDocuments.remainingPaymentAmount} IS NOT NULL
+              THEN ${propertyDocuments.remainingPaymentAmount}
+              ELSE GREATEST(${price} - ${advance}, 0) END
+       ELSE 0 END)
+  )
+  END)`;
+};
+
+/**
+ * Maps a billing status filter onto a SQL condition.
+ * `pending` / `partial` / `paid` are payment-status filters (what a billing
+ * screen needs); every other value falls back to the property workflow status.
+ */
+function billingStatusCondition(status: string) {
+  const price = billingPriceSql();
+  const paid = billingPaidSql();
+
+  switch (status) {
+    case "pending":
+      // Nothing settled yet: payment still outstanding, or workflow not started
+      return sql`((NOT (${price} > 0 AND ${paid} >= ${price})) OR (${eq(properties.workflowStatus, "pending")}))`;
+    case "partial":
+      return sql`(${price} > 0 AND ${paid} > 0 AND ${paid} < ${price})`;
+    case "paid":
+      return sql`(${price} > 0 AND ${paid} >= ${price})`;
+    default:
+      return eq(
+        properties.workflowStatus,
+        status as "approved" | "rejected" | "completed" | "cancelled" | "pending" | "processing"
+      );
+  }
 }
 
 export const propertyRouter = createRouter({
@@ -358,9 +418,9 @@ export const propertyRouter = createRouter({
         step: z.number().optional(),
         dateFrom: z.string().optional(),
         dateTo: z.string().optional(),
-        page: z.number().min(1).default(1),
-        limit: z.number().min(1).default(20),
-      }).default(() => ({ page: 1, limit: 20 }))
+        page: z.number().min(1).optional(),
+        limit: z.number().min(1).optional(),
+      }).optional().default({})
     )
     .query(async ({ input, ctx }) => {
       const db = getDb();
@@ -416,10 +476,10 @@ export const propertyRouter = createRouter({
       const total = totalResult[0]?.count || 0;
 
       const page = input.page || 1;
-      const limit = input.limit || 20;
-      const offset = (page - 1) * limit;
+      const limit = input.limit;
+      const offset = limit ? (page - 1) * limit : 0;
 
-      const results = await db
+      const baseQuery = db
         .select({
           id: properties.id,
           propertyName: properties.propertyName,
@@ -467,9 +527,11 @@ export const propertyRouter = createRouter({
         .leftJoin(propertyTypes, eq(properties.propertyTypeId, propertyTypes.id))
         .leftJoin(localUsers, eq(properties.listedById, localUsers.id))
         .where(whereClause)
-        .orderBy(desc(properties.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .orderBy(desc(properties.createdAt));
+
+      const results = limit
+        ? await baseQuery.limit(limit).offset(offset)
+        : await baseQuery;
 
       const propertyIds = results.map(p => p.id);
       const allImages = propertyIds.length > 0
@@ -483,7 +545,13 @@ export const propertyRouter = createRouter({
         images: allImages.filter(img => img.propertyId === p.id)
       }));
 
-      return { items: resultsWithImages, total, page, limit, totalPages: Math.ceil(total / limit) };
+      return {
+        items: resultsWithImages,
+        total,
+        page,
+        limit: limit ?? total,
+        totalPages: limit ? Math.ceil(total / limit) : 1
+      };
     }),
 
   getById: staffQuery
@@ -891,11 +959,15 @@ export const propertyRouter = createRouter({
         buyerCID: z.string().length(11, "⚠️ Buyer CID must be exactly 11 digits."),
         buyerPhone: z.string().min(1, "⚠️ Buyer Phone is required.").max(20),
         buyerAddress: z.string().min(1, "⚠️ Buyer Address is required."),
-        agreementFile: z.string().min(1, "Agreement file is required"),
+        // Property agreement upload moved to Step 3 — optional here so a stored file is never cleared
+        agreementFile: z.string().optional(),
         // No longer collected in the wizard; kept optional so the column can be cleared
         paymentScreenshot: z.string().optional(),
         commissionAmount: z.string().optional(),
+        // Legacy 50% advance field — kept optional so old clients/records keep working
         paymentAmount: z.string().optional(),
+        // Single "Total Amount Paid" collected in Step 2 (replaces the 50% + remaining split)
+        totalAmountPaid: z.string().optional(),
       })
     )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const isAdmin = ctx.unifiedUser!.role === "admin";
 
@@ -912,6 +984,12 @@ export const propertyRouter = createRouter({
           throw new TRPCError({ code: "BAD_REQUEST", message: "Payment amount must be a valid non-negative number." });
         }
       }
+      if (input.totalAmountPaid !== undefined && input.totalAmountPaid.trim() !== "") {
+        const tap = parseFloat(input.totalAmountPaid);
+        if (isNaN(tap) || tap < 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Total amount paid must be a valid non-negative number." });
+        }
+      }
 
       return await db.transaction(async (tx) => {
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
@@ -926,7 +1004,7 @@ export const propertyRouter = createRouter({
         // Delete old files if being replaced
         if (existing.length > 0) {
           const old = existing[0];
-          if (old.agreementFile && old.agreementFile !== input.agreementFile) {
+          if (old.agreementFile && input.agreementFile && old.agreementFile !== input.agreementFile) {
             try { await deleteFile(old.agreementFile); } catch { /* ignore */ }
           }
           if (old.paymentScreenshot && old.paymentScreenshot !== input.paymentScreenshot) {
@@ -935,11 +1013,12 @@ export const propertyRouter = createRouter({
         }
 
         const values = {
-          agreementFile: input.agreementFile,
+          agreementFile: input.agreementFile || undefined,
           // Screenshots are no longer collected; clear any previously stored one
           paymentScreenshot: input.paymentScreenshot ?? null,
           commissionAmount: input.commissionAmount,
           paymentAmount: input.paymentAmount,
+          totalAmountPaid: input.totalAmountPaid,
           approvalStatus: "approved" as const,
           approvedBy: userId,
           approvedAt: new Date(),
@@ -985,10 +1064,13 @@ export const propertyRouter = createRouter({
       z.object({
         propertyId: z.number(),
         gewogCertification: z.string().optional(),
+        // Property agreement is uploaded together with the rest of the documents in Step 3
+        agreementFile: z.string().optional(),
         internalAgreement: z.string().optional(),
         occupancyCertificate: z.string().optional(),
         plrVerification: z.string().optional(),
         remainingPaymentScreenshot: z.string().optional(),
+        // Legacy remaining-amount field — no longer collected in the wizard, kept for old records
         remainingPaymentAmount: z.string().optional(),
       })
     )    .mutation(async ({ input, ctx }) => {      const db = getDb();      const userId = ctx.unifiedUser!.id;      const isAdmin = ctx.unifiedUser!.role === "admin";
@@ -1001,7 +1083,7 @@ export const propertyRouter = createRouter({
         }
       }
 
-      const { propertyId, ...values } = input;
+      const { propertyId, agreementFile, ...values } = input;
 
       return await db.transaction(async (tx) => {
         const prop = await tx.select().from(properties).where(eq(properties.id, input.propertyId)).limit(1);
@@ -1024,10 +1106,6 @@ export const propertyRouter = createRouter({
           if (missingDocs.length > 0) {
             throw new TRPCError({ code: "BAD_REQUEST", message: `The following documents are required for this property type: ${missingDocs.map(d => d.replace(/([A-Z])/g, ' $1').trim()).join(", ")}. Please upload all required documents.` });
           }
-        }
-
-        if (!input.remainingPaymentAmount || input.remainingPaymentAmount.trim() === "") {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Remaining payment amount is required. Please enter the amount." });
         }
 
         const existing = await tx.select().from(propertyDocuments)
@@ -1059,8 +1137,7 @@ export const propertyRouter = createRouter({
               comments: null,
             })
             .where(eq(propertyDocuments.propertyId, propertyId));
-        } else {
-          await tx.insert(propertyDocuments).values({
+        } else {          await tx.insert(propertyDocuments).values({
             propertyId,
             ...values,
             uploadedBy: userId,
@@ -1070,9 +1147,33 @@ export const propertyRouter = createRouter({
           });
         }
 
+        // ── Property agreement (uploaded in Step 3 together with all documents) ──
+        if (agreementFile) {
+          const existingAgreement = await tx.select().from(propertyAgreements)
+            .where(eq(propertyAgreements.propertyId, propertyId))
+            .limit(1);
+
+          if (existingAgreement.length > 0) {
+            const oldUrl = existingAgreement[0].agreementFile;
+            if (oldUrl && oldUrl !== agreementFile) {
+              try { await deleteFile(oldUrl); } catch { /* ignore */ }
+            }
+            await tx.update(propertyAgreements)
+              .set({ agreementFile })
+              .where(eq(propertyAgreements.propertyId, propertyId));
+          } else {
+            await tx.insert(propertyAgreements).values({
+              propertyId,
+              agreementFile,
+              approvalStatus: "approved" as const,
+              approvedBy: userId,
+              approvedAt: new Date(),
+            });
+          }
+        }
+
         await tx.update(properties)
-          .set({
-            currentStep: Math.max(prop[0].currentStep, 4),
+          .set({ currentStep: Math.max(prop[0].currentStep, 4),
             approvalStatus: "approved",
           })
           .where(eq(properties.id, propertyId));
@@ -1485,7 +1586,7 @@ export const propertyRouter = createRouter({
               .set({ currentStep: 4, approvalStatus: "approved", updatedAt: now })
               .where(eq(properties.id, input.propertyId));
             break;
-          case 4:
+          case 4: {
             const existingVerification = await tx.select().from(verificationProcesses)
               .where(eq(verificationProcesses.propertyId, input.propertyId))
               .limit(1);
@@ -1500,6 +1601,7 @@ export const propertyRouter = createRouter({
               .set({ currentStep: 5, approvalStatus: "approved", updatedAt: now })
               .where(eq(properties.id, input.propertyId));
             break;
+          }
           case 5:
             await tx.update(finalLagthrams)
               .set({ approvalStatus: "approved", approvedBy: adminId, approvedAt: now })
@@ -1597,7 +1699,7 @@ export const propertyRouter = createRouter({
               .set({ approvalStatus: "rejected", rejectionComments: input.comments, updatedAt: now })
               .where(eq(properties.id, input.propertyId));
             break;
-          case 4:
+          case 4: {
             const existingVerif = await tx.select().from(verificationProcesses)
               .where(eq(verificationProcesses.propertyId, input.propertyId))
               .limit(1);
@@ -1613,6 +1715,7 @@ export const propertyRouter = createRouter({
               .set({ approvalStatus: "rejected", rejectionComments: input.comments, updatedAt: now })
               .where(eq(properties.id, input.propertyId));
             break;
+          }
           case 5:
             await tx.update(finalLagthrams)
               .set({ approvalStatus: "rejected", comments: input.comments })
@@ -1849,8 +1952,7 @@ export const propertyRouter = createRouter({
       }
 
       if (input.status) {
-        const statusVal = input.status as "approved" | "rejected" | "completed" | "cancelled" | "pending" | "processing";
-        conditions.push(eq(properties.workflowStatus, statusVal));
+        conditions.push(billingStatusCondition(input.status));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -1859,7 +1961,14 @@ export const propertyRouter = createRouter({
       const limit = input.limit || 20;
       const offset = (page - 1) * limit;
 
-      const totalResult = await db.select({ count: count() }).from(properties).where(whereClause);
+      // Count needs the same joins as the row query: payment-status filters
+      // reference property_agreements / property_documents.
+      const totalResult = await db
+        .select({ count: sql<number>`COUNT(DISTINCT ${properties.id})` })
+        .from(properties)
+        .leftJoin(propertyAgreements, eq(propertyAgreements.propertyId, properties.id))
+        .leftJoin(propertyDocuments, eq(propertyDocuments.propertyId, properties.id))
+        .where(whereClause);
       const total = totalResult[0]?.count || 0;
 
       const results = await db
@@ -1883,6 +1992,7 @@ export const propertyRouter = createRouter({
           // Agreement fields
           commissionAmount: propertyAgreements.commissionAmount,
           paymentAmount: propertyAgreements.paymentAmount,
+          totalAmountPaid: propertyAgreements.totalAmountPaid,
           agreementFile: propertyAgreements.agreementFile,
           paymentScreenshot: propertyAgreements.paymentScreenshot,
           // Document fields
@@ -1897,48 +2007,15 @@ export const propertyRouter = createRouter({
         .where(whereClause)
         .orderBy(desc(properties.createdAt))
         .limit(limit)
-        .offset(offset);
-
-      // Financial totals across all matching records (not just current page)
-      // Use finalSellingPrice when available, otherwise fall back to sellingPrice
+        .offset(offset);      // Financial totals across all matching records (not just current page)
+      // Reuses billingPriceSql/billingPaidSql so totals always match the filters.
+      const priceExpr = billingPriceSql();
+      const paidExpr = billingPaidSql();
       const totalsResult = await db.select({
-        totalSellingPrice: sql<string>`COALESCE(CAST(SUM(COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice})) AS DECIMAL), 0)`,
+        totalSellingPrice: sql<string>`COALESCE(SUM(${priceExpr}), 0)`,
         totalCommission: sql<string>`COALESCE(SUM(COALESCE(CAST(${propertyAgreements.commissionAmount} AS DECIMAL), CAST(${properties.realEstateFee} AS DECIMAL), 0)), 0)`,
-        totalPaymentAmount: sql<string>`COALESCE(SUM(
-          CASE
-            WHEN ${properties.currentStep} >= 3 THEN
-              CASE
-                WHEN ${propertyAgreements.paymentAmount} IS NOT NULL THEN ${propertyAgreements.paymentAmount}
-                ELSE COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0) / 2
-              END
-            ELSE 0
-          END
-          +
-          CASE
-            WHEN ${properties.currentStep} >= 4 THEN COALESCE(${propertyDocuments.remainingPaymentAmount}, 0)
-            ELSE 0
-          END
-        ), 0)`,
-        totalRemainingDue: sql<string>`COALESCE(SUM(
-          GREATEST(
-            COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0)
-            -
-            CASE
-              WHEN ${properties.currentStep} >= 3 THEN
-                CASE
-                  WHEN ${propertyAgreements.paymentAmount} IS NOT NULL THEN ${propertyAgreements.paymentAmount}
-                  ELSE COALESCE(${properties.finalSellingPrice}, ${properties.sellingPrice}, 0) / 2
-                END
-              ELSE 0
-            END
-            -
-            CASE
-              WHEN ${properties.currentStep} >= 4 THEN COALESCE(${propertyDocuments.remainingPaymentAmount}, 0)
-              ELSE 0
-            END,
-            0
-          )
-        ), 0)`,
+        totalPaymentAmount: sql<string>`COALESCE(SUM(${paidExpr}), 0)`,
+        totalRemainingDue: sql<string>`COALESCE(SUM(GREATEST(${priceExpr} - ${paidExpr}, 0)), 0)`,
       })
         .from(properties)
         .leftJoin(propertyAgreements, eq(propertyAgreements.propertyId, properties.id))
@@ -1955,7 +2032,7 @@ export const propertyRouter = createRouter({
       z.object({
         search: z.string().optional(),
         status: z.string().optional(),
-        format: z.enum(["csv", "json", "pdf"]).default("csv"),
+        format: z.enum(["csv", "json", "pdf", "xlsx"]).default("csv"),
         // Security: Add pagination to prevent memory exhaustion on large datasets
         page: z.number().min(1).default(1),
         limit: z.number().min(1).max(1000).default(500),
@@ -1981,8 +2058,7 @@ export const propertyRouter = createRouter({
       }
 
       if (input?.status) {
-        const statusVal = input.status as "approved" | "rejected" | "completed" | "cancelled" | "pending" | "processing";
-        conditions.push(eq(properties.workflowStatus, statusVal));
+        conditions.push(billingStatusCondition(input.status));
       }
 
       const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -2010,6 +2086,7 @@ export const propertyRouter = createRouter({
           listedByName: localUsers.fullName,
           commissionAmount: propertyAgreements.commissionAmount,
           paymentAmount: propertyAgreements.paymentAmount,
+          totalAmountPaid: propertyAgreements.totalAmountPaid,
           remainingPaymentAmount: propertyDocuments.remainingPaymentAmount,
         })
         .from(properties)
@@ -2022,23 +2099,41 @@ export const propertyRouter = createRouter({
         .limit(limit)
         .offset(offset);
 
+      // Grand totals for the report header — accumulated from the exact same
+      // per-row numbers, so the KPI strip always agrees with the table below it.
+      const totalsAccum: BillingExportTotals = { sales: 0, paid: 0, due: 0, commission: 0, net: 0 };
+
       const formattedData = results.map((item) => {
         // Use finalSellingPrice when available, otherwise fall back to sellingPrice
         const basePrice = parseFloat(item.finalSellingPrice ?? item.sellingPrice ?? "0");
-        const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
-        const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : basePrice / 2;
-        const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
-        const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, basePrice - initialPayment);
         const commission = parseFloat(item.commissionAmount ?? item.realEstateFee ?? "0");
 
         const isStep2Approved = item.currentStep >= 3;
         const isStep3Approved = item.currentStep >= 4;
 
-        const initialReceived = isStep2Approved ? initialPayment : 0;
-        const remainingReceived = isStep3Approved ? remainingPayment : 0;
-        const totalReceived = initialReceived + remainingReceived;
-        const balanceDue = Math.max(0, basePrice - totalReceived);
+        const hasTotalPaid = item.totalAmountPaid !== null && item.totalAmountPaid !== undefined;
+        let totalPaid = 0;
+
+        if (hasTotalPaid) {
+          // New model: single "Total Amount Paid" recorded in Step 2
+          totalPaid = isStep2Approved ? parseFloat(item.totalAmountPaid || "0") : 0;
+        } else {
+          // Legacy record: keep the original 50% advance + remaining split so past data is unchanged
+          const hasExactPayment = item.paymentAmount !== null && item.paymentAmount !== undefined;
+          const initialPayment = hasExactPayment ? parseFloat(item.paymentAmount || "0") : basePrice / 2;
+          const hasExactRemaining = item.remainingPaymentAmount !== null && item.remainingPaymentAmount !== undefined;
+          const remainingPayment = hasExactRemaining ? parseFloat(item.remainingPaymentAmount || "0") : Math.max(0, basePrice - initialPayment);
+          totalPaid = (isStep2Approved ? initialPayment : 0) + (isStep3Approved ? remainingPayment : 0);
+        }
+
+        const balanceDue = Math.max(0, basePrice - totalPaid);
         const netToSeller = Math.max(0, basePrice - commission);
+
+        totalsAccum.sales += basePrice;
+        totalsAccum.paid += totalPaid;
+        totalsAccum.due += balanceDue;
+        totalsAccum.commission += commission;
+        totalsAccum.net += netToSeller;
 
         return {
           id: item.id,
@@ -2051,13 +2146,16 @@ export const propertyRouter = createRouter({
           status: item.workflowStatus,
           sellingPrice: fmtPlain(item.sellingPrice),
           finalSellingPrice: fmtPlain(item.finalSellingPrice),
-          initialPayment: fmtPlain(String(initialPayment)),
-          remainingPayment: fmtPlain(String(remainingPayment)),
-          totalReceived: fmtPlain(String(totalReceived)),
+          totalPaid: fmtPlain(String(totalPaid)),
           balanceDue: fmtPlain(String(balanceDue)),
           commission: fmtPlain(String(commission)),
           netToSeller: fmtPlain(String(netToSeller)),
-          percentPaid: basePrice > 0 ? Math.round((totalReceived / basePrice) * 100) : 0,
+          percentPaid:
+            basePrice > 0
+              ? totalPaid >= basePrice
+                ? 100
+                : Math.min(99, Math.floor((totalPaid / basePrice) * 100))
+              : 0,
           createdAt: item.createdAt ? format(item.createdAt, "yyyy-MM-dd") : "",
           completedAt: item.completedAt ? format(item.completedAt, "yyyy-MM-dd") : "",
         };
@@ -2069,81 +2167,38 @@ export const propertyRouter = createRouter({
         return { data: formattedData };
       }
 
-      if (exportFormat === "pdf") {
-        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const now = new Date().toLocaleDateString("en-GB");
+      if (exportFormat === "xlsx" || exportFormat === "pdf") {
+        const statusLabels: Record<string, string> = {
+          pending: "Payment Pending",
+          partial: "Partially Paid",
+          paid: "Fully Paid",
+          processing: "Processing",
+          completed: "Completed",
+          cancelled: "Cancelled",
+          approved: "Approved",
+          rejected: "Rejected",
+        };
+        const filters: string[] = [];
+        if (input?.status) filters.push(`Status: ${statusLabels[input.status] ?? input.status}`);
+        if (input?.search) filters.push(`Search: ${input.search}`);
 
-        doc.setFontSize(18);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(15, 23, 42);
-        doc.text("Billing & Invoices Report", 14, 18);
+        const branding = await getExportBranding();
+        const meta: BillingExportMeta = {
+          siteName: branding.siteName,
+          logoDataUrl: branding.logoDataUrl,
+          generatedOn: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          recordCount: formattedData.length,
+          filters,
+        };
+        const rows = formattedData as unknown as BillingExportRow[];
 
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(100, 116, 139);
-        doc.text(`Generated on ${now}  •  ${formattedData.length} records`, 14, 25);
-
-        if (input?.search || input?.status) {
-          const filters: string[] = [];
-          if (input.status) filters.push(`Status: ${input.status}`);
-          if (input.search) filters.push(`Search: ${input.search}`);
-          doc.text(`Filters: ${filters.join("  |  ")}`, 14, 30);
+        if (exportFormat === "xlsx") {
+          return { xlsxBase64: await buildBillingExcelBase64(rows, totalsAccum, meta) };
         }
-
-        autoTable(doc, {
-          startY: input?.search || input?.status ? 34 : 30,
-          head: [["Invoice #", "Property", "Owner", "Buyer", "Status", "Selling Price", "Total Paid", "Balance Due", "Commission", "Net to Seller"]],
-          body: formattedData.map((row) => [
-            row.invoiceNo,
-            row.propertyName,
-            row.ownerName,
-            row.buyerName,
-            row.status,
-            row.sellingPrice,
-            row.totalReceived,
-            row.balanceDue,
-            row.commission,
-            row.netToSeller,
-          ]),
-          headStyles: {
-            fillColor: [15, 23, 42],
-            textColor: [255, 255, 255],
-            fontStyle: "bold",
-            fontSize: 9,
-          },
-          bodyStyles: {
-            fontSize: 9,
-            textColor: [51, 65, 85],
-          },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252],
-          },
-          styles: {
-            overflow: "linebreak",
-            cellPadding: 2,
-          },
-          columnStyles: {
-            0: { cellWidth: 22 },
-            1: { cellWidth: "auto" },
-            5: { halign: "right" },
-            6: { halign: "right" },
-            7: { halign: "right" },
-            8: { halign: "right" },
-            9: { halign: "right" },
-          },
-          didDrawPage: (data) => {
-            doc.setFontSize(8);
-            doc.setTextColor(148, 163, 184);
-            doc.text(`Page ${data.pageNumber}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 6, { align: "center" });
-          },
-        });
-
-        const pdfBase64 = doc.output("datauristring").split(",")[1];
-        return { pdfBase64 };
+        return { pdfBase64: buildBillingPdfBase64(rows, totalsAccum, meta) };
       }
 
-      const headers = ["invoiceNo", "propertyName", "ownerName", "buyerName", "propertyType", "listedBy", "status", "sellingPrice", "initialPayment", "remainingPayment", "totalReceived", "balanceDue", "commission", "netToSeller", "percentPaid", "createdAt", "completedAt"];
+      const headers = ["invoiceNo", "propertyName", "ownerName", "buyerName", "propertyType", "listedBy", "status", "sellingPrice", "finalSellingPrice", "totalPaid", "balanceDue", "commission", "netToSeller", "percentPaid", "createdAt", "completedAt"];
       const csv = generateCSV(formattedData, headers);
       return { csv };
     }),

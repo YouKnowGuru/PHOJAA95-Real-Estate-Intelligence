@@ -320,6 +320,7 @@ ALTER TABLE `attendance` ADD `deduction_notes` text;;
 ALTER TABLE `payroll` ADD `deduction_notes` text;;
 ALTER TABLE `properties` ADD `features` json;;
 ALTER TABLE `property_documents` ADD `remaining_payment_amount` decimal(15,2);;
+ALTER TABLE `property_agreements` ADD `total_amount_paid` decimal(15,2);;
 CREATE INDEX `idx_library_docs_category` ON `library_documents` (`category`);;
 CREATE INDEX `idx_library_docs_uploaded_by` ON `library_documents` (`uploaded_by`);;
 CREATE INDEX `idx_library_docs_created` ON `library_documents` (`created_at`);;

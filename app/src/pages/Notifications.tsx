@@ -21,6 +21,7 @@ import {
   Clock,
   PackageOpen,
   Mail,
+  X,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,7 +53,7 @@ export default function NotificationsPage() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const utils = trpc.useUtils();
-  const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [activeTab, setActiveTab] = useState<"unread" | "all">("unread");
 
   // Admin Broadcast State
   const [broadcastForm, setBroadcastForm] = useState({
@@ -251,9 +252,22 @@ export default function NotificationsPage() {
                                   <h4 className={cn("text-sm font-semibold truncate min-w-0", !notif.isRead && "text-primary")}>
                                     {notif.title}
                                   </h4>
-                                  <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5 shrink-0">
-                                    {notif.createdAt && formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
-                                  </span>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] text-muted-foreground whitespace-nowrap pt-0.5">
+                                      {notif.createdAt && formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true })}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      title="Dismiss notification"
+                                      className="p-1 rounded-md text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        markReadMutation.mutate({ id: notif.id });
+                                      }}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
                                   {notif.message}
@@ -266,13 +280,13 @@ export default function NotificationsPage() {
                                     <Button
                                       variant="link"
                                       size="sm"
-                                      className="h-auto p-0 text-[10px] font-bold uppercase tracking-wider"
+                                      className="h-auto p-0 text-[10px] font-bold uppercase tracking-wider text-primary"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         markReadMutation.mutate({ id: notif.id });
                                       }}
                                     >
-                                      Mark as read
+                                      Mark as seen
                                     </Button>
                                   )}
                                 </div>

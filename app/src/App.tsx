@@ -25,6 +25,8 @@ const Reports = lazy(() => import("./pages/Reports"));
 const PropertyTypes = lazy(() => import("./pages/PropertyTypes"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Billing = lazy(() => import("./pages/Billing"));
+const Clients = lazy(() => import("./pages/Clients"));
+const EmailCampaigns = lazy(() => import("./pages/EmailCampaigns"));
 const DocumentLibrary = lazy(() => import("./pages/DocumentLibrary"));
 
 // Software Development Module page
@@ -40,7 +42,14 @@ const VerifyArchitectureCertificatePage = lazy(() => import("./pages/architectur
 
 function PageLoader() {
   return (
-    <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <div className="relative flex h-screen items-center justify-center overflow-hidden bg-background">
+      {/* Ambient backdrop matches the app shell */}
+      <div aria-hidden className="absolute inset-0 -z-10 pointer-events-none overflow-hidden">
+        <div className="aurora-orb aurora-orb-1" />
+        <div className="aurora-orb aurora-orb-2" />
+        <div className="shooting-star shooting-star-1" />
+        <div className="shooting-star shooting-star-6" />
+      </div>
       <OniLoader size="lg" text="Loading" />
     </div>
   );
@@ -243,6 +252,26 @@ export default function App() {
           <ProtectedRoute>
             <RealEstateStaffRoute>
               <LazyRoute><Billing /></LazyRoute>
+            </RealEstateStaffRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/clients"
+        element={
+          <ProtectedRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><Clients /></LazyRoute>
+            </RealEstateStaffRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/email-campaigns"
+        element={
+          <ProtectedRoute>
+            <RealEstateStaffRoute>
+              <LazyRoute><EmailCampaigns /></LazyRoute>
             </RealEstateStaffRoute>
           </ProtectedRoute>
         }

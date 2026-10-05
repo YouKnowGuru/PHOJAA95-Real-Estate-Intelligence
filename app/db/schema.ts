@@ -155,6 +155,8 @@ export const propertyAgreements = mysqlTable("property_agreements", {
   paymentScreenshot: text("payment_screenshot"),
   commissionAmount: decimal("commission_amount", { precision: 15, scale: 2 }),
   paymentAmount: decimal("payment_amount", { precision: 15, scale: 2 }),
+  // Single "Total Amount Paid" value collected in Step 2 (nullable so legacy 50%/remaining records are untouched)
+  totalAmountPaid: decimal("total_amount_paid", { precision: 15, scale: 2 }),
   approvalStatus: mysqlEnum("approval_status", ["pending", "approved", "rejected"]).default("pending").notNull(),
   approvedBy: bigint("approved_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
   approvedAt: timestamp("approved_at"),
@@ -1338,3 +1340,48 @@ export const salaryNoticeLog = mysqlTable("salary_notice_log", {
 
 export type SalaryNoticeLog = typeof salaryNoticeLog.$inferSelect;
 export type InsertSalaryNoticeLog = typeof salaryNoticeLog.$inferInsert;
+
+// ─── CLIENTS (mailing-list contacts for email campaigns) ─────────────
+export const clients = mysqlTable("clients", {
+  id: serial("id").primaryKey(),
+  fullName: varchar("full_name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }).notNull(),
+  phone: varchar("phone", { length: 30 }),
+  groupName: varchar("group_name", { length: 100 }).default("General").notNull(),
+  notes: text("notes"),
+  status: mysqlEnum("status", ["active", "unsubscribed"]).default("active").notNull(),
+  createdBy: bigint("created_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+}, (table) => [
+  index("idx_clients_email").on(table.email),
+  index("idx_clients_group").on(table.groupName),
+  index("idx_clients_name").on(table.fullName),
+]);
+
+export type Client = typeof clients.$inferSelect;
+export type InsertClient = typeof clients.$inferInsert;
+
+// ─── EMAIL LOGS (one row per recipient of a campaign send) ────────────
+export const emailLogs = mysqlTable("email_logs", {
+  id: serial("id").primaryKey(),
+  batchId: varchar("batch_id", { length: 36 }).notNull(), // groups all recipients of one send
+  clientId: bigint("client_id", { mode: "number", unsigned: true }).references(() => clients.id, { onDelete: "set null" }),
+  propertyId: bigint("property_id", { mode: "number", unsigned: true }).references(() => properties.id, { onDelete: "set null" }),
+  subject: varchar("subject", { length: 500 }).notNull(),
+  toEmail: varchar("to_email", { length: 320 }).notNull(),
+  toName: varchar("to_name", { length: 255 }),
+  status: mysqlEnum("status", ["sent", "failed"]).notNull(),
+  error: text("error"),
+  sentBy: bigint("sent_by", { mode: "number", unsigned: true }).references(() => localUsers.id, { onDelete: "set null" }),
+  sentByName: varchar("sent_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_email_logs_batch").on(table.batchId),
+  index("idx_email_logs_created").on(table.createdAt),
+  index("idx_email_logs_property").on(table.propertyId),
+  index("idx_email_logs_recipient").on(table.toEmail),
+]);
+
+export type EmailLog = typeof emailLogs.$inferSelect;
+export type InsertEmailLog = typeof emailLogs.$inferInsert;

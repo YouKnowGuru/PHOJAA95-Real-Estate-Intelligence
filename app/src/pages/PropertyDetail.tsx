@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, Link } from "react-router";
 import { trpc } from "@/lib/trpc";
+import type { LucideIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 
 /**
@@ -38,6 +39,7 @@ import {
   FileArchive,
   ClipboardList,
   Save,
+  Mail,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { WORKFLOW_STEPS } from "@/constants/workflow";
@@ -101,7 +103,7 @@ export default function PropertyDetail() {
       toast.error("Invalid download URL");
       return;
     }
-    const safeFilename = filename.replace(/[<>:\"/\\|?*\x00-\x1f]/g, "_");
+    const safeFilename = filename.replace(/[<>:"/\\|?*\p{C}]/gu, "_");
 
     // If it's a Cloudinary URL, we can force download by adding fl_attachment
     let downloadUrl = url;
@@ -192,6 +194,23 @@ export default function PropertyDetail() {
   const config = statusConfig[property.approvalStatus] || statusConfig.draft;
   const StatusIcon = config.icon;
 
+  // Payment summary — new records store a single "Total Amount Paid",
+  // legacy records keep the old 50% advance + remaining split (values unchanged)
+  const effectivePrice = parseFloat(property.finalSellingPrice || property.sellingPrice || "0");
+  let totalAmountPaid = 0;
+  if (agreement) {
+    if (agreement.totalAmountPaid != null) {
+      totalAmountPaid = property.currentStep >= 3 ? parseFloat(agreement.totalAmountPaid) || 0 : 0;
+    } else {
+      const legacyInitial = agreement.paymentAmount != null ? parseFloat(agreement.paymentAmount) : effectivePrice / 2;
+      const legacyRemaining = documents?.remainingPaymentAmount != null
+        ? parseFloat(documents.remainingPaymentAmount)
+        : Math.max(0, effectivePrice - legacyInitial);
+      totalAmountPaid = (property.currentStep >= 3 ? legacyInitial : 0) + (property.currentStep >= 4 ? legacyRemaining : 0);
+    }
+  }
+  const balanceDue = Math.max(0, effectivePrice - totalAmountPaid);
+
   const canApprove = isAdmin && (property.approvalStatus === "pending_review" || property.approvalStatus === "submitted");
   const canEdit = property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
 
@@ -270,6 +289,12 @@ export default function PropertyDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to={`/email-campaigns?propertyId=${propertyId}`}>
+            <Button variant="outline" className="rounded-lg gap-1.5">
+              <Mail className="h-4 w-4" />
+              Email Clients
+            </Button>
+          </Link>
           {property.approvalStatus === "completed" && (
             <Button
               variant="outline"
@@ -746,14 +771,15 @@ export default function PropertyDetail() {
                           )}
                           {step.id === 2 && agreement && (
                             <div className="grid grid-cols-2 gap-2 text-xs">
-                              <span className="text-muted-foreground">Agreement: {agreement.agreementFile ? "Uploaded" : "Pending"}</span>
-                              <span className="text-muted-foreground">Payment: {agreement.paymentScreenshot ? "Uploaded" : "Pending"}</span>
+                              <span className="text-muted-foreground">Paid: Nu. {totalAmountPaid.toLocaleString("en-BT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                              <span className="text-muted-foreground">Balance: Nu. {balanceDue.toLocaleString("en-BT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
                           )}
-                          {step.id === 3 && documents && (
+                          {step.id === 3 && (documents || agreement) && (
                             <div className="grid grid-cols-2 gap-2 text-xs">
-                              <span className="text-muted-foreground">Gewog Cert: {documents.gewogCertification ? "Uploaded" : "Pending"}</span>
-                              <span className="text-muted-foreground">Occupancy: {documents.occupancyCertificate ? "Uploaded" : "Pending"}</span>
+                              <span className="text-muted-foreground">Agreement: {agreement?.agreementFile ? "Uploaded" : "Pending"}</span>
+                              <span className="text-muted-foreground">Gewog Cert: {documents?.gewogCertification ? "Uploaded" : "Pending"}</span>
+                              <span className="text-muted-foreground">Occupancy: {documents?.occupancyCertificate ? "Uploaded" : "Pending"}</span>
                             </div>
                           )}
                           {step.id === 4 && verification && (
@@ -894,7 +920,7 @@ export default function PropertyDetail() {
             {(() => {
               // Parse features from various formats (object, string, double-encoded string)
               let parsedFeatures: Record<string, unknown> = {};
-              let raw = property.features;
+              const raw = property.features;
 
               if (raw) {
                 // Handle double-encoded JSON (string containing JSON string)
@@ -1003,27 +1029,31 @@ export default function PropertyDetail() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <FileText className="h-4 w-4 text-amber-500" />
-              Step 2: Agreement & Initial Payment
+              Step 2: Buyer & Payment
             </CardTitle>
           </CardHeader>
           <CardContent>
             {agreement ? (
               <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                    <p className="text-xs text-muted-foreground">Agreement File</p>
-                    {agreement.agreementFile ? (
-                      <SecureFileLink url={agreement.agreementFile} label="View File" />
-                    ) : (
-                      <p className="text-sm font-medium text-amber-600">Pending</p>
-                    )}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/30">
+                    <p className="text-xs text-muted-foreground">Total Amount Paid</p>
+                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                      Nu. {totalAmountPaid.toLocaleString("en-BT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
                   </div>
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                    <p className="text-xs text-muted-foreground">Initial Payment (50%)</p>
+                    <p className="text-xs text-muted-foreground">Balance Due</p>
+                    <p className={`text-sm font-bold ${balanceDue > 0 ? "text-amber-600" : "text-emerald-600"}`}>
+                      Nu. {balanceDue.toLocaleString("en-BT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
+                    <p className="text-xs text-muted-foreground">Payment Screenshot</p>
                     {agreement.paymentScreenshot ? (
                       <SecureFileLink url={agreement.paymentScreenshot} label="View Image" icon="image" />
                     ) : (
-                      <p className="text-sm font-medium text-amber-600">Pending</p>
+                      <p className="text-sm font-medium text-muted-foreground">Not provided</p>
                     )}
                   </div>
                   <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
@@ -1053,15 +1083,24 @@ export default function PropertyDetail() {
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Layers className="h-4 w-4 text-purple-500" />
-              Step 3: Property Documents
+              Step 3: Documents & Agreement
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {documents ? (
+            {documents || agreement ? (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
+                  <p className="text-xs text-muted-foreground">Property Agreement</p>
+                  {agreement?.agreementFile ? (
+                    <SecureFileLink url={agreement.agreementFile} label="View File" />
+                  ) : (
+                    <p className="text-sm font-medium text-amber-600">Pending</p>
+                  )}
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                   <p className="text-xs text-muted-foreground">Gewog Endorse Document</p>
-                  {documents.gewogCertification ? (
+                  {documents?.gewogCertification ? (
                     <SecureFileLink url={documents.gewogCertification} label="View" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
@@ -1072,7 +1111,7 @@ export default function PropertyDetail() {
                   <>
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">Internal Agreement</p>
-                      {documents.internalAgreement ? (
+                      {documents?.internalAgreement ? (
                         <SecureFileLink url={documents.internalAgreement} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
@@ -1080,7 +1119,7 @@ export default function PropertyDetail() {
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">Occupancy Certificate</p>
-                      {documents.occupancyCertificate ? (
+                      {documents?.occupancyCertificate ? (
                         <SecureFileLink url={documents.occupancyCertificate} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
@@ -1088,7 +1127,7 @@ export default function PropertyDetail() {
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
                       <p className="text-xs text-muted-foreground">PLR Verification</p>
-                      {documents.plrVerification ? (
+                      {documents?.plrVerification ? (
                         <SecureFileLink url={documents.plrVerification} label="View" />
                       ) : (
                         <p className="text-sm font-medium text-amber-600">Pending</p>
@@ -1098,8 +1137,8 @@ export default function PropertyDetail() {
                 )}
 
                 <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                  <p className="text-xs text-muted-foreground">Remaining Payment</p>
-                  {documents.remainingPaymentScreenshot ? (
+                  <p className="text-xs text-muted-foreground">Final Payment Screenshot</p>
+                  {documents?.remainingPaymentScreenshot ? (
                     <SecureFileLink url={documents.remainingPaymentScreenshot} label="View" icon="image" />
                   ) : (
                     <p className="text-sm font-medium text-amber-600">Pending</p>
@@ -1484,7 +1523,7 @@ export default function PropertyDetail() {
   );
 }
 
-function DetailItem({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
+function DetailItem({ icon: Icon, label, value, color }: { icon: LucideIcon; label: string; value: string; color: string }) {
   return (
     <div className="flex items-start gap-3">
       <div className={`mt-0.5 p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 ${color}`}>

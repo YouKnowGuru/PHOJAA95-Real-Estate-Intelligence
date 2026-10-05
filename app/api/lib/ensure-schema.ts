@@ -21,6 +21,7 @@ export async function ensureSchemaPatches(): Promise<void> {
     "ALTER TABLE `payroll` ADD COLUMN IF NOT EXISTS `deduction_notes` text",
     "ALTER TABLE `properties` ADD COLUMN IF NOT EXISTS `features` json",
     "ALTER TABLE `property_documents` ADD COLUMN IF NOT EXISTS `remaining_payment_amount` decimal(15,2)",
+    "ALTER TABLE `property_agreements` ADD COLUMN IF NOT EXISTS `total_amount_paid` decimal(15,2)",
     "ALTER TABLE `software_customers` ADD COLUMN IF NOT EXISTS `created_by` bigint unsigned",
     "ALTER TABLE `software_customers` ADD INDEX IF NOT EXISTS `idx_software_customers_created_by` (`created_by`)",
   ];
@@ -201,7 +202,6 @@ async function ensureDefaultAdminUser(db: ReturnType<typeof getDb>): Promise<voi
     });
 
     // Log to stderr (not logger) so it appears in server logs but not structured logging
-    // eslint-disable-next-line no-console
     console.error(
       "\n" +
       "╔══════════════════════════════════════════════════════════════════╗\n" +

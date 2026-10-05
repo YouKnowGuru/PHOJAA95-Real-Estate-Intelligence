@@ -12,6 +12,7 @@ interface AppleCardProps {
   children?: React.ReactNode;
 }
 
+/* Spotlight + lift on hover; --spot-x/--spot-y are tracked on the element itself. */
 function AppleCard({
   className,
   hover = true,
@@ -22,6 +23,16 @@ function AppleCard({
   children,
   ...props
 }: AppleCardProps) {
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = React.useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty("--spot-x", `${e.clientX - rect.left}px`);
+    el.style.setProperty("--spot-y", `${e.clientY - rect.top}px`);
+  }, []);
+
   const baseClasses = cn(
     "rounded-2xl border transition-all duration-300",
     glass
@@ -36,6 +47,8 @@ function AppleCard({
 
   return (
     <motion.div
+      ref={ref}
+      onMouseMove={hover ? handleMouseMove : undefined}
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
