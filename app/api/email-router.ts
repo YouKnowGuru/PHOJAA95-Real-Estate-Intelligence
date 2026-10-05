@@ -255,7 +255,7 @@ export const emailRouter = createRouter({
         propertyIds: z.array(z.number()).max(MAX_PROPERTIES).optional(),
         propertyId: z.number().nullable().optional(), // legacy single-property callers
         includeProperty: z.boolean().default(true),
-        sampleName: z.string().default("Pema Wangmo"),
+        sampleName: z.string().default("Valued Client"),
       }),
     )
     .mutation(async ({ input }) => {

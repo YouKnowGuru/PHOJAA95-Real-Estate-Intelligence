@@ -313,9 +313,20 @@ export default function EmailCampaigns() {
   const historyFailed = historyStats?.failed ?? historyRows.length - historySent;
   const historyTotal = historyStats?.total ?? historyRows.length;
 
+  // Preview renders exactly like a real send — greet the first selected
+  // recipient so the preview matches what that person will actually see.
+  const previewSampleName =
+    allClients.find((c) => c.id === selectedIds[0])?.fullName || "Valued Client";
+
   const openPreview = () => {
     previewMutation.mutate(
-      { subject, body, propertyIds, includeProperty: includeProperty && propertyIds.length > 0 },
+      {
+        subject,
+        body,
+        propertyIds,
+        includeProperty: includeProperty && propertyIds.length > 0,
+        sampleName: previewSampleName,
+      },
       { onSuccess: (res) => { setShowPreview(true); return res; } },
     );
   };
@@ -869,7 +880,8 @@ export default function EmailCampaigns() {
           <DialogHeader>
             <DialogTitle>Email Preview</DialogTitle>
             <DialogDescription>
-              Rendered exactly as recipients will receive it (sample recipient: Pema Wangmo).
+              Previewing as <span className="font-medium text-foreground">{previewSampleName}</span> — each
+              recipient sees their own name in the greeting.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-xl border border-border/60 overflow-hidden bg-slate-100 dark:bg-slate-900">
