@@ -152,7 +152,9 @@ function propertyCardHtml(property: EmailPropertyData, index = 0, total = 1): st
   if (property.typeName) meta.push(escapeHtml(property.typeName));
   if (property.year) meta.push(`Built ${property.year}`);
 
-  const detailUrl = `${env.appUrl.replace(/\/+$/, "")}/properties/${property.id}`;
+  // Public landing page — email recipients have no account, so the internal
+  // /properties/:id route (login-gated) would bounce them to the sign-in screen.
+  const detailUrl = `${env.appUrl.replace(/\/+$/, "")}/p/${property.id}`;
   const cta = `
       <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:18px auto 0 auto;border-collapse:separate;">
         <tr><td align="center" bgcolor="${BRAND}" style="background:${BRAND};border-radius:10px;">

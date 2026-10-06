@@ -427,35 +427,49 @@ export const propertyRouter = createRouter({
       assertRealEstateModuleAccess(ctx.unifiedUser!.role);
       const conditions = [];
 
-      // Fast property search: property name prioritized, then other fields
+      // Fast property search: property name prioritized, then other fields.
+      // Also supports invoice-number search: "INV-00012", "INV00012", or bare
+      // numeric strings like "12" / "00012" are matched against properties.id.
       const rawSearch = input.search?.trim();
       if (rawSearch) {
-        const searchTerms = rawSearch.split(/\s+/).filter(t => t.length > 0);
-        
-        const searchConditions = searchTerms.map((term) => {
-          const escaped = term.replace(/[%_]/g, "\\$&");
-          // Priority: property name gets prefix match (fastest with index), others get contains
-          return or(
-            like(properties.propertyName, `${escaped}%`),     // prefix match — fastest
-            like(properties.propertyName, `%${escaped}%`),    // contains — medium
-            like(properties.ownerName, `%${escaped}%`),
-            like(properties.ownerCID, `%${escaped}%`),
-            like(properties.ownerPhone, `%${escaped}%`),
-            like(properties.ownerAddress, `%${escaped}%`),
-            like(properties.buyerName, `%${escaped}%`),
-            like(properties.buyerCID, `%${escaped}%`),
-            like(properties.buyerPhone, `%${escaped}%`),
-            like(properties.buyerAddress, `%${escaped}%`),
-            like(properties.address, `%${escaped}%`),
-            like(properties.thramNumber, `%${escaped}%`),
-            like(properties.plotNumber, `%${escaped}%`)
-          );
-        });
-        if (searchConditions.length === 1) {
-          conditions.push(searchConditions[0]);
-        } else if (searchConditions.length > 1) {
-          // All terms must match (AND logic) — but each term can match any field
-          conditions.push(and(...searchConditions));
+        // ── Invoice-number shortcut ──────────────────────────────────────
+        // Invoice numbers are generated client-side as `INV-${id.padStart(5,"0")}`.
+        // Accept all common spellings a user might type:
+        //   INV-00012  |  INV00012  |  inv-12  |  00012  |  12
+        const invMatch = rawSearch.match(/^(?:INV[-\s]?)?0*(\d+)$/i);
+        const invoiceId = invMatch ? parseInt(invMatch[1], 10) : NaN;
+
+        if (!isNaN(invoiceId) && invoiceId > 0) {
+          // Direct primary-key lookup — instant, no full-text scan needed
+          conditions.push(eq(properties.id, invoiceId));
+        } else {
+          const searchTerms = rawSearch.split(/\s+/).filter(t => t.length > 0);
+
+          const searchConditions = searchTerms.map((term) => {
+            const escaped = term.replace(/[%_]/g, "\\$&");
+            // Priority: property name gets prefix match (fastest with index), others get contains
+            return or(
+              like(properties.propertyName, `${escaped}%`),     // prefix match — fastest
+              like(properties.propertyName, `%${escaped}%`),    // contains — medium
+              like(properties.ownerName, `%${escaped}%`),
+              like(properties.ownerCID, `%${escaped}%`),
+              like(properties.ownerPhone, `%${escaped}%`),
+              like(properties.ownerAddress, `%${escaped}%`),
+              like(properties.buyerName, `%${escaped}%`),
+              like(properties.buyerCID, `%${escaped}%`),
+              like(properties.buyerPhone, `%${escaped}%`),
+              like(properties.buyerAddress, `%${escaped}%`),
+              like(properties.address, `%${escaped}%`),
+              like(properties.thramNumber, `%${escaped}%`),
+              like(properties.plotNumber, `%${escaped}%`)
+            );
+          });
+          if (searchConditions.length === 1) {
+            conditions.push(searchConditions[0]);
+          } else if (searchConditions.length > 1) {
+            // All terms must match (AND logic) — but each term can match any field
+            conditions.push(and(...searchConditions));
+          }
         }
       }
 

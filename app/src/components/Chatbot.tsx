@@ -790,21 +790,103 @@ function MenuIcon(props: React.SVGProps<SVGSVGElement>) {
 export function ChatbotFAB() {
     const [open, setOpen] = useState(false);
 
+    // Draggable FAB state
+    const btnSize = 64; // px — matches md:h-16 md:w-16
+    const margin = 16;  // px — minimum gap from viewport edges
+
+    const getInitialPos = () => {
+        if (typeof window === "undefined") return { x: 0, y: 0 };
+        return {
+            x: window.innerWidth - btnSize - margin,
+            y: window.innerHeight - btnSize - margin - 24,
+        };
+    };
+
+    const [pos, setPos] = useState<{ x: number; y: number }>(getInitialPos);
+    const [isDragging, setIsDragging] = useState(false);
+    const dragStart = useRef<{ px: number; py: number; bx: number; by: number } | null>(null);
+    const hasDragged = useRef(false);
+    const btnRef = useRef<HTMLButtonElement>(null);
+
+    // Clamp position inside viewport
+    const clamp = useCallback((x: number, y: number) => {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        return {
+            x: Math.max(margin, Math.min(vw - btnSize - margin, x)),
+            y: Math.max(margin, Math.min(vh - btnSize - margin, y)),
+        };
+    }, []);
+
+    // Snap to nearest horizontal edge on release
+    const snapToEdge = useCallback((x: number, y: number) => {
+        const vw = window.innerWidth;
+        const midX = vw / 2;
+        const snappedX = x + btnSize / 2 < midX ? margin : vw - btnSize - margin;
+        return clamp(snappedX, y);
+    }, [clamp]);
+
+    const onPointerDown = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+        if (open) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragStart.current = { px: e.clientX, py: e.clientY, bx: pos.x, by: pos.y };
+        hasDragged.current = false;
+        setIsDragging(false);
+    }, [open, pos]);
+
+    const onPointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!dragStart.current) return;
+        const dx = e.clientX - dragStart.current.px;
+        const dy = e.clientY - dragStart.current.py;
+        if (!hasDragged.current && Math.sqrt(dx * dx + dy * dy) > 6) {
+            hasDragged.current = true;
+            setIsDragging(true);
+        }
+        if (hasDragged.current) {
+            setPos(clamp(dragStart.current.bx + dx, dragStart.current.by + dy));
+        }
+    }, [clamp]);
+
+    const onPointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!dragStart.current) return;
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        if (hasDragged.current) {
+            setPos((p) => snapToEdge(p.x, p.y));
+        } else {
+            setOpen(true);
+        }
+        dragStart.current = null;
+        hasDragged.current = false;
+        setIsDragging(false);
+    }, [snapToEdge]);
+
+    // Re-clamp when window resizes
+    useEffect(() => {
+        const handle = () => setPos((p) => clamp(p.x, p.y));
+        window.addEventListener("resize", handle);
+        return () => window.removeEventListener("resize", handle);
+    }, [clamp]);
+
     return (
         <>
-            {/* Floating Action Button */}
+            {/* Draggable Floating Action Button */}
             <motion.button
+                ref={btnRef}
                 initial={{ scale: 0, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                whileHover={{ scale: 1.08 }}
-                whileTap={{ scale: 0.92 }}
-                onClick={() => setOpen(true)}
+                whileHover={!isDragging ? { scale: 1.08 } : {}}
+                whileTap={!isDragging ? { scale: 0.92 } : {}}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                style={{ left: pos.x, top: pos.y, touchAction: "none" }}
                 className={cn(
-                    "fixed right-3 sm:right-6 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-50 flex items-center justify-center",
+                    "fixed z-50 flex items-center justify-center",
                     "h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16",
                     "rounded-2xl sm:rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700",
                     "text-white shadow-xl shadow-indigo-500/30 ring-4 ring-white/10",
-                    "transition-all duration-300 group overflow-hidden",
+                    "overflow-hidden select-none",
+                    isDragging ? "cursor-grabbing shadow-2xl scale-105 ring-white/25" : "cursor-grab transition-shadow duration-300",
                     open && "hidden",
                 )}
             >
@@ -814,7 +896,7 @@ export function ChatbotFAB() {
                     transition={{ repeat: Infinity, duration: 3, ease: "linear" }} 
                 />
                 <motion.div
-                    animate={{ rotate: [0, -8, 8, -8, 0] }}
+                    animate={!isDragging ? { rotate: [0, -8, 8, -8, 0] } : {}}
                     transition={{ repeat: Infinity, duration: 4, repeatDelay: 2 }}
                     className="relative z-10"
                 >
@@ -826,6 +908,13 @@ export function ChatbotFAB() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 sm:h-3.5 w-2.5 sm:w-3.5 bg-emerald-500 ring-2 ring-indigo-700"></span>
                 </span>
+
+                {/* Drag hint tooltip */}
+                {isDragging && (
+                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-black/70 px-2 py-1 text-[10px] text-white backdrop-blur-sm pointer-events-none">
+                        Drag to move
+                    </span>
+                )}
             </motion.button>
 
             <ChatbotPanel open={open} onOpenChange={setOpen} />

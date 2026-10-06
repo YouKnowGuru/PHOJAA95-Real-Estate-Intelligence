@@ -27,6 +27,7 @@ const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Billing = lazy(() => import("./pages/Billing"));
 const Clients = lazy(() => import("./pages/Clients"));
 const EmailCampaigns = lazy(() => import("./pages/EmailCampaigns"));
+const PublicProperty = lazy(() => import("./pages/PublicProperty"));
 const DocumentLibrary = lazy(() => import("./pages/DocumentLibrary"));
 
 // Software Development Module page
@@ -116,6 +117,8 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/reset-password" element={<LazyRoute><ResetPassword /></LazyRoute>} />
+      {/* Public property page for email campaign recipients (no auth). */}
+      <Route path="/p/:id" element={<LazyRoute><PublicProperty /></LazyRoute>} />
       <Route
         path="/"
         element={

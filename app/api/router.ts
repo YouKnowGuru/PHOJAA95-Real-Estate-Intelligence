@@ -37,6 +37,7 @@ import { architecturePortalRouter } from "./architecture-portal-router";
 import { workProgressRouter } from "./work-progress-router";
 import { clientRouter } from "./client-router";
 import { emailRouter } from "./email-router";
+import { publicPropertyRouter } from "./public-property-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -82,6 +83,7 @@ export const appRouter = createRouter({
   workProgress: workProgressRouter,
   clients: clientRouter,
   email: emailRouter,
+  publicProperty: publicPropertyRouter,
 });
 
 export type AppRouter = typeof appRouter;
