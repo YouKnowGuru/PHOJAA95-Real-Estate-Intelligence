@@ -187,14 +187,31 @@ export default function PropertyDetail() {
     onError: (err) => toast.error(err.message),
   });
 
-  const startEditDate = (field: "createdAt" | "completedAt", currentVal: Date | null | undefined) => {
+  const startEditDate = (field: "createdAt" | "completedAt", currentVal: Date | string | null | undefined) => {
     setEditingDate(field);
-    const d = currentVal ? new Date(currentVal) : new Date();
-    // Format as YYYY-MM-DD for the date input
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    setDateInputValue(`${yyyy}-${mm}-${dd}`);
+    let dateStr = "";
+    if (currentVal) {
+      // If already a YYYY-MM-DD string, use it directly (no Date construction → no timezone shift)
+      const strVal = String(currentVal);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) {
+        dateStr = strVal;
+      } else {
+        // ISO timestamp — convert to local YYYY-MM-DD using local date getters
+        const d = new Date(strVal);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        dateStr = `${yyyy}-${mm}-${dd}`;
+      }
+    } else {
+      // No existing date — default to today
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      dateStr = `${yyyy}-${mm}-${dd}`;
+    }
+    setDateInputValue(dateStr);
   };
 
   const saveDate = () => {

@@ -975,10 +975,22 @@ export const propertyRouter = createRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
       }
 
+      /**
+       * Parse a "YYYY-MM-DD" string as LOCAL noon so the stored UTC timestamp
+       * always resolves to the correct calendar date regardless of server timezone.
+       * Using bare new Date("YYYY-MM-DD") parses as UTC midnight and can shift
+       * the visible date by ±1 day depending on timezone offset.
+       */
+      const parseDateLocal = (dateStr: string): Date => {
+        const [year, month, day] = dateStr.split("-").map(Number);
+        // Construct as local noon (hour=12) to stay safely within the calendar day
+        return new Date(year!, month! - 1, day!, 12, 0, 0, 0);
+      };
+
       const updateData: Record<string, Date | null | undefined> = {};
 
       if (createdAt !== undefined) {
-        const d = new Date(createdAt);
+        const d = parseDateLocal(createdAt);
         if (isNaN(d.getTime())) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid Listed On date" });
         updateData.createdAt = d;
       }
@@ -987,7 +999,7 @@ export const propertyRouter = createRouter({
         if (completedAt === null || completedAt === "") {
           updateData.completedAt = null;
         } else {
-          const d = new Date(completedAt);
+          const d = parseDateLocal(completedAt);
           if (isNaN(d.getTime())) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid Sold On date" });
           updateData.completedAt = d;
         }
