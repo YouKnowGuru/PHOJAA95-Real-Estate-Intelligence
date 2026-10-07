@@ -181,7 +181,7 @@ export default function PropertyWizard() {
   useEffect(() => {
     if (!existingProperty || hasHydrated.current) return;
     hasHydrated.current = true;
-    
+
     const p = existingProperty.property;
     if (p) {
 
@@ -297,12 +297,12 @@ export default function PropertyWizard() {
   // Sync currentStep with actual property state when data loads
   useEffect(() => {
     if (!existingProperty?.property) return;
-    
+
     const actualStep = existingProperty.property.currentStep;
     const isRejected = existingProperty.property.approvalStatus === "rejected";
     const stepParam = searchParams.get("step");
     const urlStep = stepParam ? parseInt(stepParam, 10) : 1;
-    
+
     // If URL step is ahead of actual step and not rejected, clamp to actual step
     if (!isAdmin && urlStep > actualStep && !(isRejected && existingProperty.property.currentStep === urlStep)) {
       setCurrentStep(actualStep);
@@ -465,15 +465,15 @@ export default function PropertyWizard() {
       sellingPrice = parseFloat(step1Data.sellingPrice);
     }
 
-    const finalPrice = Math.max(0, sellingPrice);
-    const commission = finalPrice * 0.03;
+    const commission = sellingPrice * 0.03;
 
     return {
       sellingPrice: sellingPrice.toFixed(2),
-      finalSellingPrice: finalPrice.toFixed(2),
+      finalSellingPrice: sellingPrice.toFixed(2),
       realEstateFee: commission.toFixed(2),
     };
   };
+
 
   const buildStep1Payload = () => {
     const pricing = calculatePricing();
@@ -1081,9 +1081,9 @@ export default function PropertyWizard() {
 
             <div className="flex flex-col-reverse sm:flex-row justify-end gap-3">
               {propertyId && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   disabled={updateMutation.isPending}
                   onClick={async () => {
                     try {
@@ -1689,7 +1689,7 @@ export default function PropertyWizard() {
           const isActive = step.id === currentStep;
           const isCompleted = step.id < currentStep;
           const isRejected = existingProperty?.property?.approvalStatus === "rejected" && existingProperty?.property?.currentStep === step.id;
-          
+
           // Allow navigation to: current step, completed steps, or rejected step
           const isAccessible = isAdmin || step.id <= (existingProperty?.property?.currentStep || 1) || isRejected;
 
@@ -1705,17 +1705,16 @@ export default function PropertyWizard() {
                     navigate(`${basePath}?step=${step.id}`, { replace: true });
                   }
                 }}
-                className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ring-1 ring-inset ${
-                  isActive
+                className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 px-2 sm:px-3 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ring-1 ring-inset ${isActive
                     ? "bg-primary/10 text-primary ring-primary/25 dark:bg-primary/20 dark:text-primary-foreground"
                     : isRejected
-                    ? "bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/50 animate-pulse"
-                    : isCompleted
-                    ? "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 hover:bg-primary/5 dark:hover:bg-primary/10"
-                    : isAccessible
-                    ? "text-muted-foreground ring-border/60 hover:bg-slate-50 dark:hover:bg-slate-800"
-                    : "text-muted-foreground ring-border/40 opacity-50 cursor-not-allowed"
-                }`}
+                      ? "bg-red-100 text-red-700 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800/50 animate-pulse"
+                      : isCompleted
+                        ? "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700 hover:bg-primary/5 dark:hover:bg-primary/10"
+                        : isAccessible
+                          ? "text-muted-foreground ring-border/60 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          : "text-muted-foreground ring-border/40 opacity-50 cursor-not-allowed"
+                  }`}
               >
                 <step.icon className="h-3.5 w-3.5 shrink-0" />
                 <span className="hidden sm:block truncate min-w-0">{step.label}</span>
@@ -1886,3 +1885,4 @@ function PricingSummaryCard({
     </motion.div>
   );
 }
+

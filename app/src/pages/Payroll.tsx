@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, CheckCircle2, FileText, Trash2, Eye, Wallet, PiggyBank, Banknote, AlertCircle, PackageOpen, Search, Users, BarChart3 } from "lucide-react";
+import { Plus, CheckCircle2, FileText, Trash2, Eye, Wallet, PiggyBank, Banknote, AlertCircle, PackageOpen, Search, Users, BarChart3, Download } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { PayslipModal } from "@/components/PayrollTable";
@@ -34,6 +34,7 @@ export default function PayrollPage() {
   const [viewMode, setViewMode] = useState<"entries" | "staff-totals">("entries");
   const [staffTotalsSearch, setStaffTotalsSearch] = useState("");
   const [staffTotalsTeam, setStaffTotalsTeam] = useState<"all" | "staff" | "architecture_staff" | "developer">("all");
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -137,6 +138,224 @@ export default function PayrollPage() {
 
   const { data: branding } = trpc.settings.getPublicSettings.useQuery();
   const { data: dbMonths } = trpc.payroll.distinctMonths.useQuery();
+
+  const exportQuery = trpc.payroll.exportPayroll.useQuery(
+    {
+      month: selectedMonth === "all" ? undefined : selectedMonth,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      role: teamFilter === "all" ? undefined : teamFilter,
+      search: debouncedSearch || undefined,
+    },
+    { enabled: false } // only fetch on demand
+  );
+
+  const { formatStaffRoleLabel: fmtRole } = { formatStaffRoleLabel };
+
+  const generatePayrollReportPDF = async () => {
+    setIsExporting(true);
+    try {
+      const result = await exportQuery.refetch();
+      const rows = result.data || [];
+      if (rows.length === 0) {
+        toast.error("No payroll data to export for the selected filters.");
+        return;
+      }
+
+      const doc = new jsPDF({ orientation: "landscape" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const siteName = branding?.site_name || "PHOJAA95";
+      const siteLogo = branding?.site_logo;
+
+      const primary: [number, number, number] = [16, 185, 129];
+      const dark: [number, number, number] = [15, 23, 42];
+      const white: [number, number, number] = [255, 255, 255];
+      const gray: [number, number, number] = [100, 116, 139];
+      const lightGray: [number, number, number] = [241, 245, 249];
+
+      // Header band
+      doc.setFillColor(...dark);
+      doc.rect(0, 0, pageWidth, 36, "F");
+      doc.setFillColor(...primary);
+      doc.rect(0, 0, pageWidth, 4, "F");
+
+      let logoX = 14;
+      if (siteLogo) {
+        try {
+          const img = new Image();
+          img.src = siteLogo;
+          await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; setTimeout(resolve, 2000); });
+          doc.addImage(img, "PNG", 14, 8, 20, 20, undefined, "FAST");
+          logoX = 38;
+        } catch { /* skip */ }
+      }
+
+      doc.setFontSize(16);
+      doc.setTextColor(...white);
+      doc.setFont("helvetica", "bold");
+      doc.text(siteName.toUpperCase(), logoX, 18);
+      doc.setFontSize(9);
+      doc.setTextColor(...primary);
+      doc.setFont("helvetica", "normal");
+      doc.text("PAYROLL REPORT", logoX, 26);
+
+      // Filter label top-right
+      const filterLabel = [
+        selectedMonth !== "all" ? `Month: ${selectedMonth}` : "All Months",
+        statusFilter !== "all" ? statusFilter.toUpperCase() : "All Statuses",
+        teamFilter !== "all" ? fmtRole(teamFilter) : "All Teams",
+      ].join(" · ");
+      doc.setFontSize(7.5);
+      doc.setTextColor(...gray);
+      doc.text(filterLabel, pageWidth - 14, 14, { align: "right" });
+      doc.setFontSize(7.5);
+      doc.text(`Generated: ${new Date().toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}`, pageWidth - 14, 22, { align: "right" });
+
+      // Totals summary
+      const totalBase = rows.reduce((s, r) => s + parseFloat(r.baseSalary || "0"), 0);
+      const totalBonus = rows.reduce((s, r) => s + parseFloat(r.bonus || "0"), 0);
+      const totalDed = rows.reduce((s, r) => s + parseFloat(r.deduction || "0"), 0);
+      const totalPF = rows.reduce((s, r) => s + parseFloat(r.pfDeduction || "0"), 0);
+      const totalNet = rows.reduce((s, r) => s + parseFloat(r.netSalary || "0"), 0);
+      const paidCount = rows.filter((r) => r.paymentStatus === "paid").length;
+      const pendingCount = rows.filter((r) => r.paymentStatus === "pending").length;
+
+      const summaryY = 44;
+      const cols = [
+        { label: "Entries", value: rows.length.toString() },
+        { label: "Paid", value: paidCount.toString() },
+        { label: "Pending", value: pendingCount.toString() },
+        { label: "Total Base", value: `Nu. ${totalBase.toLocaleString("en-IN")}` },
+        { label: "Total Bonus", value: `Nu. ${totalBonus.toLocaleString("en-IN")}` },
+        { label: "Total Deductions", value: `Nu. ${(totalDed + totalPF).toLocaleString("en-IN")}` },
+        { label: "Total Net Payable", value: `Nu. ${totalNet.toLocaleString("en-IN")}` },
+      ];
+      const colW = (pageWidth - 28) / cols.length;
+      cols.forEach((col, idx) => {
+        const x = 14 + idx * colW;
+        doc.setFillColor(...(idx === cols.length - 1 ? primary : lightGray));
+        doc.roundedRect(x, summaryY, colW - 2, 22, 2, 2, "F");
+        doc.setFontSize(7);
+        doc.setTextColor(...gray);
+        doc.setFont("helvetica", "normal");
+        doc.text(col.label.toUpperCase(), x + (colW - 2) / 2, summaryY + 7, { align: "center" });
+        doc.setFontSize(idx === cols.length - 1 ? 9 : 8);
+        doc.setTextColor(...(idx === cols.length - 1 ? dark : dark));
+        doc.setFont("helvetica", "bold");
+        doc.text(col.value, x + (colW - 2) / 2, summaryY + 16, { align: "center" });
+      });
+
+      autoTable(doc, {
+        startY: summaryY + 30,
+        margin: { left: 14, right: 14 },
+        head: [["#", "Staff", "Employee ID", "PF No.", "Team", "Month", "Base (Nu.)", "Bonus", "Ded.", "PF Ded.", "Net (Nu.)", "Status", "Paid Date"]],
+        body: rows.map((r, idx) => [
+          (idx + 1).toString(),
+          r.userName || "-",
+          r.employeeId || "-",
+          r.pfNumber || "-",
+          r.userRole ? fmtRole(r.userRole as string) : "-",
+          r.month,
+          parseFloat(r.baseSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+          `+${parseFloat(r.bonus || "0").toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          `-${parseFloat(r.deduction || "0").toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          `-${parseFloat(r.pfDeduction || "0").toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          parseFloat(r.netSalary).toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+          r.paymentStatus?.toUpperCase() || "PENDING",
+          r.paidAt ? new Date(r.paidAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "-",
+        ]),
+        foot: [["", "GRAND TOTAL", "", "", "", "",
+          totalBase.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+          `+${totalBonus.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          `-${totalDed.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          `-${totalPF.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+          totalNet.toLocaleString("en-IN", { minimumFractionDigits: 2 }),
+          "", ""
+        ]],
+        theme: "grid",
+        headStyles: { fillColor: dark, textColor: white, fontSize: 7, fontStyle: "bold" },
+        footStyles: { fillColor: primary, textColor: dark, fontStyle: "bold", fontSize: 7.5 },
+        columnStyles: {
+          0: { cellWidth: 8, halign: "center" },
+          6: { halign: "right" },
+          7: { halign: "right" },
+          8: { halign: "right" },
+          9: { halign: "right" },
+          10: { halign: "right", fontStyle: "bold" },
+          11: { halign: "center", cellWidth: 18 },
+          12: { halign: "center" },
+        },
+        styles: { fontSize: 7, cellPadding: 2.5, lineColor: lightGray, lineWidth: 0.2 },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+      });
+
+      // Footer
+      doc.setFillColor(...primary);
+      doc.rect(0, pageHeight - 4, pageWidth, 4, "F");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...gray);
+      doc.setFont("helvetica", "italic");
+      doc.text(`This is a system-generated report by ${siteName}. Confidential.`, pageWidth / 2, pageHeight - 7, { align: "center" });
+
+      const fileLabel = selectedMonth !== "all" ? selectedMonth : "All";
+      doc.save(`Payroll_Report_${fileLabel}.pdf`);
+      toast.success("Payroll report exported as PDF!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export payroll report.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const result = await exportQuery.refetch();
+      const rows = result.data || [];
+      if (rows.length === 0) {
+        toast.error("No payroll data to export for the selected filters.");
+        return;
+      }
+      const headers = ["#", "Staff", "Employee ID", "PF Number", "Team", "Month", "Base Salary", "Bonus", "Deduction", "PF Deduction", "Net Salary", "Status", "Paid Date", "Notes", "Deduction Notes"];
+      const csvRows = rows.map((r, idx) => [
+        idx + 1,
+        r.userName || "",
+        r.employeeId || "",
+        r.pfNumber || "",
+        r.userRole ? fmtRole(r.userRole as string) : "",
+        r.month,
+        parseFloat(r.baseSalary).toFixed(2),
+        parseFloat(r.bonus || "0").toFixed(2),
+        parseFloat(r.deduction || "0").toFixed(2),
+        parseFloat(r.pfDeduction || "0").toFixed(2),
+        parseFloat(r.netSalary).toFixed(2),
+        r.paymentStatus || "",
+        r.paidAt ? new Date(r.paidAt).toLocaleDateString("en-IN") : "",
+        r.notes || "",
+        r.deductionNotes || "",
+      ]);
+      const escape = (v: unknown) => {
+        const s = String(v ?? "");
+        return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+      };
+      const csv = [headers, ...csvRows].map((row) => row.map(escape).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const fileLabel = selectedMonth !== "all" ? selectedMonth : "All";
+      a.download = `Payroll_${fileLabel}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Payroll exported as CSV!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to export CSV.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const monthOptions = useMemo(() => {
     const set = new Set<string>();
@@ -393,6 +612,28 @@ export default function PayrollPage() {
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
+            {isAdmin && (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={exportCSV}
+                  disabled={isExporting}
+                  className="h-10 sm:h-9 rounded-xl border border-border/40 bg-background/50 w-full sm:w-auto shrink-0 text-xs gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  CSV
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={generatePayrollReportPDF}
+                  disabled={isExporting}
+                  className="h-10 sm:h-9 rounded-xl border border-border/40 bg-background/50 w-full sm:w-auto shrink-0 text-xs gap-1.5"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  {isExporting ? "Exporting..." : "Export PDF"}
+                </Button>
+              </>
+            )}
             {isAdmin && viewMode === "entries" && (
               <Button onClick={() => setShowAdd(true)} className="h-10 sm:h-9 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm rounded-xl w-full sm:w-auto shrink-0">
                 <Plus className="mr-2 h-4 w-4" />

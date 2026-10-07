@@ -361,7 +361,7 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
     <div class="totals">
       <div class="total-row">
         <span>Total Selling Price</span>
-        <span>${fmtPlain(item.sellingPrice)}</span>
+        <span>${fmtPlain(effectivePrice)}</span>
       </div>
       <div class="total-row">
         <span>Amount Received</span>
@@ -373,7 +373,7 @@ function buildInvoiceHtml(item: BillingItem, branding: { siteName: string; siteL
       </div>
       <div class="total-row highlight">
         <span>TOTAL PAYABLE</span>
-        <span>${fmtPlain(item.sellingPrice)}</span>
+        <span>${fmtPlain(effectivePrice)}</span>
       </div>
       <div class="total-row commission">
         <span>Commission (3%)</span>
@@ -586,10 +586,10 @@ function buildInvoicePdf(
   doc.rect(tX, sectionY, halfW, boxH2, "S");
 
   const rows: Array<{ label: string; value: string; color?: [number, number, number]; bold?: boolean }> = [
-    { label: "Total Selling Price", value: fmtPlain(item.sellingPrice) },
+    { label: "Total Selling Price", value: fmtPlain(effectivePrice) },
     { label: "Amount Received", value: fmtPlain(String(totalPaid)), color: C.green },
     { label: "Balance Due", value: fmtPlain(String(balanceDue)), color: balanceDue > 0 ? C.amber : C.green },
-    { label: "TOTAL PAYABLE", value: fmtPlain(item.sellingPrice), bold: true },
+    { label: "TOTAL PAYABLE", value: fmtPlain(effectivePrice), bold: true },
     { label: "Commission (3%)", value: `-${fmtPlain(commission)}`, color: C.primary },
     { label: "Net to Seller", value: fmtPlain(String(Math.max(0, effectivePrice - commission))), color: C.primary, bold: true },
   ];
@@ -791,7 +791,7 @@ function CompactInvoiceCard({ item, branding }: { item: BillingItem; branding: {
         <div className="grid grid-cols-2 gap-2 mb-4">
           <div className="rounded-lg bg-muted/40 px-3 py-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mb-0.5">Selling Price</p>
-            <p className="text-sm font-bold text-foreground">{fmt(item.sellingPrice)}</p>
+            <p className="text-sm font-bold text-foreground">{fmt(item.finalSellingPrice ?? item.sellingPrice)}</p>
           </div>
           <div className="rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/40 dark:border-emerald-800/30 px-3 py-2">
             <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-0.5">Total Paid</p>

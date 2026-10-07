@@ -51,6 +51,8 @@ import {
   SlidersHorizontal,
   X,
   Mail,
+  Calendar,
+  CalendarCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { STEP_LABELS } from "@/constants/workflow";
@@ -444,6 +446,26 @@ function PropertyCard({ property, index, isAdmin, onDelete }: {
                 <span className="text-border mx-0.5">·</span>
                 <Shield className="h-2.5 w-2.5 shrink-0" />
                 <span className="truncate">{property.ownerCID}</span>
+              </div>
+
+              {/* Dates */}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <Calendar className="h-2.5 w-2.5 shrink-0" />
+                  <span>
+                    {property.createdAt
+                      ? new Date(property.createdAt).toLocaleDateString("en-BT", { year: "numeric", month: "short", day: "numeric" })
+                      : "—"}
+                  </span>
+                </div>
+                {property.isSold && property.completedAt && (
+                  <div className="flex items-center gap-1 text-[10px] text-red-500 font-semibold">
+                    <CalendarCheck className="h-2.5 w-2.5 shrink-0" />
+                    <span>
+                      Sold {new Date(property.completedAt).toLocaleDateString("en-BT", { year: "numeric", month: "short", day: "numeric" })}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Price + Commission footer */}

@@ -381,4 +381,62 @@ export const payrollRouter = createRouter({
 
       return rows;
     }),
+
+  exportPayroll: adminQuery
+    .input(
+      z.object({
+        month: z.string().optional(),
+        status: z.enum(["pending", "paid", "all"]).optional(),
+        role: z.enum(["staff", "developer", "architecture_staff"]).optional(),
+        search: z.string().optional(),
+      }).optional().default({})
+    )
+    .query(async ({ input }) => {
+      const db = getDb();
+      const conditions = [];
+
+      if (input?.month && input.month !== "all") conditions.push(eq(payroll.month, input.month));
+      if (input?.status && input.status !== "all") conditions.push(eq(payroll.paymentStatus, input.status));
+      if (input?.role) conditions.push(eq(localUsers.role, input.role));
+      if (input?.search?.trim()) {
+        const q = `%${input.search.trim().replace(/[%_]/g, "\\$&")}%`;
+        conditions.push(
+          or(
+            like(localUsers.fullName, q),
+            like(localUsers.employeeId, q),
+            like(localUsers.pfNumber, q),
+            like(localUsers.email, q)
+          )
+        );
+      }
+
+      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+      return db
+        .select({
+          id: payroll.id,
+          userId: payroll.userId,
+          month: payroll.month,
+          baseSalary: payroll.baseSalary,
+          bonus: payroll.bonus,
+          deduction: payroll.deduction,
+          pfDeduction: payroll.pfDeduction,
+          pfPercentage: payroll.pfPercentage,
+          netSalary: payroll.netSalary,
+          paymentStatus: payroll.paymentStatus,
+          paidAt: payroll.paidAt,
+          notes: payroll.notes,
+          deductionNotes: payroll.deductionNotes,
+          createdAt: payroll.createdAt,
+          userName: localUsers.fullName,
+          userEmail: localUsers.email,
+          userRole: localUsers.role,
+          pfNumber: localUsers.pfNumber,
+          employeeId: localUsers.employeeId,
+        })
+        .from(payroll)
+        .leftJoin(localUsers, eq(payroll.userId, localUsers.id))
+        .where(whereClause)
+        .orderBy(desc(payroll.month), desc(payroll.paidAt), desc(payroll.createdAt));
+    }),
 });

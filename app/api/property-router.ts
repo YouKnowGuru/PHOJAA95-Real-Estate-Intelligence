@@ -726,7 +726,7 @@ export const propertyRouter = createRouter({
 
       // Calculate new pricing values (falling back to existing if omitted)
       const newPricePerDecimal = data.pricePerDecimal !== undefined
-        ? parseDecimalUpd(data.pricePerDecimal, 2)
+        ? parseDecimalUpd(data.pricePerDecimal, 4)  // scale=4 matches create path
         : oldProp.pricePerDecimal;
 
       const newLandSizeDecimal = data.landSizeDecimal !== undefined
@@ -763,7 +763,11 @@ export const propertyRouter = createRouter({
 
       let realEstateFeeNum: string = data.realEstateFee ?? oldProp.realEstateFee ?? "0";
       if (isLand) {
+        // Land: commission always 3% of the final (discounted) price
         realEstateFeeNum = (parseFloat(finalSellingPriceNum) * 0.03).toFixed(2);
+      } else if (data.sellingPrice !== undefined) {
+        // Non-land: recalculate from new selling price when it changed
+        realEstateFeeNum = (parseFloat(sellingPriceNum) * 0.03).toFixed(2);
       }
 
       // Update data with computed values
@@ -933,6 +937,55 @@ export const propertyRouter = createRouter({
 
         return { success: true };
       });
+    }),
+
+  updateDates: adminQuery
+    .input(
+      z.object({
+        id: z.number(),
+        createdAt: z.string().optional(), // ISO date string "YYYY-MM-DD"
+        completedAt: z.string().optional().nullable(), // ISO date string or null to clear
+      })
+    )
+    .mutation(async ({ input }) => {
+      const { id, createdAt, completedAt } = input;
+      const db = getDb();
+
+      const existing = await db
+        .select({ id: properties.id })
+        .from(properties)
+        .where(eq(properties.id, id))
+        .limit(1);
+
+      if (existing.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Property not found" });
+      }
+
+      const updateData: Record<string, Date | null | undefined> = {};
+
+      if (createdAt !== undefined) {
+        const d = new Date(createdAt);
+        if (isNaN(d.getTime())) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid Listed On date" });
+        updateData.createdAt = d;
+      }
+
+      if (completedAt !== undefined) {
+        if (completedAt === null || completedAt === "") {
+          updateData.completedAt = null;
+        } else {
+          const d = new Date(completedAt);
+          if (isNaN(d.getTime())) throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid Sold On date" });
+          updateData.completedAt = d;
+        }
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return { success: true };
+      }
+
+      await db.update(properties).set(updateData).where(eq(properties.id, id));
+
+      return { success: true };
     }),
 
   delete: adminQuery

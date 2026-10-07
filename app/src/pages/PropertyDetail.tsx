@@ -40,6 +40,11 @@ import {
   ClipboardList,
   Save,
   Mail,
+  Calendar,
+  CalendarCheck,
+  Pencil,
+  Check,
+  X as XIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { WORKFLOW_STEPS } from "@/constants/workflow";
@@ -78,6 +83,9 @@ export default function PropertyDetail() {
   const [adminNotes, setAdminNotes] = useState("");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const notesInitialized = useRef(false);
+  // Date editing
+  const [editingDate, setEditingDate] = useState<"createdAt" | "completedAt" | null>(null);
+  const [dateInputValue, setDateInputValue] = useState("");
 
   useEffect(() => {
     if (data?.property?.adminNotes !== undefined && !notesInitialized.current) {
@@ -169,6 +177,34 @@ export default function PropertyDetail() {
     onError: (err) => toast.error(err.message),
   });
 
+  const updateDatesMutation = trpc.property.updateDates.useMutation({
+    onSuccess: () => {
+      toast.success("Date updated successfully");
+      setEditingDate(null);
+      utils.property.getFullWorkflow.invalidate({ id: propertyId });
+      utils.property.list.invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const startEditDate = (field: "createdAt" | "completedAt", currentVal: Date | null | undefined) => {
+    setEditingDate(field);
+    const d = currentVal ? new Date(currentVal) : new Date();
+    // Format as YYYY-MM-DD for the date input
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    setDateInputValue(`${yyyy}-${mm}-${dd}`);
+  };
+
+  const saveDate = () => {
+    if (!editingDate || !dateInputValue) return;
+    updateDatesMutation.mutate({
+      id: propertyId,
+      [editingDate]: dateInputValue,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -212,7 +248,7 @@ export default function PropertyDetail() {
   const balanceDue = Math.max(0, effectivePrice - totalAmountPaid);
 
   const canApprove = isAdmin && (property.approvalStatus === "pending_review" || property.approvalStatus === "submitted");
-  const canEdit = property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
+  const canEdit = !property.isSold && property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
 
   // Staff and admin can proceed to next step if current step is approved and not yet completed
   const canProceedToNextStep = property.approvalStatus === "approved" && property.currentStep <= 5 && property.workflowStatus !== "completed";
@@ -957,6 +993,109 @@ export default function PropertyDetail() {
                 </div>
               );
             })()}
+
+            {/* Listing Dates */}
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Listing Dates</h4>
+
+              {/* Listed On */}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground text-xs">Listed On:</span>
+                {editingDate === "createdAt" ? (
+                  <>
+                    <input
+                      type="date"
+                      value={dateInputValue}
+                      onChange={(e) => setDateInputValue(e.target.value)}
+                      className="text-xs border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <button
+                      onClick={saveDate}
+                      disabled={updateDatesMutation.isPending}
+                      className="text-primary hover:text-primary/80 disabled:opacity-50"
+                      title="Save"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setEditingDate(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Cancel"
+                    >
+                      <XIcon className="h-3.5 w-3.5" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs font-semibold">
+                      {property.createdAt
+                        ? new Date(property.createdAt).toLocaleDateString("en-BT", { year: "numeric", month: "short", day: "numeric" })
+                        : "—"}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => startEditDate("createdAt", property.createdAt)}
+                        className="text-muted-foreground hover:text-primary transition-colors"
+                        title="Edit Listed On date"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Sold On */}
+              {property.isSold && (
+                <div className="flex items-center gap-2">
+                  <CalendarCheck className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                  <span className="text-muted-foreground text-xs">Sold On:</span>
+                  {editingDate === "completedAt" ? (
+                    <>
+                      <input
+                        type="date"
+                        value={dateInputValue}
+                        onChange={(e) => setDateInputValue(e.target.value)}
+                        className="text-xs border border-border rounded px-1.5 py-0.5 bg-background focus:outline-none focus:ring-1 focus:ring-red-400"
+                      />
+                      <button
+                        onClick={saveDate}
+                        disabled={updateDatesMutation.isPending}
+                        className="text-primary hover:text-primary/80 disabled:opacity-50"
+                        title="Save"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setEditingDate(null)}
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Cancel"
+                      >
+                        <XIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs font-semibold text-red-600 dark:text-red-400">
+                        {property.completedAt
+                          ? new Date(property.completedAt).toLocaleDateString("en-BT", { year: "numeric", month: "short", day: "numeric" })
+                          : "—"}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          onClick={() => startEditDate("completedAt", property.completedAt)}
+                          className="text-muted-foreground hover:text-red-500 transition-colors"
+                          title="Edit Sold On date"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
