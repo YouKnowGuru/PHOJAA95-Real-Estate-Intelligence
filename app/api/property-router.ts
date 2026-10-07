@@ -416,8 +416,9 @@ export const propertyRouter = createRouter({
         propertyTypeId: z.number().optional(),
         listedById: z.number().optional(),
         step: z.number().optional(),
-        dateFrom: z.string().optional(),
-        dateTo: z.string().optional(),
+        dateType: z.enum(["createdAt", "completedAt"]).optional(), // "createdAt" = listing date, "completedAt" = sold date
+        dateFrom: z.string().optional(), // ISO date string YYYY-MM-DD
+        dateTo: z.string().optional(),   // ISO date string YYYY-MM-DD
         page: z.number().min(1).optional(),
         limit: z.number().min(1).optional(),
       }).optional().default({})
@@ -477,6 +478,19 @@ export const propertyRouter = createRouter({
       if (input.workflowStatus) conditions.push(eq(properties.workflowStatus, input.workflowStatus));
       if (input.propertyTypeId) conditions.push(eq(properties.propertyTypeId, input.propertyTypeId));
       if (input.step) conditions.push(eq(properties.currentStep, input.step));
+
+      // ── Date range filter ─────────────────────────────────────────────────
+      const dateCol = input.dateType === "completedAt" ? properties.completedAt : properties.createdAt;
+      if (input.dateFrom) {
+        const from = new Date(input.dateFrom);
+        from.setHours(0, 0, 0, 0);
+        if (!isNaN(from.getTime())) conditions.push(sql`${dateCol} >= ${from}`);
+      }
+      if (input.dateTo) {
+        const to = new Date(input.dateTo);
+        to.setHours(23, 59, 59, 999);
+        if (!isNaN(to.getTime())) conditions.push(sql`${dateCol} <= ${to}`);
+      }
 
       if (ctx.unifiedUser!.role === "staff") {
         // Staff can view ALL properties (not just their own listings)

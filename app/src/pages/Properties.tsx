@@ -81,6 +81,9 @@ export default function Properties() {
   const [deleteName, setDeleteName] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [dateType, setDateType] = useState<"createdAt" | "completedAt">("createdAt");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -96,6 +99,9 @@ export default function Properties() {
     status: status === "all" ? undefined : status || undefined,
     step: step && step !== "all" ? parseInt(step) : undefined,
     propertyTypeId: propertyTypeId && propertyTypeId !== "all" ? parseInt(propertyTypeId) : undefined,
+    dateType: (dateFrom || dateTo) ? dateType : undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
   });
 
   const { data: propertyTypes } = trpc.propertyType.list.useQuery();
@@ -132,9 +138,12 @@ export default function Properties() {
     setStatus("all");
     setStep("all");
     setPropertyTypeId("all");
+    setDateType("createdAt");
+    setDateFrom("");
+    setDateTo("");
   };
 
-  const hasActiveFilters = search !== "" || status !== "all" || step !== "all" || propertyTypeId !== "all";
+  const hasActiveFilters = search !== "" || status !== "all" || step !== "all" || propertyTypeId !== "all" || dateFrom !== "" || dateTo !== "";
 
   const filterContent = (
     <>
@@ -181,6 +190,36 @@ export default function Properties() {
           ))}
         </SelectContent>
       </Select>
+
+      {/* Date range filter */}
+      <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+        <Select value={dateType} onValueChange={(v) => setDateType(v as typeof dateType)}>
+          <SelectTrigger className="h-9 w-full sm:w-[150px] text-xs">
+            <Calendar className="mr-1.5 h-3 w-3" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="createdAt">Created Date</SelectItem>
+            <SelectItem value="completedAt">Sold Date</SelectItem>
+          </SelectContent>
+        </Select>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-[130px]"
+          title="From date"
+        />
+        <span className="text-xs text-muted-foreground hidden sm:block">–</span>
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="h-9 rounded-md border border-input bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring w-full sm:w-[130px]"
+          title="To date"
+        />
+      </div>
+
       {hasActiveFilters && (
         <Button
           variant="ghost"
