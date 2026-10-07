@@ -248,7 +248,10 @@ export default function PropertyDetail() {
   const balanceDue = Math.max(0, effectivePrice - totalAmountPaid);
 
   const canApprove = isAdmin && (property.approvalStatus === "pending_review" || property.approvalStatus === "submitted");
-  const canEdit = !property.isSold && property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
+  // Admins can always edit; non-admins cannot edit sold/completed/approved properties
+  const canEdit = isAdmin
+    ? property.approvalStatus !== "completed" && property.approvalStatus !== "approved"
+    : !property.isSold && property.approvalStatus !== "completed" && property.approvalStatus !== "approved";
 
   // Staff and admin can proceed to next step if current step is approved and not yet completed
   const canProceedToNextStep = property.approvalStatus === "approved" && property.currentStep <= 5 && property.workflowStatus !== "completed";
